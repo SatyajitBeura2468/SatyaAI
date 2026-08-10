@@ -4,6 +4,7 @@ import { Archive, ArrowUp, Bot, ChevronDown, FileText, Library, Menu, Mic, Plus,
 import './styles.css';
 import './layout-fixes.css';
 import './motion.css';
+import './premium-polish.css';
 import { hasWebGPU, localWebLLM, openAICompatible, type ProviderSettings } from './ai/providers';
 
 type Mode = 'fast' | 'smart' | 'deep';
