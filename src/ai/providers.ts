@@ -48,8 +48,18 @@ export async function localWebLLM(mode: SatyaMode, prompt: string, onProgress?: 
   }
   if (!hasWebGPU()) throw new Error('WebGPU is unavailable in this browser. Configure an Ollama or OpenAI-compatible endpoint instead.');
   const webllm = await import('@mlc-ai/web-llm');
-  const model = MODE_CONFIG[mode].model;
-  const engine = await webllm.CreateMLCEngine(model, { initProgressCallback: (p) => onProgress?.(p.text) });
-  const result = await engine.chat.completions.create({ messages: [{ role: 'system', content: 'You are SatyaAI, a concise and honest assistant. Say when you are uncertain.' }, { role: 'user', content: prompt }], stream: false });
-  return result.choices[0]?.message.content || 'The local model returned an empty response.';
+  const primary = MODE_CONFIG[mode].model;
+  const models = [primary, 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC'].filter((value, index, all) => all.indexOf(value) === index);
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      onProgress?.(model === primary ? 'Loading browser model…' : 'GPU recovery: switching to a lighter model…');
+      const engine = await webllm.CreateMLCEngine(model, { initProgressCallback: (p) => onProgress?.(p.text) });
+      const result = await engine.chat.completions.create({ messages: [{ role: 'system', content: 'You are SatyaAI, a concise and honest assistant. Say when you are uncertain.' }, { role: 'user', content: prompt }], stream: false });
+      return result.choices[0]?.message.content || 'The local model returned an empty response.';
+    } catch (error) { lastError = error; }
+  }
+  const raw = lastError instanceof Error ? lastError.message : 'WebGPU model failed to initialize.';
+  if (/DEVICE_REMOVED|GPU|D3D12|requestDevice/i.test(raw)) throw new Error('The browser graphics device reset while loading the model. Refresh the page, close other GPU-heavy tabs, or use the local Ollama app instead.');
+  throw new Error(raw);
 }
