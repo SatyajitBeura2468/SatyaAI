@@ -11,6 +11,22 @@ export const MODE_CONFIG: Record<SatyaMode, { model: string; temperature: number
 
 export function hasWebGPU(): boolean { return typeof navigator !== 'undefined' && 'gpu' in navigator; }
 
+export const ONLINE_MODELS = [
+  { family: 'Qwen', id: 'Qwen/Qwen3-8B', capability: 'text + reasoning' },
+  { family: 'GLM', id: 'THUDM/GLM-4-9B-0414', capability: 'text + reasoning' },
+  { family: 'Mistral', id: 'mistralai/Mistral-7B-Instruct-v0.3', capability: 'text + tools' },
+  { family: 'gpt-oss', id: 'openai/gpt-oss-20b', capability: 'text + reasoning' },
+];
+
+export async function remoteChat(messages: ChatMessage[], mode: SatyaMode): Promise<string> {
+  const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, model: MODE_CONFIG[mode].model, temperature: MODE_CONFIG[mode].temperature, max_tokens: MODE_CONFIG[mode].maxTokens }) });
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }>; error?: string };
+  if (!response.ok) throw new Error(data.error || `Remote provider failed (${response.status})`);
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('Remote provider returned no assistant content.');
+  return content;
+}
+
 export async function openAICompatible(settings: ProviderSettings, messages: ChatMessage[], mode: SatyaMode): Promise<string> {
   if (!settings.baseUrl || !settings.model) throw new Error('Configure a compatible endpoint and model in Settings first.');
   const base = settings.baseUrl.replace(/\/$/, '');
