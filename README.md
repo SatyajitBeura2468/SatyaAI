@@ -2,7 +2,7 @@
 
 Truth-first intelligence for reasoning, research, and creation.
 
-### [Open SatyaAI →](https://satyaai.vercel.app)
+### [Open SatyaAI →](https://satyaai-five.vercel.app)
 
 SatyaAI V0.1 is a privacy-conscious, local-first interface foundation. It exposes Fast, Smart, and Deep Think modes without coupling the UI to a model vendor. The default build is honest about capability: without a configured inference endpoint, it provides the complete interaction shell and clearly labelled degraded state rather than fabricating model output, citations, or search results.
 
