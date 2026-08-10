@@ -42,8 +42,9 @@ export async function localWebLLM(mode: SatyaMode, prompt: string, onProgress?: 
   const online = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: MODE_CONFIG[mode].model, messages: [{ role: 'user', content: prompt }], temperature: MODE_CONFIG[mode].temperature, max_tokens: MODE_CONFIG[mode].maxTokens }) });
   if (online.status !== 404) {
     const data = await online.json() as { choices?: Array<{ message?: { content?: string } }>; error?: string };
-    if (!online.ok) throw new Error(data.error || `Remote provider failed (${online.status})`);
-    return data.choices?.[0]?.message?.content || 'Remote provider returned no assistant content.';
+    if (!online.ok && online.status !== 503) throw new Error(data.error || `Remote provider failed (${online.status})`);
+    if (!online.ok && online.status === 503) onProgress?.('Online provider unavailable; preparing the browser model…');
+    else return data.choices?.[0]?.message?.content || 'Remote provider returned no assistant content.';
   }
   if (!hasWebGPU()) throw new Error('WebGPU is unavailable in this browser. Configure an Ollama or OpenAI-compatible endpoint instead.');
   const webllm = await import('@mlc-ai/web-llm');
