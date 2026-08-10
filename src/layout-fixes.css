@@ -1,0 +1,8 @@
+html,body,#root{height:100%;overflow:hidden}
+.app-shell{height:100dvh;min-height:0;overflow:hidden}
+.main{height:100dvh;min-height:0;overflow:hidden}
+.conversation{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-bottom:190px}
+.conversation::-webkit-scrollbar{width:8px}.conversation::-webkit-scrollbar-thumb{background:#d5d8d0;border-radius:99px}
+.composer-wrap{position:sticky;bottom:0;background:linear-gradient(to bottom,transparent 0,var(--paper) 18px,var(--paper) 100%);padding-top:24px}
+.hero{flex:none}.messages{flex:none}
+@media(max-width:760px){.conversation{padding-bottom:188px}.composer-wrap{padding-top:20px}}

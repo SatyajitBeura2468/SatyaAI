@@ -4,8 +4,8 @@ export type ProviderCapabilities = { text: boolean; vision: boolean; streaming: 
 export type ProviderSettings = { baseUrl?: string; apiKey?: string; model?: string };
 
 export const MODE_CONFIG: Record<SatyaMode, { model: string; temperature: number; maxTokens: number; passes: number }> = {
-  fast: { model: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', temperature: 0.3, maxTokens: 512, passes: 1 },
-  smart: { model: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', temperature: 0.4, maxTokens: 1024, passes: 1 },
+  fast: { model: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', temperature: 0.3, maxTokens: 256, passes: 1 },
+  smart: { model: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', temperature: 0.4, maxTokens: 512, passes: 1 },
   deep: { model: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', temperature: 0.25, maxTokens: 1536, passes: 2 },
 };
 
