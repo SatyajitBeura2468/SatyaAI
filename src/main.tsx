@@ -3,12 +3,12 @@ import { createRoot } from 'react-dom/client';
 import { Archive, ArrowUp, Bot, ChevronDown, FileText, Library, Menu, Mic, Plus, Search, Settings, Sparkles, Sun, X, Zap } from 'lucide-react';
 import './styles.css';
 import './layout-fixes.css';
+import './motion.css';
 import { hasWebGPU, localWebLLM, openAICompatible, type ProviderSettings } from './ai/providers';
 
 type Mode = 'fast' | 'smart' | 'deep';
 type Message = { role: 'user' | 'ai'; text: string; pending?: boolean };
 type Chat = { id: number; title: string; preview: string; time: string };
-const MODE_DEADLINES: Record<Mode, number> = { fast: 10_000, smart: 30_000, deep: 60_000 };
 const modes: Record<Mode, { label: string; desc: string; icon: React.ReactNode }> = { fast: { label: 'Fast', desc: 'Quick, efficient answers', icon: <Zap size={15} /> }, smart: { label: 'Smart', desc: 'Balanced reasoning & quality', icon: <Sparkles size={15} /> }, deep: { label: 'Deep Think', desc: 'Maximum reasoning & verification', icon: <Bot size={15} /> } };
 const seed: Chat[] = [{ id: 1, title: 'Understanding the quiet sky', preview: 'Why do stars look different...', time: 'Today' }, { id: 2, title: 'A better way to learn', preview: 'Design a study plan for...', time: 'Yesterday' }, { id: 3, title: 'The future of open models', preview: 'Compare local inference...', time: 'Aug 08' }];
 
@@ -37,8 +37,7 @@ function App() {
     setQuery(''); setBusy(true); setStatus(provider.baseUrl ? 'Generating with Ollama…' : 'Preparing the browser model…');
     setMessages(prev => [...prev, { role: 'user', text }, { role: 'ai', text: provider.baseUrl ? 'Generating…' : 'Preparing the model for the first response. This can take a few minutes while the browser downloads the model.', pending: true }]);
     try {
-      const request = provider.baseUrl && provider.model ? openAICompatible(provider, [{ role: 'user', content: text }], mode) : localWebLLM(mode, text, progress => setStatus(progress || 'Loading browser model…'));
-      const answer = await Promise.race([request, new Promise<string>((_, reject) => setTimeout(() => reject(new Error(`${current.label} mode exceeded its ${MODE_DEADLINES[mode] / 1000}-second response budget.`)), MODE_DEADLINES[mode]))]);
+      const answer = provider.baseUrl && provider.model ? await openAICompatible(provider, [{ role: 'user', content: text }], mode) : await localWebLLM(mode, text, progress => setStatus(progress || 'Loading browser model…'));
       setMessages(prev => { const next = [...prev]; const last = next.length - 1; next[last] = { role: 'ai', text: answer }; return next; });
       setStatus('Ready'); setChats(prev => prev.map(chat => chat.id === 1 ? { ...chat, preview: text, time: 'Just now' } : chat));
     } catch (error) {
