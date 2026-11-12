@@ -226,8 +226,8 @@ async function ensureLocalModel(
     activeModelCacheHit = await getModelCacheStatus(webllm, model);
     onProgress?.(
       activeModelCacheHit
-        ? "Restoring saved " + activeModelLabel + " model from this browser…"
-        : "Downloading " + activeModelLabel + " model for first use…",
+        ? activeModelLabel + " · saved model files cache se load ho rahi hain…"
+        : activeModelLabel + " · model files pehli baar download ho rahi hain…",
     );
 
     const worker = new Worker(new URL("./llm.worker.ts", import.meta.url), {
@@ -256,8 +256,8 @@ async function ensureLocalModel(
     activeModelCacheHit = await getModelCacheStatus(webllm, model);
     onProgress?.(
       activeModelCacheHit
-        ? "Switching to the saved " + activeModelLabel + " model…"
-        : "Preparing " + activeModelLabel + " for its first use…",
+        ? activeModelLabel + " · cached model ko dobara load kar raha hoon…"
+        : activeModelLabel + " · pehli baar setup ho raha hai…",
     );
 
     // reload() replaces the resident model. The downloaded model files remain
