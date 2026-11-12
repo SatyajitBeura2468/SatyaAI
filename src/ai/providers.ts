@@ -16,6 +16,18 @@ export type ProviderSettings = {
   model?: string;
 };
 
+export type ModelProgressSnapshot = {
+  percent: number | null;
+  elapsedSeconds: number | null;
+  remainingSeconds: number | null;
+  stage: "download" | "initializing" | "complete";
+};
+
+type ModelProgressHandler = (
+  message: string,
+  details?: ModelProgressSnapshot,
+) => void;
+
 export const MODE_CONFIG: Record<
   SatyaMode,
   { model: string; temperature: number; maxTokens: number; passes: number }
@@ -64,7 +76,7 @@ let webLLMModulePromise: Promise<WebLLMModule> | null = null;
 let localEngine: WebLLMEngine | null = null;
 let localWorker: Worker | null = null;
 let loadedLocalModel: string | null = null;
-let activeProgressCallback: ((text: string) => void) | undefined;
+let activeProgressCallback: ModelProgressHandler | undefined;
 let activeModelCacheHit = false;
 let activeModelLabel = "local";
 
@@ -125,25 +137,50 @@ async function hasConfiguredRemoteGateway(): Promise<boolean> {
 }
 
 function modelLabel(model: string): string {
-  if (model.includes("1B")) return "Fast 1B";
-  if (model.includes("3B")) return "Smart 3B";
-  if (model.includes("0.5B")) return "lightweight fallback";
+  if (model.includes("1B")) return "Tvarit 1B";
+  if (model.includes("3B")) return "Pragya 3B";
+  if (model.includes("0.5B")) return "Laghu 0.5B";
   return model;
 }
 
-function formatModelProgress(text: string): string {
-  const detail = text
-    .replace(
-      /It can take a while when we first visit this page to populate the cache\. Later refreshes will become faster\.?/gi,
-      "",
-    )
-    .trim();
+function formatModelProgress(report: {
+  progress: number;
+  timeElapsed: number;
+  text: string;
+}): { message: string; details: ModelProgressSnapshot } {
+  const fraction = Number.isFinite(report.progress)
+    ? Math.min(1, Math.max(0, report.progress))
+    : null;
+  const elapsedSeconds = Number.isFinite(report.timeElapsed)
+    ? Math.max(0, report.timeElapsed)
+    : null;
+  const percent =
+    fraction === null ? null : Math.round(fraction * 100);
+  const remainingSeconds =
+    fraction !== null &&
+    fraction > 0.02 &&
+    fraction < 1 &&
+    elapsedSeconds !== null
+      ? Math.round((elapsedSeconds / fraction) * (1 - fraction))
+      : null;
+  const complete = fraction !== null && fraction >= 1;
+  const downloading = /fetch|download|param|cache/i.test(report.text);
 
-  if (activeModelCacheHit) {
-    return "Restoring saved " + activeModelLabel + " model · " + detail;
-  }
+  const action = activeModelCacheHit
+    ? "saved model files cache se load ho rahi hain"
+    : "model files pehli baar download ho rahi hain";
 
-  return "First-time download of " + activeModelLabel + " · " + detail;
+  return {
+    message: complete
+      ? activeModelLabel + " · model taiyaar hai"
+      : activeModelLabel + " · " + action + "…",
+    details: {
+      percent,
+      elapsedSeconds,
+      remainingSeconds,
+      stage: complete ? "complete" : downloading ? "download" : "initializing",
+    },
+  };
 }
 
 async function getModelCacheStatus(
@@ -178,7 +215,7 @@ async function discardLocalEngine(): Promise<void> {
 
 async function ensureLocalModel(
   model: string,
-  onProgress?: (text: string) => void,
+  onProgress?: ModelProgressHandler,
 ): Promise<WebLLMEngine> {
   const webllm = await getWebLLMModule();
   activeProgressCallback = onProgress;
@@ -201,7 +238,8 @@ async function ensureLocalModel(
       const engine = await webllm.CreateWebWorkerMLCEngine(worker, model, {
         appConfig: webllm.prebuiltAppConfig,
         initProgressCallback: (progress) => {
-          activeProgressCallback?.(formatModelProgress(progress.text || "Loading model…"));
+          const update = formatModelProgress(progress);
+          activeProgressCallback?.(update.message, update.details);
         },
       });
       localWorker = worker;
@@ -278,11 +316,13 @@ export async function openAICompatible(
 export async function localWebLLM(
   mode: SatyaMode,
   messages: ChatMessage[],
-  onProgress?: (text: string) => void,
+  onProgress?: ModelProgressHandler,
   onToken?: (partialText: string) => void,
+  onThinking?: (active: boolean) => void,
 ): Promise<string> {
   if (await hasConfiguredRemoteGateway()) {
     try {
+      onThinking?.(true);
       const online = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -307,7 +347,8 @@ export async function localWebLLM(
       if (!content) throw new Error("Remote provider returned no assistant content.");
       return content;
     } catch {
-      onProgress?.("Remote provider unavailable; switching to browser-local inference…");
+      onThinking?.(false);
+      onProgress?.("Remote model unavailable; ab browser par local inference…");
     }
   }
 
@@ -331,11 +372,12 @@ export async function localWebLLM(
       try {
         onProgress?.(
           index === 0
-            ? "Checking the saved model cache…"
-            : "GPU recovery: trying a lighter cached model…",
+            ? "Is device ka model cache dekh raha hoon…"
+            : "GPU recovery · Laghu model ko cache se laane ki koshish…",
         );
 
         const engine = await ensureLocalModel(model, onProgress);
+        onThinking?.(true);
         const stream = await engine.chat.completions.create({
           messages,
           temperature: MODE_CONFIG[mode].temperature,
