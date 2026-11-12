@@ -38,7 +38,21 @@ function App() {
     setQuery(''); setBusy(true); setStatus(provider.baseUrl ? 'Generating with Ollama…' : 'Preparing the browser model…');
     setMessages(prev => [...prev, { role: 'user', text }, { role: 'ai', text: provider.baseUrl ? 'Generating…' : 'Preparing the model for the first response. This can take a few minutes while the browser downloads the model.', pending: true }]);
     try {
-      const answer = provider.baseUrl && provider.model ? await openAICompatible(provider, [{ role: 'user', content: text }], mode) : await localWebLLM(mode, text, progress => setStatus(progress || 'Loading browser model…'));
+      const answer = provider.baseUrl && provider.model
+        ? await openAICompatible(provider, [{ role: 'user', content: text }], mode)
+        : await localWebLLM(
+            mode,
+            text,
+            progress => setStatus(progress || 'Loading browser model…'),
+            partial => setMessages(prev => {
+              const next = [...prev];
+              const last = next.length - 1;
+              if (last >= 0 && next[last].role === 'ai') {
+                next[last] = { role: 'ai', text: partial };
+              }
+              return next;
+            })
+          );
       setMessages(prev => { const next = [...prev]; const last = next.length - 1; next[last] = { role: 'ai', text: answer }; return next; });
       setStatus('Ready'); setChats(prev => prev.map(chat => chat.id === 1 ? { ...chat, preview: text, time: 'Just now' } : chat));
     } catch (error) {
