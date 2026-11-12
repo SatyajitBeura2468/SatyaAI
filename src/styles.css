@@ -221,3 +221,80 @@
 .messages-end {
   height: 1px;
 }
+
+/* Live model-loading feedback and restrained Indic microcopy. */
+.model-progress {
+  width: min(100%, 480px);
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft-surface);
+}
+.model-progress-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--soft-text);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.model-progress-heading strong {
+  color: var(--green);
+  font: 700 11px 'DM Mono', monospace;
+  white-space: nowrap;
+}
+.model-progress-track {
+  height: 5px;
+  margin: 9px 0 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+.model-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+  transition: width 320ms ease;
+}
+.model-progress-fill.indeterminate {
+  width: 30% !important;
+  animation: satya-progress-sweep 1.35s ease-in-out infinite;
+}
+.model-progress-meta {
+  color: var(--faint-text);
+  font-size: 9px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.thinking-aside {
+  margin: 8px 0 0;
+  color: var(--faint-text);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+:root[data-theme="dark"] .model-progress {
+  background: #1a2821;
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .model-progress-heading strong {
+  color: #c3e8b6;
+}
+:root[data-theme="dark"] .model-progress-fill {
+  background: #95c99e;
+}
+@keyframes satya-progress-sweep {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(440%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .model-progress-fill,
+  .model-progress-fill.indeterminate {
+    transition: none;
+    animation: none;
+  }
+}
+
