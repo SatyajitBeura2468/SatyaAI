@@ -148,8 +148,11 @@ function formatModelProgress(report: {
   timeElapsed: number;
   text: string;
 }): { message: string; details: ModelProgressSnapshot } {
-  const fraction = Number.isFinite(report.progress)
-    ? Math.min(1, Math.max(0, report.progress))
+  const rawProgress = report.progress > 1
+    ? report.progress / 100
+    : report.progress;
+  const fraction = Number.isFinite(rawProgress)
+    ? Math.min(1, Math.max(0, rawProgress))
     : null;
   const elapsedSeconds = Number.isFinite(report.timeElapsed)
     ? Math.max(0, report.timeElapsed)
