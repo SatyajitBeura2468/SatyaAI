@@ -260,7 +260,20 @@ function App() {
         answer = await localWebLLM(
           mode,
           modelMessages,
-          (progress) => setStatus(progress || "Loading the local model…"),
+          (progress) => {
+            const message = progress || "Loading the local model…";
+            setStatus(message);
+            setMessages((previous) => {
+              const lastIndex = previous.length - 1;
+              const last = previous[lastIndex];
+              if (lastIndex < 0 || last.role !== "ai" || !last.pending) {
+                return previous;
+              }
+              const next = [...previous];
+              next[lastIndex] = { ...last, text: message };
+              return next;
+            });
+          },
           (partial) => {
             setMessages((previous) => {
               const next = [...previous];
