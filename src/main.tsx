@@ -27,6 +27,7 @@ import {
   localWebLLM,
   openAICompatible,
   type ChatMessage,
+  type ModelProgressSnapshot,
   type ProviderSettings,
 } from "./ai/providers";
 import {
@@ -40,8 +41,33 @@ import {
 
 type Mode = "fast" | "smart" | "deep";
 type Theme = "light" | "dark";
-type Message = { role: "user" | "ai"; text: string; pending?: boolean };
+type Message = {
+  role: "user" | "ai";
+  text: string;
+  pending?: boolean;
+  modelProgress?: ModelProgressSnapshot;
+};
 type Chat = { id: number; title: string; preview: string; time: string };
+
+const thinkingPhrases = [
+  "Zara vichaar kar raha hoon…",
+  "Mastishk ko kaam par laga raha hoon…",
+  "Soch ko sahi disha de raha hoon…",
+  "Vichaaron ko jod raha hoon…",
+];
+
+function formatDuration(seconds: number | null): string | null {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
+    return null;
+  }
+
+  const total = Math.round(seconds);
+  if (total < 60) return total + "s";
+
+  const minutes = Math.floor(total / 60);
+  const remainder = total % 60;
+  return minutes + "m " + String(remainder).padStart(2, "0") + "s";
+}
 
 const modes: Record<Mode, { label: string; desc: string; icon: React.ReactNode }> = {
   fast: {
@@ -111,6 +137,8 @@ function App() {
   const [file, setFile] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
+  const [thinkingActive, setThinkingActive] = useState(false);
+  const [thinkingPhraseIndex, setThinkingPhraseIndex] = useState(0);
   const [memory, setMemory] = useState<UserMemory>(readSavedMemory);
   const [memoryNameDraft, setMemoryNameDraft] = useState(memory.name);
   const [memoryNotesDraft, setMemoryNotesDraft] = useState(memory.notes);
@@ -157,6 +185,18 @@ function App() {
       // Theme still works for this session if storage is unavailable.
     }
   }, [theme]);
+
+  useEffect(() => {
+    if (!thinkingActive) return;
+
+    const interval = window.setInterval(() => {
+      setThinkingPhraseIndex((currentIndex) =>
+        (currentIndex + 1) % thinkingPhrases.length,
+      );
+    }, 2300);
+
+    return () => window.clearInterval(interval);
+  }, [thinkingActive]);
 
   // Keep the newest message visible while the user is following the bottom of
   // the chat. If they deliberately scroll up, do not yank them back down.
@@ -227,22 +267,24 @@ function App() {
 
     setQuery("");
     setBusy(true);
+    setThinkingActive(false);
     followLatestRef.current = true;
+    const initialLoadingMessage = identityAnswer
+      ? "Preparing a reply…"
+      : provider.baseUrl
+        ? "Configured model se jud raha hoon…"
+        : "Is device ka model cache dekh raha hoon…";
     setStatus(
       identityAnswer
         ? "Using SatyaAI identity memory…"
-        : provider.baseUrl
-          ? "Connecting to the configured model…"
-          : "Checking this device's saved model cache…",
+        : initialLoadingMessage,
     );
     setMessages((previous) => [
       ...previous,
       { role: "user", text },
       {
         role: "ai",
-        text: identityAnswer
-          ? "Preparing a reply…"
-          : "Checking this device's saved model cache…",
+        text: initialLoadingMessage,
         pending: true,
       },
     ]);
@@ -255,13 +297,15 @@ function App() {
         // than asking a small language model to guess who it is.
         answer = identityAnswer;
       } else if (provider.baseUrl && provider.model) {
+        setThinkingActive(true);
         answer = await openAICompatible(provider, modelMessages, mode);
+        setThinkingActive(false);
       } else {
         answer = await localWebLLM(
           mode,
           modelMessages,
-          (progress) => {
-            const message = progress || "Loading the local model…";
+          (progress, details) => {
+            const message = progress || "Model load ho raha hai…";
             setStatus(message);
             setMessages((previous) => {
               const lastIndex = previous.length - 1;
@@ -270,11 +314,16 @@ function App() {
                 return previous;
               }
               const next = [...previous];
-              next[lastIndex] = { ...last, text: message };
+              next[lastIndex] = {
+                ...last,
+                text: message,
+                modelProgress: details,
+              };
               return next;
             });
           },
           (partial) => {
+            setThinkingActive(false);
             setMessages((previous) => {
               const next = [...previous];
               const last = next.length - 1;
@@ -284,6 +333,7 @@ function App() {
               return next;
             });
           },
+          (active) => setThinkingActive(active),
         );
       }
 
@@ -322,6 +372,7 @@ function App() {
       });
       setStatus("Needs attention");
     } finally {
+      setThinkingActive(false);
       setBusy(false);
     }
   }
@@ -465,6 +516,73 @@ function App() {
                     <p className={message.pending ? "pending-copy" : ""}>
                       {message.text}
                     </p>
+                    {message.pending && message.modelProgress && (
+                      <div className="model-progress">
+                        <div className="model-progress-heading">
+                          <span>
+                            {message.modelProgress.stage === "download"
+                              ? "Model files aa rahi hain"
+                              : message.modelProgress.stage === "complete"
+                                ? "Model taiyaar"
+                                : "Model taiyaar ho raha hai"}
+                          </span>
+                          <strong>
+                            {message.modelProgress.percent === null
+                              ? "Preparing"
+                              : message.modelProgress.percent + "%"}
+                          </strong>
+                        </div>
+                        <div
+                          className="model-progress-track"
+                          role="progressbar"
+                          aria-label="Model loading progress"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={message.modelProgress.percent ?? 0}
+                          aria-valuetext={
+                            message.modelProgress.percent === null
+                              ? "Preparing model"
+                              : message.modelProgress.percent + " percent complete"
+                          }
+                        >
+                          <div
+                            className={
+                              "model-progress-fill " +
+                              (message.modelProgress.percent === null
+                                ? "indeterminate"
+                                : "")
+                            }
+                            style={{
+                              width:
+                                message.modelProgress.percent === null
+                                  ? "14%"
+                                  : message.modelProgress.percent + "%",
+                            }}
+                          />
+                        </div>
+                        <div className="model-progress-meta">
+                          {message.modelProgress.percent === null
+                            ? "Model load ki taiyaari chal rahi hai…"
+                            : message.modelProgress.percent +
+                              "% complete · " +
+                              (100 - message.modelProgress.percent) +
+                              "% baaki"}
+                          {formatDuration(message.modelProgress.elapsedSeconds) &&
+                            " · " +
+                              formatDuration(message.modelProgress.elapsedSeconds) +
+                              " elapsed"}
+                          {formatDuration(message.modelProgress.remainingSeconds) &&
+                            " · ~" +
+                              formatDuration(message.modelProgress.remainingSeconds) +
+                              " baaki"}
+                        </div>
+                      </div>
+                    )}
+                    {message.pending && thinkingActive && (
+                      <p className="thinking-aside" aria-live="polite">
+                        {thinkingPhrases[thinkingPhraseIndex]}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
