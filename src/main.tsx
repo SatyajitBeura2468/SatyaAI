@@ -22,6 +22,7 @@ import "./styles.css";
 import "./layout-fixes.css";
 import "./motion.css";
 import "./premium-polish.css";
+import "./launch-fixes.css";
 import {
   hasWebGPU,
   localWebLLM,
@@ -38,6 +39,7 @@ import {
   sanitizeMemory,
   type UserMemory,
 } from "./ai/identity";
+import { loadJSON, saveJSON } from "./storage";
 
 type Mode = "fast" | "smart" | "deep";
 type Theme = "light" | "dark";
@@ -46,8 +48,10 @@ type Message = {
   text: string;
   pending?: boolean;
   modelProgress?: ModelProgressSnapshot;
+  error?: boolean;
+  file?: { name: string; text: string };
 };
-type Chat = { id: number; title: string; preview: string; time: string };
+type Chat = { id: string; title: string; updatedAt: number; messages: Message[] };
 
 const thinkingPhrases = [
   "Zara vichaar kar raha hoon…",
@@ -82,31 +86,59 @@ const modes: Record<Mode, { label: string; desc: string; icon: React.ReactNode }
   },
   deep: {
     label: "Deep Think",
-    desc: "Maximum reasoning & verification",
+    desc: "Longer, more detailed answers",
     icon: <Bot size={15} />,
   },
 };
 
-const seed: Chat[] = [
-  {
-    id: 1,
-    title: "Understanding the quiet sky",
-    preview: "Why do stars look different...",
-    time: "Today",
-  },
-  {
-    id: 2,
-    title: "A better way to learn",
-    preview: "Design a study plan for...",
-    time: "Yesterday",
-  },
-  {
-    id: 3,
-    title: "The future of open models",
-    preview: "Compare local inference...",
-    time: "Aug 08",
-  },
-];
+const CHATS_KEY = "satya-chats-v1";
+const MAX_CHATS = 30;
+const ATTACH_MAX_CHARS = 6000;
+const ATTACH_MAX_BYTES = 1_000_000;
+const newId = () =>
+  Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const isChatList = (value: unknown) =>
+  Array.isArray(value) &&
+  value.every(
+    (chat) =>
+      chat &&
+      typeof chat.id === "string" &&
+      typeof chat.title === "string" &&
+      Array.isArray(chat.messages),
+  );
+const dayLabel = (timestamp: number) =>
+  new Date(timestamp).toDateString() === new Date().toDateString()
+    ? "Today"
+    : new Date(timestamp).toLocaleDateString(undefined, {
+        month: "short",
+        day: "2-digit",
+      });
+const readText = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+type SpeechCtor = new () => {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult:
+    | ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void)
+    | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+};
+const speechCtor = (): SpeechCtor | undefined => {
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechCtor;
+    webkitSpeechRecognition?: SpeechCtor;
+  };
+  return w.SpeechRecognition || w.webkitSpeechRecognition;
+};
 
 function readSavedMemory(): UserMemory {
   try {
@@ -129,12 +161,18 @@ function App() {
   const [mode, setMode] = useState<Mode>("smart");
   const [theme, setTheme] = useState<Theme>(readSavedTheme);
   const [query, setQuery] = useState("");
-  const [chats, setChats] = useState(seed);
+  const [chats, setChats] = useState<Chat[]>(() =>
+    loadJSON<Chat[]>(CHATS_KEY, [], isChatList),
+  );
+  const [activeId, setActiveId] = useState<string>(newId);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [tools, setTools] = useState({ search: false, research: false });
   const [settings, setSettings] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [file, setFile] = useState<string | null>(null);
+  const [file, setFile] = useState<{ name: string; text: string } | null>(
+    null,
+  );
+  const [listening, setListening] = useState(false);
+  const [gateway, setGateway] = useState<"online" | "offline">("offline");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
   const [thinkingActive, setThinkingActive] = useState(false);
@@ -164,6 +202,10 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const conversationRef = useRef<HTMLElement>(null);
   const followLatestRef = useRef(true);
+  const activeRef = useRef(activeId);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const canSpeak = typeof window !== "undefined" && !!speechCtor();
+  activeRef.current = activeId;
   const current = modes[mode];
 
   const capability = useMemo(
@@ -172,9 +214,36 @@ function App() {
         ? "OpenAI-compatible endpoint configured"
         : hasWebGPU()
           ? "WebGPU · browser-local inference"
-          : "Configure an inference endpoint",
+          : "This browser has no WebGPU, so the on-device model cannot run",
     [provider.baseUrl],
   );
+  const engineTitle = provider.baseUrl
+    ? "Custom endpoint"
+    : gateway === "online"
+      ? "Hosted model"
+      : hasWebGPU()
+        ? "Browser model"
+        : "No inference available";
+
+  useEffect(() => {
+    saveJSON(CHATS_KEY, chats);
+  }, [chats]);
+
+  useEffect(() => {
+    if (provider.baseUrl) return;
+    let alive = true;
+    fetch("/api/health")
+      .then((response) => response.json())
+      .then((data: { configured?: boolean }) => {
+        if (alive) setGateway(data?.configured ? "online" : "offline");
+      })
+      .catch(() => {
+        if (alive) setGateway("offline");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [provider.baseUrl]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -226,7 +295,91 @@ function App() {
     }
   }
 
+  function upsertChat(id: string, list: Message[]) {
+    const saved = list
+      .filter((message) => !message.pending)
+      .map((message) => ({
+        role: message.role,
+        text: message.text,
+        ...(message.error ? { error: true } : {}),
+        ...(message.file ? { file: message.file } : {}),
+      })) as Message[];
+    const first =
+      saved.find((message) => message.role === "user")?.text.trim() ||
+      "New chat";
+    setChats((previous) =>
+      [
+        { id, title: first.slice(0, 40), updatedAt: Date.now(), messages: saved },
+        ...previous.filter((chat) => chat.id !== id),
+      ].slice(0, MAX_CHATS),
+    );
+  }
+
+  function openChat(chat: Chat) {
+    if (busy) return;
+    setMessages(chat.messages);
+    setActiveId(chat.id);
+    setStatus("Ready");
+    setMenu(false);
+    followLatestRef.current = true;
+  }
+
+  async function pickFile(chosen: File | undefined) {
+    if (!chosen) return;
+    if (chosen.size > ATTACH_MAX_BYTES) {
+      setStatus("That file is larger than 1 MB.");
+      return;
+    }
+    try {
+      const text = await readText(chosen);
+      setFile({
+        name: chosen.name,
+        text:
+          text.length > ATTACH_MAX_CHARS
+            ? text.slice(0, ATTACH_MAX_CHARS) + "\n…[file truncated]"
+            : text,
+      });
+    } catch {
+      setStatus("Could not read that file.");
+    }
+  }
+
+  function toggleMic() {
+    const Ctor = speechCtor();
+    if (!Ctor) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const recognition = new Ctor();
+    const base = query.trim();
+    recognition.lang = navigator.language || "en-IN";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const spoken = Array.from(event.results)
+        .map((result) => result[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+      setQuery(base ? base + " " + spoken : spoken);
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    recognition.onerror = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    recognitionRef.current = recognition;
+    setListening(true);
+    recognition.start();
+  }
+
   function startNewChat() {
+    if (busy) return;
+    setMenu(false);
+    setActiveId(newId());
     setMessages([]);
     setStatus("Ready");
     setFile(null);
@@ -249,23 +402,31 @@ function App() {
       }
     }
 
-    const history: ChatMessage[] = messages
-      .filter((message) => !message.pending)
+    const chatId = activeRef.current;
+    const attached = file;
+    const withFile = (message: { text: string; file?: { name: string; text: string } }) =>
+      message.file
+        ? "[Attached file: " + message.file.name + "]\n" + message.file.text + "\n\nQuestion: " + message.text
+        : message.text;
+    const priorMessages = messages.filter((message) => !message.pending);
+    const history: ChatMessage[] = priorMessages
+      .filter((message) => !message.error)
       .slice(-12)
       .map((message) => ({
         role: message.role === "ai" ? "assistant" : "user",
-        content: message.text,
+        content: withFile(message),
       }));
 
     const modelMessages: ChatMessage[] = [
       { role: "system", content: buildSatyaSystemPrompt(memoryForTurn) },
       ...history,
-      { role: "user", content: text },
+      { role: "user", content: attached ? withFile({ text, file: attached }) : text },
     ];
 
     const identityAnswer = getIdentityReply(text, memoryForTurn);
 
     setQuery("");
+    setFile(null);
     setBusy(true);
     setThinkingActive(false);
     followLatestRef.current = true;
@@ -281,7 +442,7 @@ function App() {
     );
     setMessages((previous) => [
       ...previous,
-      { role: "user", text },
+      { role: "user", text, ...(attached ? { file: attached } : {}) },
       {
         role: "ai",
         text: initialLoadingMessage,
@@ -346,13 +507,11 @@ function App() {
         return next;
       });
       setStatus("Ready");
-      setChats((previous) =>
-        previous.map((chat) =>
-          chat.id === 1
-            ? { ...chat, preview: text, time: "Just now" }
-            : chat,
-        ),
-      );
+      upsertChat(chatId, [
+        ...priorMessages,
+        { role: "user", text, ...(attached ? { file: attached } : {}) },
+        { role: "ai", text: answer },
+      ]);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown model error";
@@ -366,10 +525,20 @@ function App() {
               "I couldn't generate a response: " +
               errorMessage +
               "\n\nCheck the model status or choose a supported inference endpoint in Settings.",
+            error: true,
           };
         }
         return next;
       });
+      upsertChat(chatId, [
+        ...priorMessages,
+        { role: "user", text, ...(attached ? { file: attached } : {}) },
+        {
+          role: "ai",
+          text: "I couldn't generate a response: " + errorMessage,
+          error: true,
+        },
+      ]);
       setStatus("Needs attention");
     } finally {
       setThinkingActive(false);
@@ -410,13 +579,22 @@ function App() {
 
         <div className="side-section history">
           <div className="section-label">Recent</div>
+          {chats.length === 0 && (
+            <div className="empty-history">No conversations yet</div>
+          )}
           {chats.map((chat) => (
-            <button className="chat-row" key={chat.id}>
+            <button
+              className={"chat-row " + (chat.id === activeId ? "active" : "")}
+              key={chat.id}
+              onClick={() => openChat(chat)}
+            >
               <div>
                 <strong>{chat.title}</strong>
-                <small>{chat.preview}</small>
+                <small>
+                  {(chat.messages[chat.messages.length - 1]?.text || "").slice(0, 60)}
+                </small>
               </div>
-              <time>{chat.time}</time>
+              <time>{dayLabel(chat.updatedAt)}</time>
             </button>
           ))}
         </div>
@@ -425,7 +603,7 @@ function App() {
           <div className="local-state">
             <span className="status-dot" />
             <div>
-              <strong>{busy ? status : "Inference ready"}</strong>
+              <strong>{busy ? status : engineTitle}</strong>
               <small>{capability}</small>
             </div>
           </div>
@@ -516,6 +694,11 @@ function App() {
                     <p className={message.pending ? "pending-copy" : ""}>
                       {message.text}
                     </p>
+                    {message.file && (
+                      <small className="file-note">
+                        <FileText size={12} /> {message.file.name}
+                      </small>
+                    )}
                     {message.pending && message.modelProgress && (
                       <div className="model-progress">
                         <div className="model-progress-heading">
@@ -594,7 +777,7 @@ function App() {
             {file && (
               <div className="attachment">
                 <FileText size={16} />
-                <span>{file}</span>
+                <span>{file.name}</span>
                 <button onClick={() => setFile(null)} aria-label="Remove attachment">
                   <X size={14} />
                 </button>
@@ -621,6 +804,7 @@ function App() {
                     className="tool-btn"
                     onClick={() => inputRef.current?.click()}
                     disabled={busy}
+                    aria-label="Attach a text file"
                   >
                     <Plus size={17} /> Attach
                   </button>
@@ -628,36 +812,49 @@ function App() {
                     ref={inputRef}
                     hidden
                     type="file"
-                    accept="image/*,.pdf,.txt,.md,.docx"
-                    onChange={(event) =>
-                      setFile(event.target.files?.[0]?.name || null)
-                    }
+                    accept=".txt,.md,.csv,.json,text/plain"
+                    onChange={(event) => {
+                      void pickFile(event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
                   />
                   <button
-                    className={"tool-btn " + (tools.search ? "selected" : "")}
-                    onClick={() =>
-                      setTools((value) => ({ ...value, search: !value.search }))
-                    }
+                    className="tool-btn soon"
+                    disabled
+                    aria-disabled="true"
+                    title="Web search is coming soon"
+                    aria-label="Search Web (coming soon)"
                   >
-                    <Search size={16} /> Search Web
+                    <Search size={16} /> Search Web <em>Soon</em>
                   </button>
                   <button
-                    className={"tool-btn " + (tools.research ? "selected" : "")}
-                    onClick={() =>
-                      setTools((value) => ({
-                        ...value,
-                        research: !value.research,
-                      }))
-                    }
+                    className="tool-btn soon"
+                    disabled
+                    aria-disabled="true"
+                    title="Deep research is coming soon"
+                    aria-label="Research (coming soon)"
                   >
-                    <Library size={16} /> Research
+                    <Library size={16} /> Research <em>Soon</em>
                   </button>
                 </div>
                 <button
-                  className={"send " + (query.trim() && !busy ? "ready" : "")}
-                  disabled={busy || !query.trim()}
-                  onClick={() => void send()}
-                  aria-label="Send message"
+                  className={
+                    "send " +
+                    (query.trim() && !busy ? "ready " : "") +
+                    (!query.trim() ? "mic " : "") +
+                    (listening ? "listening" : "")
+                  }
+                  disabled={busy || (!query.trim() && !canSpeak)}
+                  onClick={() => (query.trim() ? void send() : toggleMic())}
+                  aria-label={
+                    query.trim()
+                      ? "Send message"
+                      : listening
+                        ? "Stop voice input"
+                        : canSpeak
+                          ? "Start voice input"
+                          : "Voice input isn't supported in this browser"
+                  }
                 >
                   {busy ? (
                     <span className="spinner" />

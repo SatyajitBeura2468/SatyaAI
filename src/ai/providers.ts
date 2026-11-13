@@ -30,25 +30,22 @@ type ModelProgressHandler = (
 
 export const MODE_CONFIG: Record<
   SatyaMode,
-  { model: string; temperature: number; maxTokens: number; passes: number }
+  { model: string; temperature: number; maxTokens: number }
 > = {
   fast: {
     model: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
     temperature: 0.3,
     maxTokens: 256,
-    passes: 1,
   },
   smart: {
     model: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
     temperature: 0.4,
     maxTokens: 512,
-    passes: 1,
   },
   deep: {
     model: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
     temperature: 0.25,
     maxTokens: 1536,
-    passes: 2,
   },
 };
 
@@ -330,7 +327,6 @@ export async function localWebLLM(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: MODE_CONFIG[mode].model,
           messages,
           temperature: MODE_CONFIG[mode].temperature,
           max_tokens: MODE_CONFIG[mode].maxTokens,
@@ -357,7 +353,7 @@ export async function localWebLLM(
 
   if (!hasWebGPU()) {
     throw new Error(
-      "WebGPU is unavailable in this browser. Configure an Ollama or OpenAI-compatible endpoint instead.",
+      "WebGPU is unavailable in this browser, so the on-device model cannot run. Try a recent version of Chrome or Edge.",
     );
   }
 
