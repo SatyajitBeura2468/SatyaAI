@@ -18,11 +18,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import "./styles.css";
-import "./layout-fixes.css";
-import "./motion.css";
-import "./premium-polish.css";
-import "./launch-fixes.css";
+import "./cosmos.css";
 import {
   hasWebGPU,
   localWebLLM,
@@ -40,6 +36,7 @@ import {
   type UserMemory,
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
+import { Markdown } from "./markdown";
 
 type Mode = "fast" | "smart" | "deep";
 type Theme = "light" | "dark";
@@ -140,6 +137,23 @@ const speechCtor = (): SpeechCtor | undefined => {
   return w.SpeechRecognition || w.webkitSpeechRecognition;
 };
 
+const SUGGESTIONS = [
+  { title: "Explain the mole concept", hint: "Chemistry, simply" },
+  { title: "Quiz me on organic reactions", hint: "5 quick questions" },
+  { title: "Plan my 7-day revision", hint: "Boards + NEET" },
+  { title: "Why is the sky blue?", hint: "Curiosity break" },
+];
+const preview = (text: string) =>
+  text.replace(/[*`#>_]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
+const isMac =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
+function trackPointer(event: React.PointerEvent<HTMLElement>) {
+  const box = event.currentTarget.getBoundingClientRect();
+  event.currentTarget.style.setProperty("--px", event.clientX - box.left + "px");
+  event.currentTarget.style.setProperty("--py", event.clientY - box.top + "px");
+}
+
 function readSavedMemory(): UserMemory {
   try {
     const saved = localStorage.getItem("satya-memory");
@@ -151,9 +165,9 @@ function readSavedMemory(): UserMemory {
 
 function readSavedTheme(): Theme {
   try {
-    return localStorage.getItem("satya-theme") === "dark" ? "dark" : "light";
+    return localStorage.getItem("satya-theme") === "light" ? "light" : "dark";
   } catch {
-    return "light";
+    return "dark";
   }
 }
 
@@ -200,6 +214,8 @@ function App() {
   });
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const newChatRef = useRef<() => void>(() => {});
   const conversationRef = useRef<HTMLElement>(null);
   const followLatestRef = useRef(true);
   const activeRef = useRef(activeId);
@@ -212,10 +228,12 @@ function App() {
     () =>
       provider.baseUrl
         ? "OpenAI-compatible endpoint configured"
-        : hasWebGPU()
-          ? "WebGPU · browser-local inference"
-          : "This browser has no WebGPU, so the on-device model cannot run",
-    [provider.baseUrl],
+        : gateway === "online"
+          ? "Answers come from the online gateway"
+          : hasWebGPU()
+            ? "WebGPU · browser-local inference"
+            : "This browser has no WebGPU, so the on-device model cannot run",
+    [provider.baseUrl, gateway],
   );
   const engineTitle = provider.baseUrl
     ? "Custom endpoint"
@@ -246,6 +264,38 @@ function App() {
   }, [provider.baseUrl]);
 
   useEffect(() => {
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    let frame = 0;
+    const move = (event: PointerEvent) => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        document.documentElement.style.setProperty("--mx", event.clientX + "px");
+        document.documentElement.style.setProperty("--my", event.clientY + "px");
+      });
+    };
+    window.addEventListener("pointermove", move, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", move);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        newChatRef.current();
+      } else if (event.key === "Escape") {
+        setSettings(false);
+        setMenu(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     try {
@@ -272,7 +322,7 @@ function App() {
   useEffect(() => {
     const container = conversationRef.current;
     if (!container || !followLatestRef.current) return;
-    container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+    container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   function openSettings() {
@@ -384,6 +434,14 @@ function App() {
     setStatus("Ready");
     setFile(null);
     followLatestRef.current = true;
+  }
+
+  newChatRef.current = startNewChat;
+
+  function pickSuggestion(text: string) {
+    if (busy) return;
+    setQuery(text);
+    textareaRef.current?.focus();
   }
 
   async function send() {
@@ -549,7 +607,17 @@ function App() {
   const appearanceLabel = theme === "dark" ? "Light appearance" : "Dark appearance";
 
   return (
-    <div className="app-shell">
+    <div className={"app-shell" + (busy ? " is-busy" : "")}>
+      <div className="cosmos" aria-hidden="true">
+        <i className="nebula n1" />
+        <i className="nebula n2" />
+        <i className="nebula n3" />
+        <i className="stars s1" />
+        <i className="stars s2" />
+        <i className="stars s3" />
+        <i className="grain" />
+      </div>
+      {menu && <div className="scrim" onClick={() => setMenu(false)} />}
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <div className="brand">
           <div className="brand-mark">S</div>
@@ -564,7 +632,7 @@ function App() {
         </div>
 
         <button className="new-chat" onClick={startNewChat}>
-          <Plus size={17} /> New chat <span>⌘ K</span>
+          <Plus size={17} /> New chat <span>{isMac ? "⌘K" : "Ctrl K"}</span>
         </button>
 
         <div className="side-section">
@@ -582,16 +650,17 @@ function App() {
           {chats.length === 0 && (
             <div className="empty-history">No conversations yet</div>
           )}
-          {chats.map((chat) => (
+          {chats.map((chat, index) => (
             <button
               className={"chat-row " + (chat.id === activeId ? "active" : "")}
               key={chat.id}
               onClick={() => openChat(chat)}
+              style={{ "--i": index } as React.CSSProperties}
             >
               <div>
                 <strong>{chat.title}</strong>
                 <small>
-                  {(chat.messages[chat.messages.length - 1]?.text || "").slice(0, 60)}
+                  {preview(chat.messages[chat.messages.length - 1]?.text || "")}
                 </small>
               </div>
               <time>{dayLabel(chat.updatedAt)}</time>
@@ -663,25 +732,41 @@ function App() {
           }}
           aria-label="Conversation"
         >
-          <div className="hero">
-            <div className="orb">
-              <span />
-              <span />
-              <span />
+          {messages.length === 0 && (
+            <div className="hero">
+              <div className="orb">
+                <span />
+                <span />
+                <span />
+              </div>
+              <h1>
+                What would you like
+                <br />
+                <em>to understand?</em>
+              </h1>
+              <p>Truth-first intelligence for reasoning, research, and creation.</p>
+              <div className="suggestions">
+                {SUGGESTIONS.map((item, index) => (
+                  <button
+                    key={item.title}
+                    className="suggestion"
+                    onPointerMove={trackPointer}
+                    onClick={() => pickSuggestion(item.title)}
+                    style={{ "--i": index } as React.CSSProperties}
+                  >
+                    <strong>{item.title}</strong>
+                    <small>{item.hint}</small>
+                  </button>
+                ))}
+              </div>
             </div>
-            <h1>
-              What would you like
-              <br />
-              <em>to understand?</em>
-            </h1>
-            <p>Truth-first intelligence for reasoning, research, and creation.</p>
-          </div>
+          )}
 
           {messages.length > 0 && (
             <div className="messages">
               {messages.map((message, index) => (
                 <div
-                  className={"message " + message.role}
+                  className={"message " + message.role + (message.error ? " error" : "")}
                   key={index + "-" + message.text.slice(0, 10)}
                 >
                   <div className="message-avatar">
@@ -691,9 +776,13 @@ function App() {
                     <div className="message-role">
                       {message.role === "ai" ? "SatyaAI" : "You"}
                     </div>
-                    <p className={message.pending ? "pending-copy" : ""}>
-                      {message.text}
-                    </p>
+                    {message.role === "ai" && !message.pending ? (
+                      <Markdown text={message.text} />
+                    ) : (
+                      <p className={message.pending ? "pending-copy" : ""}>
+                        {message.text}
+                      </p>
+                    )}
                     {message.file && (
                       <small className="file-note">
                         <FileText size={12} /> {message.file.name}
@@ -784,8 +873,9 @@ function App() {
               </div>
             )}
 
-            <div className="composer">
+            <div className="composer" onPointerMove={trackPointer}>
               <textarea
+                ref={textareaRef}
                 value={query}
                 disabled={busy}
                 onChange={(event) => setQuery(event.target.value)}
@@ -926,7 +1016,10 @@ function App() {
               </p>
               <div className="diag-row">
                 <span>Current provider</span>
-                <strong>{provider.model || "Browser WebLLM"}</strong>
+                <strong>
+                  {provider.model ||
+                    (gateway === "online" ? "Hosted model" : "Browser WebLLM")}
+                </strong>
               </div>
               <div className="diag-row">
                 <span>Status</span>
