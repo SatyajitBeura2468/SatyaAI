@@ -302,3 +302,10 @@ button:disabled{cursor:not-allowed}
 
 /* keyboard hint is meaningless on touch screens */
 @media (pointer:coarse){.new-chat span{display:none}}
+
+/* ---------- profile actions ---------- */
+.setting-actions{display:flex;align-items:center;gap:10px;margin-top:14px}
+.setting-actions .save-btn{margin-top:0}
+.ghost-btn{padding:11px 16px;border-radius:13px;font-weight:580;font-size:13.5px;color:var(--text-2);background:var(--surface);border:1px solid var(--border-strong);transition:background .2s,color .2s,transform .25s var(--ease)}
+.ghost-btn:hover{background:var(--surface-hover);color:var(--text);transform:translateY(-1px)}
+.ghost-btn:active{transform:scale(.97)}

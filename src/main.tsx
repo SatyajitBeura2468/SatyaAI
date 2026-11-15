@@ -15,6 +15,7 @@ import {
   Settings,
   Sparkles,
   Sun,
+  User,
   X,
   Zap,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import {
   buildSatyaSystemPrompt,
   extractNameCorrection,
   getIdentityReply,
+  getInitials,
   sanitizeMemory,
   type UserMemory,
 } from "./ai/identity";
@@ -223,6 +225,7 @@ function App() {
   const canSpeak = typeof window !== "undefined" && !!speechCtor();
   activeRef.current = activeId;
   const current = modes[mode];
+  const initials = getInitials(memory.name);
 
   const capability = useMemo(
     () =>
@@ -339,10 +342,22 @@ function App() {
     setMemory(nextMemory);
     try {
       localStorage.setItem("satya-memory", JSON.stringify(nextMemory));
-      setStatus("Personal memory saved on this device.");
+      setStatus("Profile saved on this device.");
     } catch {
-      setStatus("Memory could not be saved in this browser.");
+      setStatus("Profile could not be saved in this browser.");
     }
+  }
+
+  function clearMemory() {
+    setMemory(DEFAULT_USER_MEMORY);
+    setMemoryNameDraft("");
+    setMemoryNotesDraft("");
+    try {
+      localStorage.removeItem("satya-memory");
+    } catch {
+      // Nothing stored, or storage unavailable: either way the profile is empty now.
+    }
+    setStatus("Profile cleared.");
   }
 
   function upsertChat(id: string, list: Message[]) {
@@ -714,7 +729,9 @@ function App() {
             >
               <Settings size={18} />
             </button>
-            <div className="avatar">SB</div>
+            <div className="avatar" aria-label={memory.name ? memory.name : "Your profile"}>
+              {initials || <User size={16} />}
+            </div>
           </div>
         </header>
 
@@ -770,7 +787,11 @@ function App() {
                   key={index + "-" + message.text.slice(0, 10)}
                 >
                   <div className="message-avatar">
-                    {message.role === "ai" ? <Sparkles size={15} /> : "SB"}
+                    {message.role === "ai" ? (
+                      <Sparkles size={15} />
+                    ) : (
+                      initials || <User size={15} />
+                    )}
                   </div>
                   <div className="message-content">
                     <div className="message-role">
@@ -1032,36 +1053,44 @@ function App() {
             </div>
 
             <div className="setting-group">
-              <h3>SatyaAI memory</h3>
+              <h3>Your profile</h3>
               <p>
-                This profile helps SatyaAI remember who it was built for and
-                who created this application. It is stored locally in this
-                browser and can be edited or replaced at any time.
+                Tell SatyaAI what to call you and anything it should remember
+                about you. It is stored only in this browser, and you can
+                change or clear it at any time.
               </p>
               <label>
-                Primary user
+                What should SatyaAI call you?
                 <input
                   value={memoryNameDraft}
                   onChange={(event) => setMemoryNameDraft(event.target.value)}
                   maxLength={80}
-                  placeholder="Your name"
+                  placeholder="Your name (optional)"
+                  autoComplete="off"
                 />
               </label>
               <label>
-                Personal memory and context
+                About you
                 <textarea
                   value={memoryNotesDraft}
                   onChange={(event) => setMemoryNotesDraft(event.target.value)}
                   rows={4}
                   maxLength={3000}
-                  placeholder="What should SatyaAI remember?"
+                  placeholder="Your class, goals, or how you like answers explained (optional)"
                 />
               </label>
-              <button className="save-btn" onClick={saveMemory}>
-                Save memory on this device
-              </button>
+              <div className="setting-actions">
+                <button className="save-btn" onClick={saveMemory}>
+                  Save profile
+                </button>
+                <button className="ghost-btn" onClick={clearMemory}>
+                  Clear
+                </button>
+              </div>
               <div className="memory-footnote">
-                Current profile: {memory.name}
+                {memory.name
+                  ? "SatyaAI calls you " + memory.name + "."
+                  : "No name saved yet."}
               </div>
             </div>
           </section>
