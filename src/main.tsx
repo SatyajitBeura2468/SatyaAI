@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import {
   Archive,
   ArrowUp,
+  Bookmark,
+  BookmarkCheck,
   Bot,
   Check,
   ChevronDown,
@@ -53,6 +55,8 @@ type Message = {
   file?: { name: string; text: string };
 };
 type Chat = { id: string; title: string; updatedAt: number; messages: Message[] };
+type SavedAnswer = { id: string; question: string; answer: string; savedAt: number };
+type SidebarView = "chats" | "saved";
 
 const thinkingPhrases = [
   "Zara vichaar kar raha hoon…",
@@ -93,6 +97,8 @@ const modes: Record<Mode, { label: string; desc: string; icon: React.ReactNode }
 };
 
 const CHATS_KEY = "satya-chats-v1";
+const SAVED_KEY = "satya-saved-v1";
+const MAX_SAVED = 100;
 const AVATAR_KEY = "satya-avatar";
 const AVATAR_SIZE = 256;
 const MAX_CHATS = 30;
@@ -108,6 +114,15 @@ const isChatList = (value: unknown) =>
       typeof chat.id === "string" &&
       typeof chat.title === "string" &&
       Array.isArray(chat.messages),
+  );
+const isSavedList = (value: unknown) =>
+  Array.isArray(value) &&
+  value.every(
+    (item) =>
+      item &&
+      typeof item.id === "string" &&
+      typeof item.question === "string" &&
+      typeof item.answer === "string",
   );
 const dayLabel = (timestamp: number) =>
   new Date(timestamp).toDateString() === new Date().toDateString()
@@ -246,6 +261,10 @@ function App() {
   const [memory, setMemory] = useState<UserMemory>(readSavedMemory);
   const [memoryNameDraft, setMemoryNameDraft] = useState(memory.name);
   const [memoryNotesDraft, setMemoryNotesDraft] = useState(memory.notes);
+  const [saved, setSaved] = useState<SavedAnswer[]>(() =>
+    loadJSON<SavedAnswer[]>(SAVED_KEY, [], isSavedList),
+  );
+  const [sidebarView, setSidebarView] = useState<SidebarView>("chats");
   const [avatar, setAvatar] = useState<string | null>(readSavedAvatar);
   const [avatarNote, setAvatarNote] = useState("");
   const [reasoningOpen, setReasoningOpen] = useState(false);
@@ -304,6 +323,10 @@ function App() {
   useEffect(() => {
     saveJSON(CHATS_KEY, chats);
   }, [chats]);
+
+  useEffect(() => {
+    saveJSON(SAVED_KEY, saved);
+  }, [saved]);
 
   useEffect(() => {
     if (provider.baseUrl) return;
@@ -477,6 +500,55 @@ function App() {
     );
   }
 
+  function questionFor(index: number) {
+    for (let i = index - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].text;
+    }
+    return "";
+  }
+
+  function isSaved(index: number) {
+    const message = messages[index];
+    const question = questionFor(index);
+    return saved.some(
+      (item) => item.answer === message.text && item.question === question,
+    );
+  }
+
+  function toggleSaved(index: number) {
+    const message = messages[index];
+    if (!message || message.role !== "ai" || message.pending || message.error) return;
+    const question = questionFor(index);
+    setSaved((previous) => {
+      const existing = previous.find(
+        (item) => item.answer === message.text && item.question === question,
+      );
+      if (existing) return previous.filter((item) => item !== existing);
+      return [
+        { id: newId(), question, answer: message.text, savedAt: Date.now() },
+        ...previous,
+      ].slice(0, MAX_SAVED);
+    });
+  }
+
+  function removeSaved(id: string) {
+    setSaved((previous) => previous.filter((item) => item.id !== id));
+  }
+
+  // Opens a saved answer as a fresh, unsaved conversation. It only becomes a
+  // chat in "Conversations" if the user actually sends a follow-up.
+  function openSaved(item: SavedAnswer) {
+    if (busy) return;
+    setMessages([
+      { role: "user", text: item.question || "Saved answer" },
+      { role: "ai", text: item.answer },
+    ]);
+    setActiveId(newId());
+    setStatus("Ready");
+    setMenu(false);
+    followLatestRef.current = true;
+  }
+
   function openChat(chat: Chat) {
     if (busy) return;
     setMessages(chat.messages);
@@ -540,6 +612,7 @@ function App() {
 
   function startNewChat() {
     if (busy) return;
+    setSidebarView("chats");
     setMenu(false);
     setActiveId(newId());
     setMessages([]);
@@ -749,35 +822,80 @@ function App() {
 
         <div className="side-section">
           <div className="section-label">Workspace</div>
-          <button className="side-link active">
+          <button
+            className={"side-link" + (sidebarView === "chats" ? " active" : "")}
+            onClick={() => setSidebarView("chats")}
+            aria-pressed={sidebarView === "chats"}
+          >
             <Library size={16} /> Conversations
+            {chats.length > 0 && <span className="side-count">{chats.length}</span>}
           </button>
-          <button className="side-link">
+          <button
+            className={"side-link" + (sidebarView === "saved" ? " active" : "")}
+            onClick={() => setSidebarView("saved")}
+            aria-pressed={sidebarView === "saved"}
+          >
             <Archive size={16} /> Saved answers
+            {saved.length > 0 && <span className="side-count">{saved.length}</span>}
           </button>
         </div>
 
         <div className="side-section history">
-          <div className="section-label">Recent</div>
-          {chats.length === 0 && (
-            <div className="empty-history">No conversations yet</div>
+          {sidebarView === "chats" ? (
+            <>
+              <div className="section-label">Recent</div>
+              {chats.length === 0 && (
+                <div className="empty-history">No conversations yet</div>
+              )}
+              {chats.map((chat, index) => (
+                <button
+                  className={"chat-row " + (chat.id === activeId ? "active" : "")}
+                  key={chat.id}
+                  onClick={() => openChat(chat)}
+                  style={{ "--i": index } as React.CSSProperties}
+                >
+                  <div>
+                    <strong>{chat.title}</strong>
+                    <small>
+                      {preview(chat.messages[chat.messages.length - 1]?.text || "")}
+                    </small>
+                  </div>
+                  <time>{dayLabel(chat.updatedAt)}</time>
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              <div className="section-label">Saved</div>
+              {saved.length === 0 && (
+                <div className="empty-history">
+                  Nothing saved yet. Tap “Save answer” under any reply.
+                </div>
+              )}
+              {saved.map((item, index) => (
+                <div
+                  className="saved-row"
+                  key={item.id}
+                  style={{ "--i": index } as React.CSSProperties}
+                >
+                  <button className="chat-row" onClick={() => openSaved(item)}>
+                    <div>
+                      <strong>{item.question || "Saved answer"}</strong>
+                      <small>{preview(item.answer)}</small>
+                    </div>
+                  </button>
+                  <button
+                    className="icon-btn saved-remove"
+                    onClick={() => removeSaved(item.id)}
+                    aria-label="Remove saved answer"
+                    title="Remove"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </>
           )}
-          {chats.map((chat, index) => (
-            <button
-              className={"chat-row " + (chat.id === activeId ? "active" : "")}
-              key={chat.id}
-              onClick={() => openChat(chat)}
-              style={{ "--i": index } as React.CSSProperties}
-            >
-              <div>
-                <strong>{chat.title}</strong>
-                <small>
-                  {preview(chat.messages[chat.messages.length - 1]?.text || "")}
-                </small>
-              </div>
-              <time>{dayLabel(chat.updatedAt)}</time>
-            </button>
-          ))}
         </div>
 
         <div className="sidebar-bottom">
@@ -957,6 +1075,25 @@ function App() {
                         <FileText size={12} /> {message.file.name}
                       </small>
                     )}
+                    {message.role === "ai" &&
+                      !message.pending &&
+                      !message.error &&
+                      !(busy && index === messages.length - 1) && (
+                        <div className="message-actions">
+                          <button
+                            className={"msg-action" + (isSaved(index) ? " on" : "")}
+                            onClick={() => toggleSaved(index)}
+                            aria-pressed={isSaved(index)}
+                          >
+                            {isSaved(index) ? (
+                              <BookmarkCheck size={14} />
+                            ) : (
+                              <Bookmark size={14} />
+                            )}
+                            {isSaved(index) ? "Saved" : "Save answer"}
+                          </button>
+                        </div>
+                      )}
                     {message.pending && message.modelProgress && (
                       <div className="model-progress">
                         <div className="model-progress-heading">
