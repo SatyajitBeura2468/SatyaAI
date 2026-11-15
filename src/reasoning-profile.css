@@ -1,0 +1,41 @@
+/* ---------- reasoning dropdown (replaces the old bottom mode dock) ---------- */
+.reasoning{position:relative}
+.reasoning-btn{cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.reasoning-btn:hover,.reasoning-btn.open{background:var(--surface-hover);color:var(--text);border-color:var(--border-strong)}
+.reasoning-btn svg{flex:none}
+.reasoning-btn > svg:first-child{color:var(--accent-2)}
+.reasoning-current{font-style:normal;font-weight:500;color:var(--text-3)}
+.reasoning-btn .chev{transition:transform .3s var(--ease)}
+.reasoning-btn.open .chev{transform:rotate(180deg)}
+.reasoning-menu{position:absolute;top:calc(100% + 8px);left:0;z-index:30;display:flex;flex-direction:column;gap:2px;width:min(320px,calc(100vw - 24px));padding:6px;border-radius:18px;background:var(--glass-strong);-webkit-backdrop-filter:blur(26px) saturate(1.5);backdrop-filter:blur(26px) saturate(1.5);border:1px solid var(--border-strong);box-shadow:var(--shadow),var(--hi);animation:menuIn .25s var(--ease) both}
+@keyframes menuIn{from{opacity:0;transform:translateY(-6px) scale(.97)}}
+.reasoning-option{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:13px;text-align:left;color:var(--text-2);transition:background .2s,color .2s}
+.reasoning-option:hover{background:var(--surface-hover);color:var(--text)}
+.reasoning-option.chosen{color:var(--text);background:linear-gradient(135deg,rgba(139,123,255,.26),rgba(94,200,255,.14))}
+.ro-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--accent-2)}
+.ro-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+.ro-text strong{font-size:13.5px;font-weight:600}
+.ro-text small{font-size:12px;color:var(--text-3)}
+.ro-check{color:var(--accent-2)}
+
+/* the dock is gone, so the composer now sits at the very bottom */
+.composer-wrap{padding-bottom:max(14px,env(safe-area-inset-bottom))}
+
+/* ---------- profile picture ---------- */
+button.avatar{padding:0;overflow:hidden;cursor:pointer;transition:transform .25s var(--ease),box-shadow .25s}
+button.avatar:hover{transform:scale(1.06)}
+button.avatar:active{transform:scale(.95)}
+.avatar img,.message-avatar img,.avatar-preview img{display:block;width:100%;height:100%;object-fit:cover}
+.message-avatar{overflow:hidden}
+.avatar-setting{display:flex;align-items:center;gap:14px;margin-top:4px}
+.avatar-preview{flex:none;display:grid;place-items:center;width:56px;height:56px;border-radius:50%;overflow:hidden;font-weight:700;font-size:16px;color:#fff;background:var(--grad);box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--border-strong)}
+.avatar-setting-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+@media (max-width:860px){
+  .reasoning-menu{width:min(300px,calc(100vw - 80px))}
+  .reasoning-option{min-height:48px}
+  .reasoning-btn{min-height:40px}
+}
+@media (max-width:480px){
+  .reasoning-current{display:none}
+}

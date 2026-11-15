@@ -4,6 +4,7 @@ import {
   Archive,
   ArrowUp,
   Bot,
+  Check,
   ChevronDown,
   FileText,
   Library,
@@ -20,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import "./cosmos.css";
+import "./reasoning-profile.css";
 import {
   hasWebGPU,
   localWebLLM,
@@ -91,6 +93,8 @@ const modes: Record<Mode, { label: string; desc: string; icon: React.ReactNode }
 };
 
 const CHATS_KEY = "satya-chats-v1";
+const AVATAR_KEY = "satya-avatar";
+const AVATAR_SIZE = 256;
 const MAX_CHATS = 30;
 const ATTACH_MAX_CHARS = 6000;
 const ATTACH_MAX_BYTES = 1_000_000;
@@ -165,6 +169,52 @@ function readSavedMemory(): UserMemory {
   }
 }
 
+function readSavedAvatar(): string | null {
+  try {
+    const saved = localStorage.getItem(AVATAR_KEY);
+    return saved && saved.startsWith("data:image/") ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+// Centre-crops the chosen image to a square and shrinks it, so a big photo
+// still fits comfortably in localStorage.
+async function resizeAvatar(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Could not decode image"));
+      image.src = url;
+    });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    if (!side) throw new Error("Image has no size");
+    const canvas = document.createElement("canvas");
+    canvas.width = AVATAR_SIZE;
+    canvas.height = AVATAR_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    ctx.drawImage(
+      img,
+      (img.naturalWidth - side) / 2,
+      (img.naturalHeight - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      AVATAR_SIZE,
+      AVATAR_SIZE,
+    );
+    return canvas.toDataURL("image/jpeg", 0.88);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function readSavedTheme(): Theme {
   try {
     return localStorage.getItem("satya-theme") === "light" ? "light" : "dark";
@@ -196,6 +246,9 @@ function App() {
   const [memory, setMemory] = useState<UserMemory>(readSavedMemory);
   const [memoryNameDraft, setMemoryNameDraft] = useState(memory.name);
   const [memoryNotesDraft, setMemoryNotesDraft] = useState(memory.notes);
+  const [avatar, setAvatar] = useState<string | null>(readSavedAvatar);
+  const [avatarNote, setAvatarNote] = useState("");
+  const [reasoningOpen, setReasoningOpen] = useState(false);
 
   const [provider] = useState<ProviderSettings>(() => {
     try {
@@ -216,6 +269,8 @@ function App() {
   });
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const reasoningRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const newChatRef = useRef<() => void>(() => {});
   const conversationRef = useRef<HTMLElement>(null);
@@ -292,11 +347,23 @@ function App() {
       } else if (event.key === "Escape") {
         setSettings(false);
         setMenu(false);
+        setReasoningOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!reasoningOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!reasoningRef.current?.contains(event.target as Node)) {
+        setReasoningOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [reasoningOpen]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -358,6 +425,36 @@ function App() {
       // Nothing stored, or storage unavailable: either way the profile is empty now.
     }
     setStatus("Profile cleared.");
+  }
+
+  async function pickAvatar(chosen: File | undefined) {
+    if (!chosen) return;
+    if (!chosen.type.startsWith("image/")) {
+      setAvatarNote("Please choose an image file.");
+      return;
+    }
+    try {
+      const resized = await resizeAvatar(chosen);
+      setAvatar(resized);
+      try {
+        localStorage.setItem(AVATAR_KEY, resized);
+        setAvatarNote("Profile picture updated.");
+      } catch {
+        setAvatarNote("Picture applied, but it could not be saved in this browser.");
+      }
+    } catch {
+      setAvatarNote("Could not read that image. Try a JPG or PNG.");
+    }
+  }
+
+  function removeAvatar() {
+    setAvatar(null);
+    try {
+      localStorage.removeItem(AVATAR_KEY);
+    } catch {
+      // Nothing stored, or storage unavailable: either way the picture is gone.
+    }
+    setAvatarNote("Profile picture removed.");
   }
 
   function upsertChat(id: string, list: Message[]) {
@@ -718,8 +815,42 @@ function App() {
           >
             <Menu size={19} />
           </button>
-          <div className="crumb">
-            Conversations <ChevronDown size={14} />
+          <div className="reasoning" ref={reasoningRef}>
+            <button
+              className={"crumb reasoning-btn" + (reasoningOpen ? " open" : "")}
+              onClick={() => setReasoningOpen((open) => !open)}
+              aria-haspopup="listbox"
+              aria-expanded={reasoningOpen}
+              aria-label={"Reasoning mode: " + current.label}
+            >
+              {current.icon}
+              <span>Reasoning</span>
+              <em className="reasoning-current">{current.label}</em>
+              <ChevronDown size={14} className="chev" />
+            </button>
+            {reasoningOpen && (
+              <div className="reasoning-menu" role="listbox" aria-label="Reasoning mode">
+                {(Object.keys(modes) as Mode[]).map((key) => (
+                  <button
+                    key={key}
+                    role="option"
+                    aria-selected={mode === key}
+                    className={"reasoning-option" + (mode === key ? " chosen" : "")}
+                    onClick={() => {
+                      setMode(key);
+                      setReasoningOpen(false);
+                    }}
+                  >
+                    <span className="ro-icon">{modes[key].icon}</span>
+                    <span className="ro-text">
+                      <strong>{modes[key].label}</strong>
+                      <small>{modes[key].desc}</small>
+                    </span>
+                    {mode === key && <Check size={15} className="ro-check" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="top-actions">
             <button
@@ -729,9 +860,24 @@ function App() {
             >
               <Settings size={18} />
             </button>
-            <div className="avatar" aria-label={memory.name ? memory.name : "Your profile"}>
-              {initials || <User size={16} />}
-            </div>
+            <button
+              className="avatar"
+              onClick={() => avatarInputRef.current?.click()}
+              aria-label="Change profile picture"
+              title={memory.name ? memory.name + " · change picture" : "Change profile picture"}
+            >
+              {avatar ? <img src={avatar} alt="" /> : initials || <User size={16} />}
+            </button>
+            <input
+              ref={avatarInputRef}
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={(event) => {
+                void pickAvatar(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
           </div>
         </header>
 
@@ -789,6 +935,8 @@ function App() {
                   <div className="message-avatar">
                     {message.role === "ai" ? (
                       <Sparkles size={15} />
+                    ) : avatar ? (
+                      <img src={avatar} alt="" />
                     ) : (
                       initials || <User size={15} />
                     )}
@@ -988,23 +1136,6 @@ function App() {
             </div>
           </div>
         </section>
-
-        <div className="mode-dock">
-          <div className="mode-label">Reasoning mode</div>
-          <div className="mode-switch">
-            {(Object.keys(modes) as Mode[]).map((key) => (
-              <button
-                key={key}
-                className={mode === key ? "chosen" : ""}
-                onClick={() => setMode(key)}
-              >
-                {modes[key].icon}
-                <span>{modes[key].label}</span>
-              </button>
-            ))}
-          </div>
-          <div className="mode-description">{current.desc}</div>
-        </div>
       </main>
 
       {settings && (
@@ -1059,6 +1190,25 @@ function App() {
                 about you. It is stored only in this browser, and you can
                 change or clear it at any time.
               </p>
+              <div className="avatar-setting">
+                <div className="avatar-preview" aria-hidden="true">
+                  {avatar ? <img src={avatar} alt="" /> : initials || <User size={22} />}
+                </div>
+                <div className="avatar-setting-actions">
+                  <button
+                    className="ghost-btn"
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    {avatar ? "Change picture" : "Upload picture"}
+                  </button>
+                  {avatar && (
+                    <button className="ghost-btn" onClick={removeAvatar}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+              {avatarNote && <div className="memory-footnote" role="status">{avatarNote}</div>}
               <label>
                 What should SatyaAI call you?
                 <input
