@@ -55,3 +55,72 @@ button.avatar:active{transform:scale(.95)}
 .msg-action:active{transform:scale(.96)}
 .msg-action.on{color:var(--accent-2);border-color:rgba(94,200,255,.4);background:rgba(94,200,255,.08)}
 @media (max-width:860px){.msg-action{height:36px}}
+
+/* =====================================================================
+   Living cosmos: starfield canvas, breathing nebulae, aurora, alive hero
+   ===================================================================== */
+.starfield{position:absolute;inset:0;width:100%;height:100%;display:block;opacity:1;transition:opacity 1s ease}
+.starfield.off{opacity:0}
+
+/* nebulae drift AND breathe */
+@keyframes nebBreath{0%,100%{opacity:calc(.5*var(--neb))}50%{opacity:calc(.86*var(--neb))}}
+.n1{animation:floatA 46s ease-in-out infinite alternate,nebBreath 11s ease-in-out infinite}
+.n2{animation:floatB 58s ease-in-out infinite alternate,nebBreath 14s ease-in-out -4s infinite}
+.n3{animation:floatA 70s ease-in-out infinite alternate-reverse,nebBreath 9s ease-in-out -2s infinite}
+
+/* aurora ribbon rising from the bottom edge */
+.cosmos::before{content:"";position:absolute;left:-40%;bottom:-18%;width:180%;height:62%;pointer-events:none;
+  background:radial-gradient(60% 70% at 28% 100%,rgba(94,200,255,.2),transparent 70%),radial-gradient(55% 65% at 68% 100%,rgba(150,120,255,.22),transparent 70%),radial-gradient(40% 50% at 92% 100%,rgba(90,235,200,.12),transparent 70%);
+  filter:blur(18px);animation:aurora 19s ease-in-out infinite alternate;will-change:transform}
+:root[data-theme="light"] .cosmos::before{opacity:.45}
+@keyframes aurora{0%{transform:translate3d(-7%,0,0) scaleY(.85)}100%{transform:translate3d(7%,-4%,0) scaleY(1.25)}}
+
+/* hero */
+.hero>.orb{animation:rise .8s var(--ease) both,orbFloat 7s ease-in-out .9s infinite}
+@keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.orb::after{inset:-10px;border:1px solid rgba(139,123,255,.55);animation:halo 4.2s ease-out infinite}
+@keyframes halo{0%{transform:scale(.9);opacity:.75}100%{transform:scale(2.15);opacity:0}}
+.hero h1{animation:titleIn 1.15s var(--ease) .05s both}
+@keyframes titleIn{from{opacity:0;letter-spacing:.1em;transform:translateY(18px) scale(.98);filter:blur(14px)}}
+.hero h1 em{animation:sheen 9s ease-in-out infinite alternate,emGlow 6s ease-in-out infinite}
+@keyframes emGlow{0%,100%{filter:drop-shadow(0 0 10px rgba(139,123,255,.22))}50%{filter:drop-shadow(0 0 24px rgba(94,200,255,.5))}}
+:root[data-theme="light"] .hero h1 em{animation:sheen 9s ease-in-out infinite alternate}
+
+/* suggestion cards: staggered entrance + a light that circles each border */
+@property --ang{syntax:"<angle>";initial-value:0deg;inherits:false}
+.suggestion{animation:cardIn .8s var(--ease) both;animation-delay:calc(.42s + var(--i,0)*110ms)}
+@keyframes cardIn{from{opacity:0;transform:translateY(22px) scale(.96);filter:blur(5px)}}
+.suggestion::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;opacity:.7;
+  background:conic-gradient(from var(--ang),transparent 0 68%,rgba(139,123,255,.95) 84%,rgba(94,200,255,.95) 92%,transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:borderSpin 8s linear infinite;animation-delay:calc(var(--i,0)*-2s)}
+@keyframes borderSpin{to{--ang:360deg}}
+
+/* small touches elsewhere so the whole page feels alive */
+.brand-mark{animation:brandGlow 5s ease-in-out infinite}
+@keyframes brandGlow{0%,100%{box-shadow:0 0 0 1px rgba(255,255,255,.18) inset,0 8px 24px -6px var(--glow)}50%{box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,0 8px 34px -2px var(--glow)}}
+.composer:focus-within{animation:composerGlow 3.4s ease-in-out infinite}
+@keyframes composerGlow{0%,100%{box-shadow:var(--shadow),var(--hi),0 0 0 1px rgba(139,123,255,.35),0 0 28px -8px var(--glow)}50%{box-shadow:var(--shadow),var(--hi),0 0 0 1px rgba(94,200,255,.5),0 0 44px -6px rgba(94,200,255,.45)}}
+
+@media (max-width:860px){
+  .cosmos::before{filter:blur(12px);height:46%}
+  .suggestion::after{animation-duration:10s}
+}
+
+/* Laptop-height screens (e.g. 1366x768): compact the hero so the orb and
+   title are never clipped above the conversation area. */
+@media (max-height:860px) and (min-width:861px){
+  .hero{padding:8px 0 6px}
+  .orb{width:84px;height:84px;margin-bottom:20px}
+  .orb::before{inset:11px}
+  .orb span:nth-child(2){inset:-16px}
+  .orb span:nth-child(3){inset:-28px}
+  .hero h1{font-size:clamp(32px,5vw,50px)}
+  .hero p{margin-top:12px}
+  .suggestions{margin-top:22px}
+}
+
+/* the composer's full-bleed blur strip must not create scrollbars */
+.conversation{overflow-x:hidden}
+.composer-wrap::before{bottom:0}

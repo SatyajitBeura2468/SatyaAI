@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import "./cosmos.css";
 import "./reasoning-profile.css";
+import { Starfield } from "./Starfield";
 import {
   hasWebGPU,
   localWebLLM,
@@ -804,9 +805,7 @@ function App() {
         <i className="nebula n1" />
         <i className="nebula n2" />
         <i className="nebula n3" />
-        <i className="stars s1" />
-        <i className="stars s2" />
-        <i className="stars s3" />
+        <Starfield active={theme === "dark"} busy={busy} />
         <i className="grain" />
       </div>
       {menu && <div className="scrim" onClick={() => setMenu(false)} />}
