@@ -2,7 +2,7 @@
 // The browser never sees the provider key, and the client cannot choose the model,
 // the system prompt, or an unbounded token budget.
 
-const SYSTEM_PROMPT = 'You are SatyaAI, a concise and honest assistant. Say when you are uncertain.';
+import { buildSatyaCorePrompt } from '../src/ai/core/index.js';
 const MAX_MESSAGES = 40;
 const MAX_CHARS = 24000;
 const MAX_TOKENS_CAP = 2048;
@@ -65,6 +65,19 @@ export default async function handler(req, res) {
   if (turns.length === 0 || turns[turns.length - 1].role !== 'user') return res.status(400).json({ error: 'The last message must be from the user.' });
   if (turns.reduce((sum, m) => sum + m.content.length, 0) > MAX_CHARS) return res.status(413).json({ error: `Prompt too long (max ${MAX_CHARS} characters).` });
 
+  const mode = ["fast", "smart", "deep"].includes(body.mode) ? body.mode : null;
+  const systemPrompt = buildSatyaCorePrompt({
+    userMemory: body.user_memory,
+    runtimeContext: {
+      mode,
+      inferenceRoute: "remote-gateway",
+      provider: "Configured remote inference endpoint",
+      activeModel: model,
+      localInferenceAvailable: false,
+      remoteInferenceAvailable: true,
+    },
+  });
+
   const requested = Number(body.max_tokens);
   const maxTokens = Number.isFinite(requested) && requested > 0 ? Math.min(Math.floor(requested), MAX_TOKENS_CAP) : DEFAULT_MAX_TOKENS;
   const temp = Number(body.temperature);
@@ -75,7 +88,7 @@ export default async function handler(req, res) {
     upstream = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...turns], temperature, max_tokens: maxTokens, stream: false }),
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...turns], temperature, max_tokens: maxTokens, stream: false }),
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
   } catch (error) {

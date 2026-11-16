@@ -661,7 +661,13 @@ function App() {
       }));
 
     const modelMessages: ChatMessage[] = [
-      { role: "system", content: buildSatyaSystemPrompt(memoryForTurn) },
+      { role: "system", content: buildSatyaSystemPrompt(memoryForTurn, provider.baseUrl && provider.model ? {
+          mode,
+          inferenceRoute: "custom-compatible",
+          provider: "User-configured OpenAI-compatible endpoint",
+          activeModel: provider.model,
+          remoteInferenceAvailable: true,
+        } : undefined) },
       ...history,
       { role: "user", content: attached ? withFile({ text, file: attached }) : text },
     ];
@@ -738,6 +744,7 @@ function App() {
             });
           },
           (active) => setThinkingActive(active),
+          memoryForTurn,
         );
       }
 

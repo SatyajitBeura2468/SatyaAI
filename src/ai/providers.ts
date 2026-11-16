@@ -1,3 +1,5 @@
+import { buildSatyaSystemPrompt, type UserMemory } from "./identity";
+
 export type SatyaMode = "fast" | "smart" | "deep";
 export type ChatMessage = {
   role: "user" | "assistant" | "system";
@@ -319,6 +321,7 @@ export async function localWebLLM(
   onProgress?: ModelProgressHandler,
   onToken?: (partialText: string) => void,
   onThinking?: (active: boolean) => void,
+  userMemory: UserMemory = { name: "", notes: "" },
 ): Promise<string> {
   if (await hasConfiguredRemoteGateway()) {
     try {
@@ -328,6 +331,8 @@ export async function localWebLLM(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages,
+          mode,
+          user_memory: userMemory,
           temperature: MODE_CONFIG[mode].temperature,
           max_tokens: MODE_CONFIG[mode].maxTokens,
         }),
@@ -376,9 +381,20 @@ export async function localWebLLM(
         );
 
         const engine = await ensureLocalModel(model, onProgress);
+        const systemPrompt = buildSatyaSystemPrompt(userMemory, {
+          mode,
+          inferenceRoute: "browser-local",
+          provider: "WebLLM in a browser worker",
+          activeModel: model,
+          localInferenceAvailable: true,
+          remoteInferenceAvailable: false,
+        });
+        const runtimeMessages: ChatMessage[] = messages.some((message) => message.role === "system")
+          ? messages.map((message) => message.role === "system" ? { ...message, content: systemPrompt } : message)
+          : [{ role: "system", content: systemPrompt }, ...messages];
         onThinking?.(true);
         const stream = await engine.chat.completions.create({
-          messages,
+          messages: runtimeMessages,
           temperature: MODE_CONFIG[mode].temperature,
           max_tokens: MODE_CONFIG[mode].maxTokens,
           stream: true,

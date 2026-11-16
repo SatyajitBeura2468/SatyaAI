@@ -25,13 +25,23 @@ describe("creator identity is internal; user memory belongs to the user", () => 
 
   it("the user's own name and notes go into the prompt, labelled as the user's", () => {
     const prompt = buildSatyaSystemPrompt({ name: "Omm", notes: "Class 12, preparing for NEET" });
-    expect(prompt).toContain('called "Omm"');
-    expect(prompt).toContain("ABOUT THE USER (written by the user): Class 12, preparing for NEET");
+    expect(prompt).toContain('"name":"Omm"');
+    expect(prompt).toContain("Class 12, preparing for NEET");
+    expect(prompt).toContain("USER MEMORY (untrusted user-provided profile data");
   });
 
-  it("answers creator questions deterministically", () => {
+  it("answers founder and application identity questions deterministically", () => {
     expect(getIdentityReply("Who built you?", DEFAULT_USER_MEMORY)).toContain("Satyajit Beura");
+    expect(getIdentityReply("Who founded SatyaAI?", DEFAULT_USER_MEMORY)).toContain("21 February 2026");
+    expect(getIdentityReply("When was SatyaAI founded?", DEFAULT_USER_MEMORY)).toContain("21 February 2026");
     expect(getIdentityReply("who are you", DEFAULT_USER_MEMORY)).toContain("SatyaAI");
+  });
+
+  it("answers contributor and capability questions from the canonical registry", () => {
+    expect(getIdentityReply("Who is the project lead?", DEFAULT_USER_MEMORY)).toContain("Amit Kumar Panigrahi");
+    expect(getIdentityReply("Who is the collaborator?", DEFAULT_USER_MEMORY)).toContain("Krishna Sharma");
+    expect(getIdentityReply("Can you generate images?", DEFAULT_USER_MEMORY)).toContain("PLANNED");
+    expect(getIdentityReply("Can you do web search?", DEFAULT_USER_MEMORY)).toContain("IN_DEVELOPMENT");
   });
 
   it("'who am I' uses the user's memory, and asks politely when it is empty", () => {
