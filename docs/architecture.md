@@ -10,7 +10,9 @@ src/ai/identity.ts is the application-facing adapter. It keeps user-editable pro
 
 ## SatyaSom Engine and reasoning tiers
 
-SatyaSom Engine is SatyaAI's foundational engine identity. The four named tiers are Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). The tier name communicates the selected reasoning level; it is not a separate foundation-model or architecture name. Runtime identity answers must keep the foundation and selected tier distinct.
+SatyaSom Engine is the shared model-engine platform for SatyaAI, not a foundation model or checkpoint. SatyaAI does not have one single foundational model shared by all tiers. The four tiers are Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think), each with a configuration suited to its workload. A tier name identifies the active reasoning level, not the underlying checkpoint.
+
+This repository currently routes inference to pre-existing configured checkpoints and does not contain a model-training pipeline. Do not claim the current checkpoint weights were trained from scratch inside SatyaSom Engine. The actual training pipeline and provenance must be documented separately when implemented.
 
 ## Inference routes
 
