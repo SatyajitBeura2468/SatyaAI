@@ -52,18 +52,21 @@ import {
   getIdentityReply,
   getInitials,
   sanitizeMemory,
+  getSatyaEngine,
+  type SatyaEngineMode,
   type UserMemory,
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
 import { Markdown } from "./markdown";
 
-type Mode = "nano" | "fast" | "smart" | "deep";
+type Mode = SatyaEngineMode;
 type Theme = "light" | "dark";
 type Message = {
   role: "user" | "ai";
   text: string;
   pending?: boolean;
   modelProgress?: ModelProgressSnapshot;
+  engineName?: string;
   error?: boolean;
   file?: { name: string; text: string };
 };
@@ -85,27 +88,11 @@ function formatDuration(seconds: number | null): string | null {
   return minutes + "m " + String(remainder).padStart(2, "0") + "s";
 }
 
-const modes: Record<Mode, { label: string; desc: string; icon: React.ReactNode }> = {
-  nano: {
-    label: "Nano",
-    desc: "Lightweight, on-device replies",
-    icon: <Cpu size={15} />,
-  },
-  fast: {
-    label: "Fast",
-    desc: "Quick, efficient answers",
-    icon: <Zap size={15} />,
-  },
-  smart: {
-    label: "Smart",
-    desc: "Balanced reasoning & quality",
-    icon: <Sparkles size={15} />,
-  },
-  deep: {
-    label: "Deep Think",
-    desc: "Longer, more detailed answers",
-    icon: <Bot size={15} />,
-  },
+const modes: Record<Mode, { desc: string }> = {
+  nano: { desc: "Lightweight, on-device replies" },
+  fast: { desc: "Quick, efficient answers" },
+  smart: { desc: "Balanced reasoning & quality" },
+  deep: { desc: "Longer, more detailed answers" },
 };
 
 const CHATS_KEY = "satya-chats-v1";
@@ -320,7 +307,7 @@ function App() {
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const canSpeak = typeof window !== "undefined" && !!speechCtor();
   activeRef.current = activeId;
-  const current = modes[mode];
+  const current = getSatyaEngine(mode)!;
   const initials = getInitials(memory.name);
 
   const capability = useMemo(
@@ -767,19 +754,24 @@ function App() {
         content: withFile(message),
       }));
 
+    const inferenceRoute = mode !== "nano" && provider.baseUrl && provider.model
+      ? "custom-compatible"
+      : mode !== "nano" && gateway === "online"
+        ? "remote-gateway"
+        : "browser-local";
     const modelMessages: ChatMessage[] = [
-      { role: "system", content: buildSatyaSystemPrompt(memoryForTurn, provider.baseUrl && provider.model ? {
+      { role: "system", content: buildSatyaSystemPrompt(memoryForTurn, {
           mode,
-          inferenceRoute: "custom-compatible",
-          provider: "User-configured OpenAI-compatible endpoint",
-          activeModel: provider.model,
-          remoteInferenceAvailable: true,
-        } : undefined) },
+          inferenceRoute,
+          localInferenceAvailable: inferenceRoute === "browser-local",
+          remoteInferenceAvailable: inferenceRoute !== "browser-local",
+        }) },
       ...history,
       { role: "user", content: attached ? withFile({ text, file: attached }) : text },
     ];
 
-    const identityAnswer = getIdentityReply(text, memoryForTurn);
+    const selectedEngine = getSatyaEngine(mode)!;
+    const identityAnswer = getIdentityReply(text, memoryForTurn, mode);
 
     setQuery("");
     setFile(null);
@@ -828,6 +820,7 @@ function App() {
         role: "ai",
         text: initialLoadingMessage,
         pending: true,
+        engineName: selectedEngine.name,
         ...(initialModelProgress ? { modelProgress: initialModelProgress } : {}),
       },
     ]);
@@ -895,7 +888,7 @@ function App() {
               const next = [...previous];
               const last = next.length - 1;
               if (last >= 0 && next[last].role === "ai") {
-                next[last] = { role: "ai", text: partial };
+                next[last] = { ...next[last], role: "ai", text: partial, pending: false };
               }
               return next;
             });
@@ -909,7 +902,7 @@ function App() {
         const next = [...previous];
         const last = next.length - 1;
         if (last >= 0 && next[last].role === "ai") {
-          next[last] = { role: "ai", text: answer };
+          next[last] = { ...next[last], role: "ai", text: answer, pending: false };
         }
         return next;
       });
@@ -917,7 +910,7 @@ function App() {
       upsertChat(chatId, [
         ...priorMessages,
         { role: "user", text, ...(attached ? { file: attached } : {}) },
-        { role: "ai", text: answer },
+        { role: "ai", text: answer, engineName: selectedEngine.name },
       ]);
     } catch (error) {
       const errorMessage =
@@ -927,12 +920,14 @@ function App() {
         const last = next.length - 1;
         if (last >= 0 && next[last].role === "ai") {
           next[last] = {
+            ...next[last],
             role: "ai",
             text:
               "I couldn't generate a response: " +
               errorMessage +
               "\n\nCheck the model status or choose a supported inference endpoint in Settings.",
             error: true,
+            pending: false,
           };
         }
         return next;
@@ -944,6 +939,7 @@ function App() {
           role: "ai",
           text: "I couldn't generate a response: " + errorMessage,
           error: true,
+          engineName: selectedEngine.name,
         },
       ]);
       setStatus("Needs attention");
@@ -1106,11 +1102,11 @@ function App() {
               onClick={() => setReasoningOpen((open) => !open)}
               aria-haspopup="listbox"
               aria-expanded={reasoningOpen}
-              aria-label={"Reasoning mode: " + current.label}
+              aria-label={"Reasoning mode: " + current.modeLabel + ", engine " + current.name}
             >
-              {current.icon}
+              <span className="reasoning-symbol" aria-hidden="true">{current.symbol}</span>
               <span>Reasoning</span>
-              <em className="reasoning-current">{current.label}</em>
+              <em className="reasoning-current">{current.modeLabel}</em>
               <ChevronDown size={14} className="chev" />
             </button>
             {reasoningOpen && (
@@ -1126,9 +1122,12 @@ function App() {
                       setReasoningOpen(false);
                     }}
                   >
-                    <span className="ro-icon">{modes[key].icon}</span>
+                    <span className="ro-icon ro-symbol" aria-hidden="true">{getSatyaEngine(key)!.symbol}</span>
                     <span className="ro-text">
-                      <strong>{modes[key].label}</strong>
+                      <span className="ro-primary">
+                        <strong>{getSatyaEngine(key)!.name}</strong>
+                        <small className="ro-mode">{getSatyaEngine(key)!.modeLabel}</small>
+                      </span>
                       <small>{modes[key].desc}</small>
                     </span>
                     {mode === key && <Check size={15} className="ro-check" />}
@@ -1228,7 +1227,9 @@ function App() {
                   </div>
                   <div className="message-content">
                     <div className="message-role">
-                      {message.role === "ai" ? "SatyaAI" : "You"}
+                      {message.role === "ai" ? (
+                        <>SatyaAI{message.engineName ? <span className="message-engine">({message.engineName})</span> : null}</>
+                      ) : "You"}
                     </div>
                     {message.role === "ai" && !message.pending ? (
                       <Markdown text={message.text} />
