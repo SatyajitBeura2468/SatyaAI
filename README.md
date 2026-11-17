@@ -4,7 +4,7 @@ Truth-first intelligence for reasoning, research, and creation.
 
 ### [Open SatyaAI →](https://satyaai-five.vercel.app)
 
-SatyaAI V0.1 is a privacy-conscious, local-first AI application. It exposes four reasoning modes with its own public engine identities: Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). When WebGPU is available, text inference runs locally in the browser and model assets are cached on the device. If local inference is unavailable, SatyaAI reports the limitation instead of fabricating model output, citations, or search results.
+SatyaAI V0.1 is a privacy-conscious, local-first AI application. Its shared model-engine platform is SatyaSom Engine. It exposes four workload-specific reasoning tiers: Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). These tier names are product identities, not foundation-model names. When WebGPU is available, text inference runs locally in the browser and model assets are cached on the device. If local inference is unavailable, SatyaAI reports the limitation instead of fabricating model output, citations, or search results.
 
 ## Run locally
 
