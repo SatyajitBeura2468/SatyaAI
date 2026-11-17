@@ -1,16 +1,16 @@
-export type SatyaEngineMode = "nano" | "fast" | "smart" | "deep";
-export type SatyaEngineIdentity = Readonly<{ name: string; symbol: string; modeLabel: string }>;
+export type SatyaTierMode = "nano" | "fast" | "smart" | "deep";
+export type SatyaTierIdentity = Readonly<{ name: string; symbol: string; modeLabel: string }>;
 export type CoreCapabilityStatus = "AVAILABLE" | "IN_DEVELOPMENT" | "PLANNED" | "UNAVAILABLE";
 export type CoreRuntimeContext = {
-  mode?: SatyaEngineMode | null;
+  mode?: SatyaTierMode | null;
   inferenceRoute?: "browser-local" | "remote-gateway" | "custom-compatible" | "unknown";
   availableTools?: string[];
   localInferenceAvailable?: boolean | null;
   remoteInferenceAvailable?: boolean | null;
 };
 export type CoreUserMemory = { name: string; notes: string };
-export declare const SATYAAI_ENGINES: Readonly<Record<SatyaEngineMode, SatyaEngineIdentity>>;
-export declare function getSatyaEngine(mode: SatyaEngineMode | null | undefined): SatyaEngineIdentity | null;
+export declare const SATYAAI_TIERS: Readonly<Record<SatyaTierMode, SatyaTierIdentity>>;
+export declare function getSatyaTier(mode: SatyaTierMode | null | undefined): SatyaTierIdentity | null;
 export declare const CORE_METADATA: Readonly<{
   name: string; version: string; lastUpdated: string; productName: string; positioning: string; foundedOn: string;
 }>;
@@ -36,9 +36,9 @@ export declare const PERSONALITY: Readonly<{
   description: string; traits: readonly string[]; contextStyles: Readonly<Record<string, string>>; boundaries: readonly string[];
 }>;
 export declare function normalizeRuntimeContext(input?: CoreRuntimeContext): Readonly<{
-  mode: SatyaEngineMode | null;
+  mode: SatyaTierMode | null;
   inferenceRoute: string;
-  engine: SatyaEngineIdentity | null;
+  tier: SatyaTierIdentity | null;
   availableTools: string[];
   localInferenceAvailable: boolean | null;
   remoteInferenceAvailable: boolean | null;
