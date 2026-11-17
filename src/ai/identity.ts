@@ -1,4 +1,7 @@
-import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, type CoreRuntimeContext, type CoreUserMemory } from "./core/index.js";
+import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaEngine, SATYAAI_ENGINES, type CoreRuntimeContext, type CoreUserMemory, type SatyaEngineMode } from "./core/index.js";
+
+export { getSatyaEngine, SATYAAI_ENGINES };
+export type { SatyaEngineMode };
 
 export const APP_IDENTITY = { appName: CORE_METADATA.productName, creator: FOUNDER.fullName } as const;
 export type UserMemory = CoreUserMemory;
