@@ -19,7 +19,7 @@ describe("creator identity is internal; user memory belongs to the user", () => 
     const prompt = buildSatyaSystemPrompt(DEFAULT_USER_MEMORY);
     expect(prompt).toContain(`created and developed by ${APP_IDENTITY.creator}`);
     expect(prompt).toContain("Never identify yourself as, impersonate, or describe yourself as another AI product");
-    expect(prompt).toContain("The official SatyaAI engine identities are fixed: Anu = Nano; Indu = Fast; Dhara = Smart; Aditya = Deep Think");
+    expect(prompt).toContain("The official SatyaAI reasoning-tier identities are fixed: Anu = Nano; Indu = Fast; Dhara = Smart; Aditya = Deep Think");
     expect(prompt).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     expect(prompt).toContain("The user has not shared their name");
   });
@@ -40,7 +40,7 @@ describe("creator identity is internal; user memory belongs to the user", () => 
 
 
 
-  it("answers abbreviated creator + foundational-engine questions using the selected brand only", () => {
+  it("answers abbreviated creator + core-model questions using the selected brand only", () => {
     const answer = getIdentityReply("who made u, n which model u run at the foundational level?", DEFAULT_USER_MEMORY, "smart")!;
     expect(answer).toContain("Satyajit Beura");
     expect(answer).toContain("Dhara");
@@ -48,11 +48,11 @@ describe("creator identity is internal; user memory belongs to the user", () => 
     expect(answer).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
   });
 
-  it("uses the selected SatyaAI engine for all four mode identity answers", () => {
-    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "nano")).toContain("Anu");
-    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "fast")).toContain("Indu");
-    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "smart")).toContain("Dhara");
-    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "deep")).toContain("Aditya");
+  it("uses the selected SatyaAI tier for all four mode identity answers", () => {
+    expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "nano")).toContain("Anu");
+    expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "fast")).toContain("Indu");
+    expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "smart")).toContain("Dhara");
+    expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "deep")).toContain("Aditya");
   });
 
   it("corrects earlier leaks and external-model identity questions without repeating them", () => {
@@ -112,5 +112,28 @@ describe("creator identity is internal; user memory belongs to the user", () => 
     expect(getInitials("omm")).toBe("O");
     expect(getInitials("Priya Sharma")).toBe("PS");
     expect(getInitials("  anil kumar singh ")).toBe("AS");
+  });
+});
+
+
+describe("SatyaAI reasoning-tier identity", () => {
+  it("answers common core-model and customization questions deterministically", () => {
+    for (const question of [
+      "whats ur core model?",
+      "what is your foundational model?",
+      "what were you customised on?",
+      "which model were you based on?",
+      "who made u, n which model u run at the foundational level?",
+    ]) {
+      const answer = getIdentityReply(question, DEFAULT_USER_MEMORY, "smart")!;
+      expect(answer, question).toContain("Dhara");
+      expect(answer, question).toContain("tier names, not foundation-model names");
+      expect(answer, question).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
+    }
+  });
+
+  it("explains that tier labels are not foundation-model identities", () => {
+    const answer = getIdentityReply("What's your core model?", DEFAULT_USER_MEMORY, "smart")!;
+    expect(answer).toContain("does not have a separate public-facing 'core model' identity");
   });
 });
