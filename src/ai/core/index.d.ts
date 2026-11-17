@@ -11,6 +11,7 @@ export type CoreRuntimeContext = {
 export type CoreUserMemory = { name: string; notes: string };
 export declare const SATYASOM_ENGINE_NAME: "SatyaSom Engine";
 export declare const SATYASOM_ARCHITECTURE: "SatyaSom Engine Architecture";
+export declare const SATYASOM_ARCHITECTURE: "SatyaSom Engine Architecture";
 export declare const SATYAAI_TIERS: Readonly<Record<SatyaTierMode, SatyaTierIdentity>>;
 export declare function getSatyaTier(mode: SatyaTierMode | null | undefined): SatyaTierIdentity | null;
 export declare const CORE_METADATA: Readonly<{
