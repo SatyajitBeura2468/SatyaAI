@@ -1,6 +1,6 @@
-import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaTier, SATYASOM_ENGINE_NAME, SATYAAI_TIERS, type CoreRuntimeContext, type CoreUserMemory, type SatyaTierMode } from "./core/index.js";
+import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaTier, SATYASOM_ENGINE_NAME, SATYASOM_ARCHITECTURE, SATYAAI_TIERS, type CoreRuntimeContext, type CoreUserMemory, type SatyaTierMode } from "./core/index.js";
 
-export { getSatyaTier, SATYASOM_ENGINE_NAME, SATYAAI_TIERS };
+export { getSatyaTier, SATYASOM_ENGINE_NAME, SATYASOM_ARCHITECTURE, SATYAAI_TIERS };
 export type { SatyaTierMode };
 
 export const APP_IDENTITY = { appName: CORE_METADATA.productName, creator: FOUNDER.fullName } as const;
@@ -58,7 +58,7 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
     .join(", ");
   const asksCreator = /\bwho\s+(?:built|created|made|developed)\s+(?:you|yourself|satyaai)\b|\bwho\s+(?:is|was)\s+(?:your\s+creator|(?:the\s+)?(?:sole\s+)?founder)\b|\bwho\s+founded\s+satyaai\b|\bwho\s+is\s+behind\s+satyaai\b/.test(question);
   const asksTier = /\b(?:which|what)\s+(?:is\s+)?(?:your\s+)?(?:reasoning\s+)?(?:tier|mode|level)\b/.test(question);
-  const asksAboutEngineOrFoundation =
+  const asksArchitecture =
     /\b(?:what|which)\s+(?:(?:is|are)\s+)?(?:your\s+)?(?:(?:core|foundational|underlying|base|foundation)\s+)?(?:model|engine|architecture)\b/.test(question) ||
     /\b(?:core|foundational|underlying|base|foundation)\s+(?:model|engine|architecture)\b/.test(question) ||
     /\bwhat\s+(?:model|architecture)\s+(?:are|were)\s+you\b/.test(question) ||
@@ -74,15 +74,15 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
     /\b(?:model|engine|ai|foundation|base|powered|customized)\b/.test(question);
   const asksAboutExternalIdentity = /\b(?:are you|is satyaai|is this)\s+(?:an?\s+)?(?:meta\s+ai|llama|qwen|mistral|gemini|claude|chatgpt|gpt(?:[- ]?\d)?|deepseek|glm|grok|phi|smollm|ray)\b/i.test(question);
 
-  const engineAnswer = "SatyaSom Engine is SatyaAI's shared model-engine platform. SatyaAI does not have one single foundational model shared across all tiers. Its four model tiers are " + tierFamily + ", each with a model configuration and settings designed for its workload. You're currently using " + tier.name + " (" + tier.modeLabel + ").";
-  const correctionAnswer = "You're right to question that. My earlier description was incorrect because it confused a tier with the shared engine platform. SatyaSom Engine is the common engine behind SatyaAI's model family; " + tier.name + " is the selected " + tier.modeLabel + " tier. SatyaAI does not have one universal foundational model across all tiers.";
+  const architectureAnswer = "SatyaAI is built on the " + SATYASOM_ARCHITECTURE + ", an architecture developed from scratch. All four model variants belong to this same architecture: " + tierFamily + ". Each is designed for its own use cases and capabilities, with its own model size, parameter configuration, and generation settings. There is no single foundation model shared by all four. You're currently using " + tier.name + " (" + tier.modeLabel + ").";
+  const correctionAnswer = "You're right to question that. My earlier description was incomplete. SatyaAI's model family is built on the " + SATYASOM_ARCHITECTURE + ", developed from scratch. " + tier.name + " is the selected " + tier.modeLabel + " variant, not the foundation model for the others.";
   const creatorAnswer = "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder. He initiated the project as an independent technology builder with the vision of creating India's Truth-First Private AI.";
 
   if (correctedName) return "Got it. I'll call you " + correctedName + " from now on.";
   if (asksPriorIdentityCorrection || asksAboutExternalIdentity) return correctionAnswer;
-  if (asksCreator && (asksTier || asksAboutEngineOrFoundation)) return "I'm SatyaAI, founded on 21 February 2026 by " + FOUNDER.fullName + ", my Sole Founder. " + engineAnswer;
-  if (asksAboutEngineOrFoundation) return engineAnswer;
-  if (asksTier) return "You're using " + tier.name + " (" + tier.modeLabel + "), one of SatyaAI's reasoning tiers within SatyaSom Engine. The complete tier family is " + tierFamily + ".";
+  if (asksCreator && (asksTier || asksArchitecture)) return "I'm SatyaAI, founded on 21 February 2026 by " + FOUNDER.fullName + ", my Sole Founder. " + architectureAnswer;
+  if (asksArchitecture) return architectureAnswer;
+  if (asksTier) return "You're using " + tier.name + " (" + tier.modeLabel + "), one of SatyaAI's four model variants built on SatyaSom Engine Architecture. The complete family is " + tierFamily + ".";
   if (asksCreator) return creatorAnswer;
   if (/\b(when was satyaai founded|when did satyaai start|satyaai founding date|what is satyaai'?s founding date)\b/.test(question)) {
     return "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder.";
@@ -95,7 +95,7 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
     return "SatyaAI's current team records are: " + TEAM.map((member) => member.name + " (" + member.designation + ")").join("; ") + ".";
   }
   if (/\b(who are you|what is satyaai|what are you|what is your purpose|what is your mission|why were you created)\b/.test(question)) {
-    return "I'm SatyaAI, India's Truth-First Private AI. My shared model-engine platform is SatyaSom Engine, and my selected reasoning tier is " + tier.name + " (" + tier.modeLabel + "). SatyaAI was founded by " + FOUNDER.fullName + ".";
+    return "I'm SatyaAI, India's Truth-First Private AI, built on the from-scratch SatyaSom Engine Architecture. My selected model variant is " + tier.name + " (" + tier.modeLabel + "). SatyaAI was founded by " + FOUNDER.fullName + ".";
   }
   if (/\b(can you (?:do )?web search|is web search (?:available|working|ready)|do you support web search)\b/.test(question)) return capabilityReply("web-search");
   if (/\b(can you (?:do )?deep research|is deep research (?:available|working|ready)|do you support deep research)\b/.test(question)) return capabilityReply("deep-research");
