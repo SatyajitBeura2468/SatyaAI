@@ -71,8 +71,6 @@ export default async function handler(req, res) {
     runtimeContext: {
       mode,
       inferenceRoute: "remote-gateway",
-      provider: "Configured remote inference endpoint",
-      activeModel: model,
       localInferenceAvailable: false,
       remoteInferenceAvailable: true,
     },
@@ -102,8 +100,9 @@ export default async function handler(req, res) {
   // Upstream failures are always reported as 502 so they can never be mistaken for
   // "this gateway route does not exist" (404) or "gateway not configured" (503).
   if (!upstream.ok) {
-    const detail = typeof data?.error === 'string' ? data.error : typeof data?.error?.message === 'string' ? data.error.message : '';
-    return res.status(502).json({ error: `Remote model provider error (${upstream.status})${detail ? `: ${detail.slice(0, 200)}` : ''}` });
+    // Keep provider/model identifiers and upstream diagnostics out of user-facing errors.
+    console.error('[SatyaAI] Remote inference request failed:', upstream.status, data?.error);
+    return res.status(502).json({ error: 'SatyaAI could not complete the selected engine request. Please try again.' });
   }
   const content = data?.choices?.[0]?.message?.content;
   if (typeof content !== 'string' || !content) return res.status(502).json({ error: 'The remote model returned no content.' });
