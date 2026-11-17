@@ -830,27 +830,30 @@ function App() {
           (progress, details) => {
             const phase = details?.messagePhase;
             if (phase === "download" && details?.percent !== null && details?.percent !== undefined) {
-              const now = Date.now();
               const previousPercent = lastDownloadPercentRef.current;
-              lastDownloadProgressAtRef.current = now;
-              lastDownloadPercentRef.current = details.percent;
+              const activeStage = loadingMessageStageRef.current;
+              const alreadyDownloading = activeStage === "download" ||
+                activeStage === "download-progress" ||
+                activeStage === "download-slow";
 
-              if (previousPercent === null) {
+              // A new download stage starts its own stall clock. During an
+              // active download, only a higher reported percentage resets it.
+              if (!alreadyDownloading || previousPercent === null) {
                 activateLoadingStage("download", details);
               } else if (details.percent > previousPercent) {
+                lastDownloadProgressAtRef.current = Date.now();
+                lastDownloadPercentRef.current = details.percent;
                 const advancedBy = details.percent - previousPercent;
                 if (advancedBy >= DOWNLOAD_PROGRESS_STEP_PERCENT) {
                   activateLoadingStage("download-progress", details);
-                } else if (loadingMessageStageRef.current === "download-slow") {
+                } else if (activeStage === "download-slow") {
                   activateLoadingStage("download", details);
                 } else {
                   updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine("download"), details);
                 }
-              } else if (loadingMessageStageRef.current !== "download" &&
-                         loadingMessageStageRef.current !== "download-progress" &&
-                         loadingMessageStageRef.current !== "download-slow") {
-                activateLoadingStage("download", details);
               } else {
+                // Same-percent callbacks must not make a stalled download
+                // look active or postpone the long-wait messages.
                 updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine("download"), details);
               }
             } else if (phase) {
