@@ -132,11 +132,12 @@ describe("SatyaAI reasoning-tier identity", () => {
     }
   });
 
-  it("identifies SatyaSom Engine as the shared platform and keeps the selected tier separate", () => {
+  it("identifies SatyaSom Engine Architecture as the from-scratch architecture and keeps tiers separate", () => {
     const answer = getIdentityReply("What's your core model?", DEFAULT_USER_MEMORY, "smart")!;
     expect(answer).toContain("SatyaSom Engine");
     expect(answer).toContain("Dhara (Smart)");
-    expect(answer).toContain("shared model-engine platform");
+    expect(answer).toContain("SatyaSom Engine Architecture");
+    expect(answer).toContain("developed from scratch");
     expect(answer).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
   });
 });
@@ -148,3 +149,21 @@ describe("SatyaAI reasoning-tier identity", () => {
     expect(answer).toContain("Dhara");
     expect(answer).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
   });
+
+
+describe("SatyaSom Engine Architecture identity", () => {
+  it("answers architecture and scratch-development questions using the canonical architecture", () => {
+    for (const question of [
+      "What architecture are your models built on?",
+      "Were your models built from scratch?",
+      "What's your core model?",
+      "What were you customised on?",
+    ]) {
+      const answer = getIdentityReply(question, DEFAULT_USER_MEMORY, "smart")!;
+      expect(answer, question).toContain("SatyaSom Engine Architecture");
+      expect(answer, question).toContain("developed from scratch");
+      expect(answer, question).toContain("Dhara");
+      expect(answer, question).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
+    }
+  });
+});
