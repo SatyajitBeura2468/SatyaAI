@@ -1,6 +1,6 @@
-import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaTier, SATYAAI_FOUNDATION, SATYAAI_TIERS, type CoreRuntimeContext, type CoreUserMemory, type SatyaTierMode } from "./core/index.js";
+import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaTier, SATYASOM_ENGINE_NAME, SATYAAI_TIERS, type CoreRuntimeContext, type CoreUserMemory, type SatyaTierMode } from "./core/index.js";
 
-export { getSatyaTier, SATYAAI_FOUNDATION, SATYAAI_TIERS };
+export { getSatyaTier, SATYASOM_ENGINE_NAME, SATYAAI_TIERS };
 export type { SatyaTierMode };
 
 export const APP_IDENTITY = { appName: CORE_METADATA.productName, creator: FOUNDER.fullName } as const;
