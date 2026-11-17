@@ -1,4 +1,5 @@
 import { buildSatyaSystemPrompt, type UserMemory } from "./identity";
+import type { LoadingMessageStage } from "../loading-phrases";
 
 export type SatyaMode = "nano" | "fast" | "smart" | "deep";
 export type ChatMessage = {
@@ -23,6 +24,7 @@ export type ModelProgressSnapshot = {
   elapsedSeconds: number | null;
   remainingSeconds: number | null;
   stage: "download" | "initializing" | "complete";
+  messagePhase?: LoadingMessageStage;
 };
 
 type ModelProgressHandler = (
@@ -187,6 +189,13 @@ function formatModelProgress(report: {
       elapsedSeconds,
       remainingSeconds,
       stage: complete ? "complete" : downloading ? "download" : "initializing",
+      messagePhase: complete
+        ? "ready"
+        : activeModelCacheHit && downloading
+          ? "cache-load"
+          : downloading
+            ? "download"
+            : "initializing",
     },
   };
 }
@@ -224,20 +233,50 @@ async function discardLocalEngine(): Promise<void> {
 async function ensureLocalModel(
   model: string,
   onProgress?: ModelProgressHandler,
+  recoveryAttempt = false,
 ): Promise<WebLLMEngine> {
   const webllm = await getWebLLMModule();
   activeProgressCallback = onProgress;
   activeModelLabel = modelLabel(model);
+
+  // Reusing the resident model needs no cache check or model reload.
+  if (localEngine && loadedLocalModel === model) return localEngine;
+
+  const initialPhase: LoadingMessageStage = recoveryAttempt
+    ? "recovery"
+    : localEngine
+      ? "switching"
+      : "cache-check";
+  onProgress?.("Preparing the selected model…", {
+    percent: null,
+    elapsedSeconds: null,
+    remainingSeconds: null,
+    stage: "initializing",
+    messagePhase: initialPhase,
+  });
+
   await requestPersistentStorage();
+  activeModelCacheHit = await getModelCacheStatus(webllm, model);
+
+  if (activeModelCacheHit) {
+    onProgress?.("Loading the saved model files…", {
+      percent: null,
+      elapsedSeconds: null,
+      remainingSeconds: null,
+      stage: "initializing",
+      messagePhase: "cache-load",
+    });
+  } else {
+    onProgress?.("Downloading model files…", {
+      percent: 0,
+      elapsedSeconds: null,
+      remainingSeconds: null,
+      stage: "download",
+      messagePhase: "download",
+    });
+  }
 
   if (!localEngine) {
-    activeModelCacheHit = await getModelCacheStatus(webllm, model);
-    onProgress?.(
-      activeModelCacheHit
-        ? activeModelLabel + " · saved model files cache se load ho rahi hain…"
-        : activeModelLabel + " · model files pehli baar download ho rahi hain…",
-    );
-
     const worker = new Worker(new URL("./llm.worker.ts", import.meta.url), {
       type: "module",
     });
@@ -260,21 +299,10 @@ async function ensureLocalModel(
     }
   }
 
-  if (loadedLocalModel !== model) {
-    activeModelCacheHit = await getModelCacheStatus(webllm, model);
-    onProgress?.(
-      activeModelCacheHit
-        ? activeModelLabel + " · cached model ko dobara load kar raha hoon…"
-        : activeModelLabel + " · pehli baar setup ho raha hai…",
-    );
-
-    // reload() replaces the resident model. The downloaded model files remain
-    // in the browser cache, so switching back restores them instead of fetching
-    // the weights from the network again.
-    await localEngine.reload(model);
-    loadedLocalModel = model;
-  }
-
+  // reload() replaces the resident model. Downloaded files remain in the
+  // browser cache, so switching back can reuse them without another download.
+  await localEngine.reload(model);
+  loadedLocalModel = model;
   return localEngine;
 }
 

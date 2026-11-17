@@ -29,6 +29,15 @@ import { Starfield } from "./Starfield";
 import { freshStarters } from "./starters";
 import { createThinkingPhraseOrder, THINKING_PHRASES } from "./thinking-phrases";
 import {
+  createLoadingPhraseOrder,
+  LOADING_MESSAGE_POOLS,
+  LOADING_PHRASE_ROTATION_MS,
+  DOWNLOAD_STALL_THRESHOLD_MS,
+  DOWNLOAD_PROGRESS_STEP_PERCENT,
+  PROGRESS_COMMENTARY_DURATION_MS,
+  type LoadingMessageStage,
+} from "./loading-phrases";
+import {
   hasWebGPU,
   localWebLLM,
   openAICompatible,
@@ -61,6 +70,7 @@ type Message = {
 type Chat = { id: string; title: string; updatedAt: number; messages: Message[] };
 type SavedAnswer = { id: string; question: string; answer: string; savedAt: number };
 type SidebarView = "chats" | "saved";
+type LoadingPhraseDeck = { order: number[]; position: number };
 
 function formatDuration(seconds: number | null): string | null {
   if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
@@ -263,6 +273,13 @@ function App() {
   }
   const thinkingPhrasePositionRef = useRef(0);
   const [thinkingPhrasePosition, setThinkingPhrasePosition] = useState(0);
+  const [loadingMessageStage, setLoadingMessageStage] = useState<LoadingMessageStage | null>(null);
+  const loadingMessageStageRef = useRef<LoadingMessageStage | null>(null);
+  const loadingMessageRef = useRef("");
+  const loadingPhraseDecksRef = useRef<Partial<Record<LoadingMessageStage, LoadingPhraseDeck>>>({});
+  const lastDownloadProgressAtRef = useRef(0);
+  const lastDownloadPercentRef = useRef<number | null>(null);
+  const progressCommentaryUntilRef = useRef(0);
   const [memory, setMemory] = useState<UserMemory>(readSavedMemory);
   const [memoryNameDraft, setMemoryNameDraft] = useState(memory.name);
   const [memoryNotesDraft, setMemoryNotesDraft] = useState(memory.notes);
@@ -394,6 +411,81 @@ function App() {
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [reasoningOpen]);
+
+  function nextLoadingLine(stage: LoadingMessageStage): string {
+    const pool = LOADING_MESSAGE_POOLS[stage];
+    let deck = loadingPhraseDecksRef.current[stage];
+    if (!deck || deck.position >= deck.order.length - 1) {
+      const previousLast = deck?.order[deck.order.length - 1];
+      deck = { order: createLoadingPhraseOrder(stage, previousLast), position: 0 };
+    } else {
+      deck.position += 1;
+    }
+    loadingPhraseDecksRef.current[stage] = deck;
+    return pool[deck.order[deck.position]];
+  }
+
+  function updatePendingLoadingText(line: string, details?: ModelProgressSnapshot) {
+    loadingMessageRef.current = line;
+    setStatus(line);
+    setMessages((previous) => {
+      const lastIndex = previous.length - 1;
+      const last = previous[lastIndex];
+      if (lastIndex < 0 || last.role !== "ai" || !last.pending) return previous;
+      const next = [...previous];
+      next[lastIndex] = {
+        ...last,
+        text: line,
+        ...(details ? { modelProgress: details } : {}),
+      };
+      return next;
+    });
+  }
+
+  function activateLoadingStage(stage: LoadingMessageStage, details?: ModelProgressSnapshot) {
+    loadingMessageStageRef.current = stage;
+    setLoadingMessageStage(stage);
+    if (stage === "download") {
+      lastDownloadProgressAtRef.current = Date.now();
+      lastDownloadPercentRef.current = details?.percent ?? 0;
+    }
+    if (stage === "download-progress") {
+      progressCommentaryUntilRef.current = Date.now() + PROGRESS_COMMENTARY_DURATION_MS;
+    }
+    updatePendingLoadingText(nextLoadingLine(stage), details);
+  }
+
+  function rotateLoadingStage() {
+    const stage = loadingMessageStageRef.current;
+    if (!stage || stage === "ready") return;
+    updatePendingLoadingText(nextLoadingLine(stage));
+  }
+
+  useEffect(() => {
+    if (!busy || !loadingMessageStage) return;
+    const interval = window.setInterval(() => {
+      const stage = loadingMessageStageRef.current;
+      const now = Date.now();
+      if (!stage || stage === "ready") return;
+
+      if (stage === "download" || stage === "download-progress") {
+        const lastProgressAt = lastDownloadProgressAtRef.current;
+        if (lastProgressAt && now - lastProgressAt >= DOWNLOAD_STALL_THRESHOLD_MS) {
+          activateLoadingStage("download-slow");
+          return;
+        }
+        if (stage === "download-progress") {
+          if (now >= progressCommentaryUntilRef.current) {
+            activateLoadingStage("download");
+          }
+          return;
+        }
+      }
+
+      rotateLoadingStage();
+    }, LOADING_PHRASE_ROTATION_MS);
+    return () => window.clearInterval(interval);
+  }, [busy, loadingMessageStage]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -693,14 +785,18 @@ function App() {
     setFile(null);
     setBusy(true);
     setThinkingActive(false);
+    loadingMessageStageRef.current = null;
+    setLoadingMessageStage(null);
+    loadingMessageRef.current = "";
+    lastDownloadProgressAtRef.current = 0;
+    lastDownloadPercentRef.current = null;
+    progressCommentaryUntilRef.current = 0;
     followLatestRef.current = true;
     const initialLoadingMessage = identityAnswer
       ? "Preparing a reply…"
       : provider.baseUrl && mode !== "nano"
         ? "Configured model se jud raha hoon…"
-        : mode === "nano"
-          ? "Nano model se jud raha hoon…"
-          : "Is device ka model cache dekh raha hoon…";
+        : "Getting things ready…";
     setStatus(
       identityAnswer
         ? "Using SatyaAI identity memory…"
@@ -732,25 +828,46 @@ function App() {
           mode,
           modelMessages,
           (progress, details) => {
-            const message = progress || "Model load ho raha hai…";
-            setStatus(message);
-            setMessages((previous) => {
-              const lastIndex = previous.length - 1;
-              const last = previous[lastIndex];
-              if (lastIndex < 0 || last.role !== "ai" || !last.pending) {
-                return previous;
+            const phase = details?.messagePhase;
+            if (phase === "download" && details?.percent !== null && details?.percent !== undefined) {
+              const now = Date.now();
+              const previousPercent = lastDownloadPercentRef.current;
+              lastDownloadProgressAtRef.current = now;
+              lastDownloadPercentRef.current = details.percent;
+
+              if (previousPercent === null) {
+                activateLoadingStage("download", details);
+              } else if (details.percent > previousPercent) {
+                const advancedBy = details.percent - previousPercent;
+                if (advancedBy >= DOWNLOAD_PROGRESS_STEP_PERCENT) {
+                  activateLoadingStage("download-progress", details);
+                } else if (loadingMessageStageRef.current === "download-slow") {
+                  activateLoadingStage("download", details);
+                } else {
+                  updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine("download"), details);
+                }
+              } else if (loadingMessageStageRef.current !== "download" &&
+                         loadingMessageStageRef.current !== "download-progress" &&
+                         loadingMessageStageRef.current !== "download-slow") {
+                activateLoadingStage("download", details);
+              } else {
+                updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine("download"), details);
               }
-              const next = [...previous];
-              next[lastIndex] = {
-                ...last,
-                text: message,
-                modelProgress: details,
-              };
-              return next;
-            });
+            } else if (phase) {
+              if (loadingMessageStageRef.current !== phase) {
+                activateLoadingStage(phase, details);
+              } else {
+                updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine(phase), details);
+              }
+            } else {
+              updatePendingLoadingText(progress || "Model load ho raha hai…", details);
+            }
           },
           (partial) => {
             setThinkingActive(false);
+            loadingMessageStageRef.current = null;
+            setLoadingMessageStage(null);
+            loadingMessageRef.current = "";
             setMessages((previous) => {
               const next = [...previous];
               const last = next.length - 1;
@@ -809,6 +926,9 @@ function App() {
       setStatus("Needs attention");
     } finally {
       setThinkingActive(false);
+      loadingMessageStageRef.current = null;
+      setLoadingMessageStage(null);
+      loadingMessageRef.current = "";
       setBusy(false);
     }
   }
@@ -1122,11 +1242,19 @@ function App() {
                       <div className="model-progress">
                         <div className="model-progress-heading">
                           <span>
-                            {message.modelProgress.stage === "download"
-                              ? "Model files aa rahi hain"
-                              : message.modelProgress.stage === "complete"
-                                ? "Model taiyaar"
-                                : "Model taiyaar ho raha hai"}
+                            {message.modelProgress.messagePhase === "cache-check"
+                              ? "Checking model cache"
+                              : message.modelProgress.messagePhase === "cache-load"
+                                ? "Loading cached model"
+                                : message.modelProgress.messagePhase === "switching"
+                                  ? "Switching model"
+                                  : message.modelProgress.messagePhase === "recovery"
+                                    ? "Recovering model"
+                                    : message.modelProgress.stage === "download"
+                                      ? "Model files aa rahi hain"
+                                      : message.modelProgress.stage === "complete"
+                                        ? "Model taiyaar"
+                                        : "Model taiyaar ho raha hai"}
                           </span>
                           <strong>
                             {message.modelProgress.percent === null
@@ -1164,7 +1292,15 @@ function App() {
                         </div>
                         <div className="model-progress-meta">
                           {message.modelProgress.percent === null
-                            ? "Model load ki taiyaari chal rahi hai…"
+                            ? message.modelProgress.messagePhase === "cache-check"
+                              ? "Checking whether the model is already saved on this device…"
+                              : message.modelProgress.messagePhase === "cache-load"
+                                ? "Retrieving previously downloaded model files…"
+                                : message.modelProgress.messagePhase === "switching"
+                                  ? "Loading the selected model…"
+                                  : message.modelProgress.messagePhase === "recovery"
+                                    ? "Trying the fallback model…"
+                                    : "Preparing model for inference…"
                             : message.modelProgress.percent +
                               "% complete · " +
                               (100 - message.modelProgress.percent) +
