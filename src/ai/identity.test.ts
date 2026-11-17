@@ -19,7 +19,7 @@ describe("creator identity is internal; user memory belongs to the user", () => 
     const prompt = buildSatyaSystemPrompt(DEFAULT_USER_MEMORY);
     expect(prompt).toContain(`created and developed by ${APP_IDENTITY.creator}`);
     expect(prompt).toContain("Never identify yourself as, impersonate, or describe yourself as another AI product");
-    expect(prompt).toContain("The official SatyaAI reasoning-tier identities are fixed: Anu = Nano; Indu = Fast; Dhara = Smart; Aditya = Deep Think");
+    expect(prompt).toContain("The official SatyaAI reasoning-tier names are fixed: Anu = Nano; Indu = Fast; Dhara = Smart; Aditya = Deep Think");
     expect(prompt).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     expect(prompt).toContain("The user has not shared their name");
   });
@@ -57,7 +57,7 @@ describe("creator identity is internal; user memory belongs to the user", () => 
 
   it("corrects earlier leaks and external-model identity questions without repeating them", () => {
     const correction = getIdentityReply('But you just said "my core model is Llama"', DEFAULT_USER_MEMORY, "smart")!;
-    expect(correction).toContain("incorrect");
+    expect(correction).toContain("was incorrect");
     expect(correction).toContain("Dhara");
     expect(correction).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     const identity = getIdentityReply("Are you Llama?", DEFAULT_USER_MEMORY, "fast")!;
