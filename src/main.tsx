@@ -792,11 +792,30 @@ function App() {
     lastDownloadPercentRef.current = null;
     progressCommentaryUntilRef.current = 0;
     followLatestRef.current = true;
+    const usesLocalModel = !identityAnswer && !(provider.baseUrl && provider.model && mode !== "nano");
     const initialLoadingMessage = identityAnswer
       ? "Preparing a reply…"
       : provider.baseUrl && mode !== "nano"
         ? "Configured model se jud raha hoon…"
-        : "Getting things ready…";
+        : nextLoadingLine("cache-check");
+    const initialModelProgress = usesLocalModel
+      ? {
+          percent: null,
+          elapsedSeconds: null,
+          remainingSeconds: null,
+          stage: "initializing" as const,
+          messagePhase: "cache-check" as const,
+        }
+      : undefined;
+
+    // Mount the local-model progress card before the first cache callback so
+    // its rotating phrase never appears in the standalone pending-message slot.
+    if (usesLocalModel) {
+      loadingMessageStageRef.current = "cache-check";
+      setLoadingMessageStage("cache-check");
+      loadingMessageRef.current = initialLoadingMessage;
+    }
+
     setStatus(
       identityAnswer
         ? "Using SatyaAI identity memory…"
@@ -809,6 +828,7 @@ function App() {
         role: "ai",
         text: initialLoadingMessage,
         pending: true,
+        ...(initialModelProgress ? { modelProgress: initialModelProgress } : {}),
       },
     ]);
 
