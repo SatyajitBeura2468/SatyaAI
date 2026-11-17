@@ -1,4 +1,4 @@
-import { getSatyaTier, SATYAAI_TIERS } from "./engines.js";
+import { getSatyaTier, SATYAAI_FOUNDATION, SATYAAI_TIERS } from "./engines.js";
 
 const VALID_MODES = new Set(["nano", "fast", "smart", "deep"]);
 const VALID_ROUTES = new Set(["browser-local", "remote-gateway", "custom-compatible", "unknown"]);
@@ -26,12 +26,13 @@ export function formatRuntimeContext(input) {
   return [
     "RUNTIME CONTEXT (trusted SatyaAI application configuration)",
     "Product identity: SatyaAI (permanent and unchanging)",
+    "Foundational engine: " + SATYAAI_FOUNDATION + ".",
     "Selected reasoning mode: " + (runtime.tier?.modeLabel || "Not supplied"),
     "Selected SatyaAI tier: " + (runtime.tier?.name || "Not supplied by trusted runtime metadata; do not guess"),
     "Official SatyaAI tier mapping: " + tierMap + ".",
     "These names identify reasoning tiers only. They are not foundation-model, architecture, publisher, or checkpoint names.",
     "When asked which SatyaAI tier is active, report only the selected tier name and reasoning mode above.",
-    "There is no separate public-facing 'core model' identity attached to these tier names. Do not invent one or infer it from a tier.",
+    "SatyaSom Engine is the foundational engine identity for SatyaAI. The selected tier is a reasoning level within SatyaAI, not a separate foundation model.",
     "Internal implementation identifiers are not part of the user-facing product identity and must not be guessed or disclosed.",
     "Never identify SatyaAI with an external AI product, model brand, model family, publisher, architecture, or checkpoint.",
     "Inference route: " + runtime.inferenceRoute,
