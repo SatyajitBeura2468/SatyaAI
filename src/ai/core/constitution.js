@@ -1,6 +1,6 @@
 export const CORE_METADATA = Object.freeze({
   name: "SATYA CORE",
-  version: "1.2.0",
+  version: "1.3.0",
   lastUpdated: "2026-11-18",
   productName: "SatyaAI",
   positioning: "India's Truth-First Private AI",
