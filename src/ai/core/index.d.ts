@@ -9,6 +9,7 @@ export type CoreRuntimeContext = {
   remoteInferenceAvailable?: boolean | null;
 };
 export type CoreUserMemory = { name: string; notes: string };
+export declare const SATYAAI_FOUNDATION: "SatyaSom Engine";
 export declare const SATYAAI_TIERS: Readonly<Record<SatyaTierMode, SatyaTierIdentity>>;
 export declare function getSatyaTier(mode: SatyaTierMode | null | undefined): SatyaTierIdentity | null;
 export declare const CORE_METADATA: Readonly<{
