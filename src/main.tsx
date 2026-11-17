@@ -25,6 +25,7 @@ import {
 import "./cosmos.css";
 import "./reasoning-profile.css";
 import { Starfield } from "./Starfield";
+import { freshStarters } from "./starters";
 import {
   hasWebGPU,
   localWebLLM,
@@ -159,12 +160,8 @@ const speechCtor = (): SpeechCtor | undefined => {
   return w.SpeechRecognition || w.webkitSpeechRecognition;
 };
 
-const SUGGESTIONS = [
-  { title: "Explain the mole concept", hint: "Chemistry, simply" },
-  { title: "Quiz me on organic reactions", hint: "5 quick questions" },
-  { title: "Plan my 7-day revision", hint: "Boards + NEET" },
-  { title: "Why is the sky blue?", hint: "Curiosity break" },
-];
+// A new set of four every page load (see starters.ts).
+const STARTERS = freshStarters();
 const preview = (text: string) =>
   text.replace(/[*`#>_]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
 const isMac =
@@ -354,6 +351,8 @@ function App() {
         frame = 0;
         document.documentElement.style.setProperty("--mx", event.clientX + "px");
         document.documentElement.style.setProperty("--my", event.clientY + "px");
+        document.documentElement.style.setProperty("--tx", String((event.clientX / window.innerWidth - 0.5) * 2));
+        document.documentElement.style.setProperty("--ty", String((event.clientY / window.innerHeight - 0.5) * 2));
       });
     };
     window.addEventListener("pointermove", move, { passive: true });
@@ -806,9 +805,11 @@ function App() {
         <i className="nebula n2" />
         <i className="nebula n3" />
         <Starfield active={theme === "dark"} busy={busy} />
+        <i className="vignette" />
         <i className="grain" />
       </div>
       {menu && <div className="scrim" onClick={() => setMenu(false)} />}
+      <div className={"side-backdrop" + (menu ? " open" : "")} aria-hidden="true" />
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <div className="brand">
           <div className="brand-mark">S</div>
@@ -1033,7 +1034,7 @@ function App() {
               </h1>
               <p>Truth-first intelligence for reasoning, research, and creation.</p>
               <div className="suggestions">
-                {SUGGESTIONS.map((item, index) => (
+                {STARTERS.map((item, index) => (
                   <button
                     key={item.title}
                     className="suggestion"
