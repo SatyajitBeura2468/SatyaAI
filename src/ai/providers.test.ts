@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MODE_CONFIG } from "./providers";
-import { SATYAAI_ENGINES } from "./core/index.js";
+import { SATYAAI_TIERS } from "./core/index.js";
 
 describe("SatyaAI inference modes", () => {
   it("routes Nano to the bundled WebLLM SmolLM2 360M model", () => {
@@ -17,9 +17,9 @@ describe("SatyaAI inference modes", () => {
 });
 
 
-describe("SatyaAI branded engine routing", () => {
-  it("maps each reasoning mode to its permanent public engine identity", () => {
-    expect(SATYAAI_ENGINES).toEqual({
+describe("SatyaAI branded tier routing", () => {
+  it("maps each reasoning mode to its permanent public tier identity", () => {
+    expect(SATYAAI_TIERS).toEqual({
       nano: { name: "Anu", symbol: "⚛", modeLabel: "Nano" },
       fast: { name: "Indu", symbol: "☾", modeLabel: "Fast" },
       smart: { name: "Dhara", symbol: "🌍", modeLabel: "Smart" },
