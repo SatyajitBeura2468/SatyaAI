@@ -39,7 +39,7 @@ describe("SATYA CORE canonical registry", () => {
     expect(prompt).toContain("Amit Kumar Panigrahi: Project Lead");
     expect(prompt).toContain("Krishna Sharma: Collaborator");
     expect(prompt).toContain("Selected reasoning mode: Deep Think");
-    expect(prompt).toContain("Foundational engine: SatyaSom Engine.");
+    expect(prompt).toContain("Shared model engine: SatyaSom Engine.");
     expect(prompt).toContain("Selected SatyaAI tier: Aditya");
     expect(prompt).toContain("Official SatyaAI tier mapping: Nano = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
     expect(prompt).toContain("Never state or imply that an external named AI/model is your base model");
@@ -54,7 +54,7 @@ describe("SATYA CORE canonical registry", () => {
     expect(SATYAAI_TIERS.deep.name).toBe("Aditya");
     const runtime = formatRuntimeContext({ mode: "nano", inferenceRoute: "browser-local" });
     expect(runtime).toContain("Selected reasoning mode: Nano");
-    expect(runtime).toContain("Foundational engine: SatyaSom Engine.");
+    expect(runtime).toContain("Shared model engine: SatyaSom Engine.");
     expect(runtime).toContain("Selected SatyaAI tier: Anu");
     expect(runtime).toContain("Inference route: browser-local");
   });
@@ -72,9 +72,9 @@ describe("SATYA CORE canonical registry", () => {
 describe("reasoning tiers are not foundation models", () => {
   it("defines the four public tier names without assigning them foundation-model meaning", () => {
     const prompt = buildSatyaCorePrompt({ runtimeContext: { mode: "smart", inferenceRoute: "browser-local" } });
-    expect(prompt).toContain("SatyaSom Engine is named SatyaSom Engine");
-    expect(prompt).toContain("SatyaSom Engine is the foundational engine identity for SatyaAI");
-    expect(prompt).toContain("Foundational engine: SatyaSom Engine.");
+    expect(prompt).toContain("SatyaSom Engine is SatyaAI's shared model-engine platform");
+    expect(prompt).toContain("SatyaSom Engine is SatyaAI's shared model-engine platform");
+    expect(prompt).toContain("Shared model engine: SatyaSom Engine.");
     expect(prompt).toContain("Selected SatyaAI tier: Dhara");
   });
 });
