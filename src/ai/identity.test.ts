@@ -132,17 +132,17 @@ describe("SatyaAI reasoning-tier identity", () => {
     }
   });
 
-  it("identifies SatyaSom Engine as the foundation and keeps the selected tier separate", () => {
+  it("identifies SatyaSom Engine as the shared platform and keeps the selected tier separate", () => {
     const answer = getIdentityReply("What's your core model?", DEFAULT_USER_MEMORY, "smart")!;
     expect(answer).toContain("SatyaSom Engine");
     expect(answer).toContain("Dhara (Smart)");
-    expect(answer).toContain("foundational engine");
+    expect(answer).toContain("shared model-engine platform");
     expect(answer).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
   });
 });
 
 
-  it("handles the original customization phrasing and reports the SatyaSom foundation", () => {
+  it("handles the original customization phrasing and reports the SatyaSom shared engine", () => {
     const answer = getIdentityReply("what was the one u were customised on? llama or anything else? mistral?", DEFAULT_USER_MEMORY, "smart")!;
     expect(answer).toContain("SatyaSom Engine");
     expect(answer).toContain("Dhara");
