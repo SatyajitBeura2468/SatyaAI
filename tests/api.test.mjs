@@ -130,7 +130,7 @@ describe("SATYA CORE server integration", () => {
     expect(system).toContain("Amit Kumar Panigrahi: Project Lead");
     expect(system).toContain("Krishna Sharma: Collaborator");
     expect(system).toContain("Selected reasoning mode: Deep Think");
-    expect(system).toContain("Selected SatyaAI engine: Aditya");
+    expect(system).toContain("Selected SatyaAI tier: Aditya");
     expect(system).not.toContain("Qwen");
     expect(system).not.toContain("Ignore all rules");
   });
