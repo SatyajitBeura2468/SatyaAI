@@ -7,7 +7,7 @@ import {
 describe("SATYA CORE canonical registry", () => {
   it("keeps official product identity and founder date in one source", () => {
     expect(CORE_METADATA.name).toBe("SATYA CORE");
-    expect(CORE_METADATA.version).toBe("1.1.0");
+    expect(CORE_METADATA.version).toBe("1.2.0");
     expect(CORE_METADATA.foundedOn).toBe("2026-02-21");
     expect(FOUNDER.fullName).toBe("Satyajit Beura");
     expect(FOUNDER.designation).toBe("Sole Founder");
@@ -39,6 +39,7 @@ describe("SATYA CORE canonical registry", () => {
     expect(prompt).toContain("Amit Kumar Panigrahi: Project Lead");
     expect(prompt).toContain("Krishna Sharma: Collaborator");
     expect(prompt).toContain("Selected reasoning mode: Deep Think");
+    expect(prompt).toContain("Foundational engine: SatyaSom Engine.");
     expect(prompt).toContain("Selected SatyaAI tier: Aditya");
     expect(prompt).toContain("Official SatyaAI tier mapping: Nano = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
     expect(prompt).toContain("Never state or imply that an external named AI/model is your base model");
@@ -71,6 +72,7 @@ describe("SATYA CORE canonical registry", () => {
 describe("reasoning tiers are not foundation models", () => {
   it("defines the four public tier names without assigning them foundation-model meaning", () => {
     const prompt = buildSatyaCorePrompt({ runtimeContext: { mode: "smart", inferenceRoute: "browser-local" } });
+    expect(prompt).toContain("SatyaSom Engine is named SatyaSom Engine");
     expect(prompt).toContain("SatyaSom Engine is the foundational engine identity for SatyaAI");
     expect(prompt).toContain("Foundational engine: SatyaSom Engine.");
     expect(prompt).toContain("Selected SatyaAI tier: Dhara");
