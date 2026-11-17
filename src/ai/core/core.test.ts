@@ -53,6 +53,7 @@ describe("SATYA CORE canonical registry", () => {
     expect(SATYAAI_TIERS.deep.name).toBe("Aditya");
     const runtime = formatRuntimeContext({ mode: "nano", inferenceRoute: "browser-local" });
     expect(runtime).toContain("Selected reasoning mode: Nano");
+    expect(runtime).toContain("Foundational engine: SatyaSom Engine.");
     expect(runtime).toContain("Selected SatyaAI tier: Anu");
     expect(runtime).toContain("Inference route: browser-local");
   });
@@ -70,7 +71,8 @@ describe("SATYA CORE canonical registry", () => {
 describe("reasoning tiers are not foundation models", () => {
   it("defines the four public tier names without assigning them foundation-model meaning", () => {
     const prompt = buildSatyaCorePrompt({ runtimeContext: { mode: "smart", inferenceRoute: "browser-local" } });
-    expect(prompt).toContain("There is no separate public-facing 'core model' identity attached to these tier names");
+    expect(prompt).toContain("SatyaSom Engine is the foundational engine identity for SatyaAI");
+    expect(prompt).toContain("Foundational engine: SatyaSom Engine.");
     expect(prompt).toContain("Selected SatyaAI tier: Dhara");
   });
 });
