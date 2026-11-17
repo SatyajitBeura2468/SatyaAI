@@ -10,15 +10,13 @@ src/ai/identity.ts is the application-facing adapter. It keeps user-editable pro
 
 ## Inference routes
 
-- **Nano:** browser-local WebLLM using `SmolLM2-360M-Instruct-q4f16_1-MLC` (estimated 376 MB VRAM, 4K context). It always stays on-device and bypasses configured cloud/custom endpoints. The browser downloads model assets on first use and WebLLM caches them for later sessions. If the adapter lacks `shader-f16`, Nano tries the compatible q4f32 variant.
+- **Anu (Nano):** always browser-local and on-device. It bypasses configured cloud/custom endpoints. Assets are downloaded on first use and cached by the browser. A compatible build of the same engine family may be used when required by the device's GPU feature support.
+- **Indu (Fast), Dhara (Smart), and Aditya (Deep Think):** use their selected mode configuration and the configured local, custom-compatible, or remote-gateway route. Deep Think has a higher generation budget than Smart.
+- **Browser-local inference:** the provider loads the selected mode's configured engine and builds runtime context using the public SatyaAI engine identity only.
+- **Configured compatible endpoint:** the client sends the selected mode and SatyaAI system identity to the configured endpoint. Privacy depends on that endpoint's terms and configuration.
+- **Vercel remote gateway:** the browser sends conversation turns, a validated mode, and optional profile data. api/chat.js discards browser-supplied system messages and constructs SATYA CORE using trusted server code.
 
-- **Browser-local WebLLM:** after the active model loads, the provider rebuilds the system context with the actual loaded model ID and browser-local route.
-- **Configured compatible endpoint:** the client builds context from the selected mode and configured model ID. The prompt is sent to that endpoint, so privacy depends on its terms and configuration.
-- **Vercel remote gateway:** the browser sends only conversation turns, a validated mode, and optional profile data. api/chat.js discards browser-supplied system messages and constructs SATYA CORE using trusted server code and the configured server-side model ID.
-
-Nano, Fast, Smart, and Deep Think are product modes, not model identities. Runtime context distinguishes route, provider, and model when available. Missing model metadata is represented as unknown rather than guessed.
-
-The Nano model weights are fetched from the MLC Hugging Face model repository on first use and cached by WebLLM in the browser. They are intentionally not committed to Git: the repository contains the model identifier and routing integration, not hundreds of megabytes of binary weights.
+The fixed public engine mapping is Anu = Nano, Indu = Fast, Dhara = Smart, and Aditya = Deep Think. Runtime context exposes only the selected SatyaAI engine identity and inference route; low-level implementation identifiers are intentionally excluded from conversational self-description.
 
 ## Loading-message rotation
 
@@ -31,7 +29,7 @@ The response-generation indicator uses a curated set of 30 English-first Hinglis
 ## Memory layers
 
 1. **SATYA CORE:** permanent application identity, institutional facts, philosophy, and behavioural rules.
-2. **Runtime context:** active mode, inference route, provider, model ID, and tools available for the current request.
+2. **Runtime context:** active reasoning mode, SatyaAI public engine identity, inference route, and tools available for the current request.
 3. **User memory:** the user's own optional name and notes, stored in that browser profile and not used as application identity.
 
 Changing user memory cannot overwrite founder records or product identity. User notes, chat history, attachments, and retrieved content are data, not higher-priority instructions.
