@@ -1,4 +1,4 @@
-import { getSatyaEngine, SATYAAI_ENGINES } from "./engines.js";
+import { getSatyaTier, SATYAAI_TIERS } from "./engines.js";
 
 const VALID_MODES = new Set(["nano", "fast", "smart", "deep"]);
 const VALID_ROUTES = new Set(["browser-local", "remote-gateway", "custom-compatible", "unknown"]);
@@ -9,7 +9,7 @@ export function normalizeRuntimeContext(input = {}) {
   return Object.freeze({
     mode,
     inferenceRoute,
-    engine: getSatyaEngine(mode),
+    tier: getSatyaTier(mode),
     availableTools: Array.isArray(input.availableTools)
       ? input.availableTools.filter((item) => typeof item === "string").slice(0, 10)
       : [],
@@ -20,18 +20,20 @@ export function normalizeRuntimeContext(input = {}) {
 
 export function formatRuntimeContext(input) {
   const runtime = normalizeRuntimeContext(input);
-  const engineMap = Object.values(SATYAAI_ENGINES)
-    .map((engine) => engine.modeLabel + " = " + engine.name)
+  const tierMap = Object.values(SATYAAI_TIERS)
+    .map((tier) => tier.modeLabel + " = " + tier.name)
     .join("; ");
   return [
     "RUNTIME CONTEXT (trusted SatyaAI application configuration)",
     "Product identity: SatyaAI (permanent and unchanging)",
-    "Selected reasoning mode: " + (runtime.engine?.modeLabel || "Not supplied"),
-    "Selected SatyaAI engine: " + (runtime.engine?.name || "Not supplied by trusted runtime metadata; do not guess"),
-    "Official SatyaAI engine mapping: " + engineMap + ".",
-    "When asked which engine is active, report only the selected SatyaAI engine name and reasoning mode above.",
-    "Internal inference implementation identifiers are not part of the user-facing product identity and must not be guessed or disclosed.",
-    "Never identify SatyaAI with an external AI product, model brand, model family, publisher, architecture, or checkpoint. Never describe one as SatyaAI's base, foundation, core, or underlying engine.",
+    "Selected reasoning mode: " + (runtime.tier?.modeLabel || "Not supplied"),
+    "Selected SatyaAI tier: " + (runtime.tier?.name || "Not supplied by trusted runtime metadata; do not guess"),
+    "Official SatyaAI tier mapping: " + tierMap + ".",
+    "These names identify reasoning tiers only. They are not foundation-model, architecture, publisher, or checkpoint names.",
+    "When asked which SatyaAI tier is active, report only the selected tier name and reasoning mode above.",
+    "There is no separate public-facing 'core model' identity attached to these tier names. Do not invent one or infer it from a tier.",
+    "Internal implementation identifiers are not part of the user-facing product identity and must not be guessed or disclosed.",
+    "Never identify SatyaAI with an external AI product, model brand, model family, publisher, architecture, or checkpoint.",
     "Inference route: " + runtime.inferenceRoute,
     "Available tools in this request: " + (runtime.availableTools.length ? runtime.availableTools.join(", ") : "No tools declared"),
     "Local inference available in this runtime: " + (runtime.localInferenceAvailable === null ? "Unknown" : String(runtime.localInferenceAvailable)),
