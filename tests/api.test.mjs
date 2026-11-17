@@ -104,11 +104,12 @@ describe('api/chat gateway', () => {
     expect(r.code).toBe(502);
     expect(JSON.stringify(r.body)).not.toMatch(/Unexpected token|JSON/i);
   });
-  it('upstream model-not-found (404) is reported as 502, never as 404', async () => {
+  it('upstream model-not-found (404) is reported as a generic 502 without exposing its identifier', async () => {
     process.env.REMOTE_MODEL_ID = 'does-not-exist';
     const r = await call({ messages: user() });
     expect(r.code).toBe(502);
-    expect(r.body.error).toMatch(/not found/);
+    expect(r.body.error).toBe('SatyaAI could not complete the selected engine request. Please try again.');
+    expect(JSON.stringify(r.body)).not.toContain('does-not-exist');
   });
   it('never leaks the API key or provider metadata to the client', async () => {
     const ok = await call({ messages: user() });
