@@ -40,6 +40,7 @@ describe("SATYA CORE canonical registry", () => {
     expect(prompt).toContain("Krishna Sharma: Collaborator");
     expect(prompt).toContain("Selected reasoning mode: Deep Think");
     expect(prompt).toContain("Shared model engine: SatyaSom Engine.");
+    expect(prompt).toContain("Shared architecture: SatyaSom Engine Architecture, designed and developed from scratch.");
     expect(prompt).toContain("Selected SatyaAI tier: Aditya");
     expect(prompt).toContain("Official SatyaAI tier mapping: Nano = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
     expect(prompt).toContain("Never state or imply that an external named AI/model is your base model");
