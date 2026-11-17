@@ -52,21 +52,21 @@ import {
   getIdentityReply,
   getInitials,
   sanitizeMemory,
-  getSatyaEngine,
-  type SatyaEngineMode,
+  getSatyaTier,
+  type SatyaTierMode,
   type UserMemory,
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
 import { Markdown } from "./markdown";
 
-type Mode = SatyaEngineMode;
+type Mode = SatyaTierMode;
 type Theme = "light" | "dark";
 type Message = {
   role: "user" | "ai";
   text: string;
   pending?: boolean;
   modelProgress?: ModelProgressSnapshot;
-  engineName?: string;
+  tierName?: string;
   error?: boolean;
   file?: { name: string; text: string };
 };
@@ -307,7 +307,7 @@ function App() {
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const canSpeak = typeof window !== "undefined" && !!speechCtor();
   activeRef.current = activeId;
-  const current = getSatyaEngine(mode)!;
+  const current = getSatyaTier(mode)!;
   const initials = getInitials(memory.name);
 
   const capability = useMemo(
@@ -770,7 +770,7 @@ function App() {
       { role: "user", content: attached ? withFile({ text, file: attached }) : text },
     ];
 
-    const selectedEngine = getSatyaEngine(mode)!;
+    const selectedTier = getSatyaTier(mode)!;
     const identityAnswer = getIdentityReply(text, memoryForTurn, mode);
 
     setQuery("");
@@ -820,7 +820,7 @@ function App() {
         role: "ai",
         text: initialLoadingMessage,
         pending: true,
-        engineName: selectedEngine.name,
+        tierName: selectedTier.name,
         ...(initialModelProgress ? { modelProgress: initialModelProgress } : {}),
       },
     ]);
@@ -910,7 +910,7 @@ function App() {
       upsertChat(chatId, [
         ...priorMessages,
         { role: "user", text, ...(attached ? { file: attached } : {}) },
-        { role: "ai", text: answer, engineName: selectedEngine.name },
+        { role: "ai", text: answer, tierName: selectedTier.name },
       ]);
     } catch (error) {
       const errorMessage =
@@ -939,7 +939,7 @@ function App() {
           role: "ai",
           text: "I couldn't generate a response: " + errorMessage,
           error: true,
-          engineName: selectedEngine.name,
+          tierName: selectedTier.name,
         },
       ]);
       setStatus("Needs attention");
@@ -1122,11 +1122,11 @@ function App() {
                       setReasoningOpen(false);
                     }}
                   >
-                    <span className="ro-icon ro-symbol" aria-hidden="true">{getSatyaEngine(key)!.symbol}</span>
+                    <span className="ro-icon ro-symbol" aria-hidden="true">{getSatyaTier(key)!.symbol}</span>
                     <span className="ro-text">
                       <span className="ro-primary">
-                        <strong>{getSatyaEngine(key)!.name}</strong>
-                        <small className="ro-mode">{getSatyaEngine(key)!.modeLabel}</small>
+                        <strong>{getSatyaTier(key)!.name}</strong>
+                        <small className="ro-mode">{getSatyaTier(key)!.modeLabel}</small>
                       </span>
                       <small>{modes[key].desc}</small>
                     </span>
@@ -1228,7 +1228,7 @@ function App() {
                   <div className="message-content">
                     <div className="message-role">
                       {message.role === "ai" ? (
-                        <>SatyaAI{message.engineName ? <span className="message-engine">({message.engineName})</span> : null}</>
+                        <>SatyaAI{message.tierName ? <span className="message-tier">({message.tierName})</span> : null}</>
                       ) : "You"}
                     </div>
                     {message.role === "ai" && !message.pending ? (
