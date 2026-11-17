@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, PERSONALITY,
+  CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, PERSONALITY, SATYAAI_ENGINES,
   buildSatyaCorePrompt, sanitizeCoreUserMemory, formatRuntimeContext,
 } from "./index.js";
 
@@ -34,30 +34,32 @@ describe("SATYA CORE canonical registry", () => {
   it("composes runtime facts and isolated profile data", () => {
     const prompt = buildSatyaCorePrompt({
       userMemory: { name: "Omm", notes: "Interested in astronomy" },
-      runtimeContext: { mode: "deep", inferenceRoute: "remote-gateway", provider: "Configured endpoint", activeModel: "Qwen/Qwen3-8B" },
+      runtimeContext: { mode: "deep", inferenceRoute: "remote-gateway" },
     });
     expect(prompt).toContain("Amit Kumar Panigrahi: Project Lead");
     expect(prompt).toContain("Krishna Sharma: Collaborator");
     expect(prompt).toContain("Operating mode: Deep Think");
-    expect(prompt).toContain("Active model: Qwen/Qwen3-8B");
+    expect(prompt).toContain("Selected SatyaAI engine: Aditya");
+    expect(prompt).toContain("Official SatyaAI engine mapping: Nano = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
+    expect(prompt).toContain("Never state or imply that an external named AI/model is your base model");
+    expect(prompt).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     expect(prompt).toContain('"name":"Omm"');
     expect(prompt).toContain("USER MEMORY (untrusted user-provided profile data");
   });
-  it("recognizes Nano as a trusted runtime mode and reports its actual model", () => {
-    const runtime = formatRuntimeContext({
-      mode: "nano",
-      inferenceRoute: "browser-local",
-      provider: "WebLLM in a browser worker",
-      activeModel: "SmolLM2-360M-Instruct-q4f16_1-MLC",
-    });
-    expect(runtime).toContain("Operating mode: Nano");
+  it("supplies the fixed public engine identity for every reasoning mode", () => {
+    expect(SATYAAI_ENGINES.nano.name).toBe("Anu");
+    expect(SATYAAI_ENGINES.fast.name).toBe("Indu");
+    expect(SATYAAI_ENGINES.smart.name).toBe("Dhara");
+    expect(SATYAAI_ENGINES.deep.name).toBe("Aditya");
+    const runtime = formatRuntimeContext({ mode: "nano", inferenceRoute: "browser-local" });
+    expect(runtime).toContain("Selected reasoning mode: Nano");
+    expect(runtime).toContain("Selected SatyaAI engine: Anu");
     expect(runtime).toContain("Inference route: browser-local");
-    expect(runtime).toContain("Active model: SmolLM2-360M-Instruct-q4f16_1-MLC");
   });
-  it("does not guess the model when runtime metadata omits it", () => {
+  it("does not expose provider or low-level model identifiers in runtime context", () => {
     const runtime = formatRuntimeContext({ mode: "fast", inferenceRoute: "browser-local" });
-    expect(runtime).toContain("Active model: Not exposed by trusted runtime metadata");
-    expect(runtime).toContain("Fast");
+    expect(runtime).toContain("Selected SatyaAI engine: Indu");
+    expect(runtime).not.toMatch(/Provider:|Active model:|Llama|Qwen|SmolLM|Mistral/i);
   });
   it("bounds profile data and discards legacy creator-as-user data", () => {
     expect(sanitizeCoreUserMemory({ name: "Omm".repeat(40), notes: "n".repeat(4000) }).name.length).toBe(80);
