@@ -3,7 +3,7 @@
 .reasoning-btn{cursor:pointer;transition:background .2s,color .2s,border-color .2s}
 .reasoning-btn:hover,.reasoning-btn.open{background:var(--surface-hover);color:var(--text);border-color:var(--border-strong)}
 .reasoning-btn svg{flex:none}
-.reasoning-btn > svg:first-child{color:var(--accent-2)}
+.reasoning-symbol{display:inline-grid;place-items:center;flex:none;min-width:18px;font-size:18px;line-height:1;color:var(--accent-2);filter:drop-shadow(0 0 5px var(--glow))}
 .reasoning-current{font-style:normal;font-weight:500;color:var(--text-3)}
 .reasoning-btn .chev{transition:transform .3s var(--ease)}
 .reasoning-btn.open .chev{transform:rotate(180deg)}
@@ -12,11 +12,15 @@
 .reasoning-option{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:13px;text-align:left;color:var(--text-2);transition:background .2s,color .2s}
 .reasoning-option:hover{background:var(--surface-hover);color:var(--text)}
 .reasoning-option.chosen{color:var(--text);background:linear-gradient(135deg,rgba(139,123,255,.26),rgba(94,200,255,.14))}
-.ro-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--accent-2)}
-.ro-text{display:flex;flex-direction:column;gap:1px;min-width:0}
-.ro-text strong{font-size:13.5px;font-weight:600}
+.ro-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:var(--surface);border:1px solid var(--border);color:var(--accent-2)}
+.ro-symbol{font-size:22px;line-height:1}
+.ro-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ro-primary{display:flex;align-items:baseline;gap:14px;min-width:0}
+.ro-text strong{font-size:14px;font-weight:620;color:var(--text)}
 .ro-text small{font-size:12px;color:var(--text-3)}
+.ro-text .ro-mode{font-size:11px;font-weight:550;letter-spacing:.035em;color:var(--text-3)}
 .ro-check{color:var(--accent-2)}
+.message-engine{margin-left:5px;font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:none;color:var(--text-2);opacity:.88}
 
 /* the dock is gone, so the composer now sits at the very bottom */
 .composer-wrap{padding-bottom:max(14px,env(safe-area-inset-bottom))}
