@@ -1,6 +1,6 @@
 export type CoreCapabilityStatus = "AVAILABLE" | "IN_DEVELOPMENT" | "PLANNED" | "UNAVAILABLE";
 export type CoreRuntimeContext = {
-  mode?: "fast" | "smart" | "deep" | null;
+  mode?: "nano" | "fast" | "smart" | "deep" | null;
   inferenceRoute?: "browser-local" | "remote-gateway" | "custom-compatible" | "unknown";
   provider?: string | null;
   activeModel?: string | null;
@@ -34,7 +34,7 @@ export declare const PERSONALITY: Readonly<{
   description: string; traits: readonly string[]; contextStyles: Readonly<Record<string, string>>; boundaries: readonly string[];
 }>;
 export declare function normalizeRuntimeContext(input?: CoreRuntimeContext): Readonly<{
-  mode: "fast" | "smart" | "deep" | null;
+  mode: "nano" | "fast" | "smart" | "deep" | null;
   inferenceRoute: string; provider: string | null; activeModel: string | null;
   availableTools: string[]; localInferenceAvailable: boolean | null; remoteInferenceAvailable: boolean | null;
 }>;

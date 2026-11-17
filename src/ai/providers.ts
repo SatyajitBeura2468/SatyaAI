@@ -1,6 +1,6 @@
 import { buildSatyaSystemPrompt, type UserMemory } from "./identity";
 
-export type SatyaMode = "fast" | "smart" | "deep";
+export type SatyaMode = "nano" | "fast" | "smart" | "deep";
 export type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
@@ -34,6 +34,11 @@ export const MODE_CONFIG: Record<
   SatyaMode,
   { model: string; temperature: number; maxTokens: number }
 > = {
+  nano: {
+    model: "SmolLM2-360M-Instruct-q4f16_1-MLC",
+    temperature: 0.35,
+    maxTokens: 192,
+  },
   fast: {
     model: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
     temperature: 0.3,
@@ -136,6 +141,7 @@ async function hasConfiguredRemoteGateway(): Promise<boolean> {
 }
 
 function modelLabel(model: string): string {
+  if (model.includes("360M")) return "Nano 360M";
   if (model.includes("1B")) return "Tvarit 1B";
   if (model.includes("3B")) return "Pragya 3B";
   if (model.includes("0.5B")) return "Laghu 0.5B";
@@ -315,6 +321,23 @@ export async function openAICompatible(
   return content;
 }
 
+async function supportsShaderF16(): Promise<boolean> {
+  if (!hasWebGPU()) return false;
+  const gpu = (navigator as Navigator & {
+    gpu?: {
+      requestAdapter?: () => Promise<{
+        features?: { has: (feature: string) => boolean };
+      } | null>;
+    };
+  }).gpu;
+  try {
+    const adapter = await gpu?.requestAdapter?.();
+    return adapter?.features?.has("shader-f16") ?? false;
+  } catch {
+    return false;
+  }
+}
+
 export async function localWebLLM(
   mode: SatyaMode,
   messages: ChatMessage[],
@@ -323,7 +346,8 @@ export async function localWebLLM(
   onThinking?: (active: boolean) => void,
   userMemory: UserMemory = { name: "", notes: "" },
 ): Promise<string> {
-  if (await hasConfiguredRemoteGateway()) {
+  // Nano is deliberately on-device and never silently routes to a cloud provider.
+  if (mode !== "nano" && (await hasConfiguredRemoteGateway())) {
     try {
       onThinking?.(true);
       const online = await fetch("/api/chat", {
@@ -364,8 +388,13 @@ export async function localWebLLM(
 
   return withLocalEngineLock(async () => {
     const primary = MODE_CONFIG[mode].model;
+    const nanoF32 = "SmolLM2-360M-Instruct-q4f32_1-MLC";
+    const nanoCandidates = mode === "nano"
+      ? (await supportsShaderF16() ? [primary, nanoF32] : [nanoF32])
+      : [primary];
+    // q4f32 is the compatibility build for adapters without shader-f16.
     const models = [
-      primary,
+      ...nanoCandidates,
       "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
     ].filter((value, index, all) => all.indexOf(value) === index);
     let lastError: unknown;
@@ -377,7 +406,7 @@ export async function localWebLLM(
         onProgress?.(
           index === 0
             ? "Is device ka model cache dekh raha hoon…"
-            : "GPU recovery · Laghu model ko cache se laane ki koshish…",
+            : "GPU recovery · " + modelLabel(model) + " ko load karne ki koshish…",
         );
 
         const engine = await ensureLocalModel(model, onProgress);

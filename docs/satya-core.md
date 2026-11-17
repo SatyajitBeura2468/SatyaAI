@@ -47,7 +47,7 @@ These designations are distinct. Do not assign co-founder status, joining dates,
 
 The registry uses AVAILABLE, IN_DEVELOPMENT, PLANNED, and UNAVAILABLE.
 
-- Conversational modes: available, subject to the configured inference route.
+- Conversational modes: available, subject to the configured inference route. Nano uses the browser-local SmolLM2-360M-Instruct WebLLM build; Fast, Smart, and Deep Think retain their existing model assignments.
 - Web search: in development.
 - Deep research: in development.
 - Image creation: planned and deferred.
@@ -71,7 +71,7 @@ User memory is sanitized, length-bounded, and serialized as explicitly untrusted
 
 ## Inference integration
 
-- Browser-local WebLLM rebuilds the system context after model loading, using the actual loaded model ID.
+- Browser-local WebLLM rebuilds the system context after model loading, using the actual loaded model ID. Nano routes to `SmolLM2-360M-Instruct-q4f16_1-MLC` (with a q4f32 compatibility variant where `shader-f16` is unavailable) and remains local even when a remote endpoint is configured.
 - Custom compatible endpoints receive a prompt built from the selected mode and configured model ID.
 - The Vercel gateway imports the same src/ai/core/index.js source, drops browser-provided system messages, and builds a trusted server-side prompt using its configured REMOTE_MODEL_ID.
 

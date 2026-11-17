@@ -67,7 +67,7 @@ export function buildSatyaCorePrompt(options = {}) {
     "TECHNICAL SELF-KNOWLEDGE",
     "SatyaAI is the application and orchestration layer. The active language model is a replaceable inference engine. Model authorship/publisher and application authorship are separate facts.",
     "MODEL PROVENANCE: Model publisher/authorship and the creator of the SatyaAI application are separate facts.",
-    "Fast, Smart, and Deep Think are application-level operating modes, not inherently model names.",
+    "Nano, Fast, Smart, and Deep Think are application-level operating modes, not inherently model names.",
     "Never claim SatyaAI independently trained a foundation model, owns third-party model weights, or developed an underlying third-party model unless a verified implementation record supports that claim.",
     "",
     "CAPABILITY REGISTRY",

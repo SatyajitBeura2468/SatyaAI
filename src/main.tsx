@@ -8,6 +8,7 @@ import {
   Bot,
   Check,
   ChevronDown,
+  Cpu,
   FileText,
   Library,
   Menu,
@@ -46,7 +47,7 @@ import {
 import { loadJSON, saveJSON } from "./storage";
 import { Markdown } from "./markdown";
 
-type Mode = "fast" | "smart" | "deep";
+type Mode = "nano" | "fast" | "smart" | "deep";
 type Theme = "light" | "dark";
 type Message = {
   role: "user" | "ai";
@@ -81,6 +82,11 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 const modes: Record<Mode, { label: string; desc: string; icon: React.ReactNode }> = {
+  nano: {
+    label: "Nano",
+    desc: "Lightweight, on-device replies",
+    icon: <Cpu size={15} />,
+  },
   fast: {
     label: "Fast",
     desc: "Quick, efficient answers",
@@ -681,9 +687,11 @@ function App() {
     followLatestRef.current = true;
     const initialLoadingMessage = identityAnswer
       ? "Preparing a reply…"
-      : provider.baseUrl
+      : provider.baseUrl && mode !== "nano"
         ? "Configured model se jud raha hoon…"
-        : "Is device ka model cache dekh raha hoon…";
+        : mode === "nano"
+          ? "Nano model se jud raha hoon…"
+          : "Is device ka model cache dekh raha hoon…";
     setStatus(
       identityAnswer
         ? "Using SatyaAI identity memory…"
@@ -706,7 +714,7 @@ function App() {
         // Identity questions are answered from the saved app profile, rather
         // than asking a small language model to guess who it is.
         answer = identityAnswer;
-      } else if (provider.baseUrl && provider.model) {
+      } else if (provider.baseUrl && provider.model && mode !== "nano") {
         setThinkingActive(true);
         answer = await openAICompatible(provider, modelMessages, mode);
         setThinkingActive(false);

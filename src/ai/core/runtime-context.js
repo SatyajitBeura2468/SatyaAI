@@ -1,4 +1,4 @@
-const VALID_MODES = new Set(["fast", "smart", "deep"]);
+const VALID_MODES = new Set(["nano", "fast", "smart", "deep"]);
 const VALID_ROUTES = new Set(["browser-local", "remote-gateway", "custom-compatible", "unknown"]);
 
 function cleanLabel(value, maxLength = 160) {
@@ -23,7 +23,7 @@ export function normalizeRuntimeContext(input = {}) {
 
 export function formatRuntimeContext(input) {
   const runtime = normalizeRuntimeContext(input);
-  const modeNames = { fast: "Fast", smart: "Smart", deep: "Deep Think" };
+  const modeNames = { nano: "Nano", fast: "Fast", smart: "Smart", deep: "Deep Think" };
   return [
     "RUNTIME CONTEXT (trusted application configuration)",
     "Operating mode: " + (runtime.mode ? modeNames[runtime.mode] : "Not supplied"),
@@ -33,7 +33,7 @@ export function formatRuntimeContext(input) {
     "Available tools in this request: " + (runtime.availableTools.length ? runtime.availableTools.join(", ") : "No tools declared"),
     "Local inference available in this runtime: " + (runtime.localInferenceAvailable === null ? "Unknown" : String(runtime.localInferenceAvailable)),
     "Remote inference available in this runtime: " + (runtime.remoteInferenceAvailable === null ? "Unknown" : String(runtime.remoteInferenceAvailable)),
-    "Fast, Smart, and Deep Think are product modes, not model identities. Never claim a specific active model unless the Active model field above supplies it.",
+    "Nano, Fast, Smart, and Deep Think are product modes, not model identities. Never claim a specific active model unless the Active model field above supplies it.",
     "A remote inference route sends request context to the configured remote provider; never describe that route as on-device or local.",
   ].join("\n");
 }

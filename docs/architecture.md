@@ -10,11 +10,15 @@ src/ai/identity.ts is the application-facing adapter. It keeps user-editable pro
 
 ## Inference routes
 
+- **Nano:** browser-local WebLLM using `SmolLM2-360M-Instruct-q4f16_1-MLC` (estimated 376 MB VRAM, 4K context). It always stays on-device and bypasses configured cloud/custom endpoints. The browser downloads model assets on first use and WebLLM caches them for later sessions. If the adapter lacks `shader-f16`, Nano tries the compatible q4f32 variant.
+
 - **Browser-local WebLLM:** after the active model loads, the provider rebuilds the system context with the actual loaded model ID and browser-local route.
 - **Configured compatible endpoint:** the client builds context from the selected mode and configured model ID. The prompt is sent to that endpoint, so privacy depends on its terms and configuration.
 - **Vercel remote gateway:** the browser sends only conversation turns, a validated mode, and optional profile data. api/chat.js discards browser-supplied system messages and constructs SATYA CORE using trusted server code and the configured server-side model ID.
 
-Fast, Smart, and Deep Think are product modes, not model identities. Runtime context distinguishes route, provider, and model when available. Missing model metadata is represented as unknown rather than guessed.
+Nano, Fast, Smart, and Deep Think are product modes, not model identities. Runtime context distinguishes route, provider, and model when available. Missing model metadata is represented as unknown rather than guessed.
+
+The Nano model weights are fetched from the MLC Hugging Face model repository on first use and cached by WebLLM in the browser. They are intentionally not committed to Git: the repository contains the model identifier and routing integration, not hundreds of megabytes of binary weights.
 
 ## Memory layers
 

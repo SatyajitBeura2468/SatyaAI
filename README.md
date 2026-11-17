@@ -4,7 +4,7 @@ Truth-first intelligence for reasoning, research, and creation.
 
 ### [Open SatyaAI →](https://satyaai-five.vercel.app)
 
-SatyaAI V0.1 is a privacy-conscious, local-first interface foundation. It exposes Fast, Smart, and Deep Think modes without coupling the UI to a model vendor. The default build is honest about capability: without a configured inference endpoint, it provides the complete interaction shell and clearly labelled degraded state rather than fabricating model output, citations, or search results.
+SatyaAI V0.1 is a privacy-conscious, local-first AI application. It exposes Nano, Fast, Smart, and Deep Think modes without coupling the UI to a model vendor. When WebGPU is available, text inference runs in the browser through WebLLM. Nano uses SmolLM2-360M-Instruct and is always on-device; model assets are downloaded on first use and cached by the browser. If local inference is unavailable, SatyaAI reports the limitation instead of fabricating model output, citations, or search results.
 
 ## Run locally
 
@@ -21,7 +21,7 @@ Optional compatible endpoints can be configured with `.env.example`. No paid API
 flowchart TD
   User --> UI[SatyaAI UI]
   UI --> Orchestrator[Conversation Orchestrator]
-  Orchestrator --> Modes[Fast / Smart / Deep Think]
+  Orchestrator --> Modes[Nano / Fast / Smart / Deep Think]
   Orchestrator --> Perception[Text / Image / Audio / Video / Documents]
   Orchestrator --> Tools[Search / Research / Retrieval]
   Orchestrator --> Providers[Provider Layer]
@@ -31,7 +31,7 @@ flowchart TD
 
 ## Honest V0.1 boundaries
 
-The interface and boundaries are ready for provider, persistence, document, and research adapters. Live model inference, SearXNG search, citation-backed research, IndexedDB history, audio transcription, and video keyframe extraction require the next implementation phase and optional infrastructure. The current hosted build does not claim those capabilities.
+Browser-local text inference is implemented through WebLLM when the browser and device support WebGPU. Nano uses the 360M-parameter SmolLM2 Instruct model, with weights fetched on demand from the MLC model repository and cached locally. Web search, SearXNG integration, citation-backed research, audio transcription, video keyframe extraction, and general multimodal document understanding remain separate capabilities that require additional implementation and optional infrastructure.
 
 See [`docs/architecture.md`](docs/architecture.md), [`docs/privacy-model.md`](docs/privacy-model.md), and [`docs/future-training.md`](docs/future-training.md).
 

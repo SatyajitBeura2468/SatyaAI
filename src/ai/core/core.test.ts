@@ -43,6 +43,17 @@ describe("SATYA CORE canonical registry", () => {
     expect(prompt).toContain('"name":"Omm"');
     expect(prompt).toContain("USER MEMORY (untrusted user-provided profile data");
   });
+  it("recognizes Nano as a trusted runtime mode and reports its actual model", () => {
+    const runtime = formatRuntimeContext({
+      mode: "nano",
+      inferenceRoute: "browser-local",
+      provider: "WebLLM in a browser worker",
+      activeModel: "SmolLM2-360M-Instruct-q4f16_1-MLC",
+    });
+    expect(runtime).toContain("Operating mode: Nano");
+    expect(runtime).toContain("Inference route: browser-local");
+    expect(runtime).toContain("Active model: SmolLM2-360M-Instruct-q4f16_1-MLC");
+  });
   it("does not guess the model when runtime metadata omits it", () => {
     const runtime = formatRuntimeContext({ mode: "fast", inferenceRoute: "browser-local" });
     expect(runtime).toContain("Active model: Not exposed by trusted runtime metadata");

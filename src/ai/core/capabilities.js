@@ -10,7 +10,7 @@ export const CAPABILITIES = Object.freeze([
     id: "conversational-intelligence",
     name: "Conversational intelligence",
     status: CAPABILITY_STATUS.AVAILABLE,
-    details: "Fast, Smart, and Deep Think are application-level modes. Their actual model and inference route depend on trusted runtime configuration.",
+    details: "Nano, Fast, Smart, and Deep Think are application-level modes. Nano uses lightweight browser-local inference; the other modes follow trusted provider configuration.",
   }),
   Object.freeze({
     id: "web-search",
