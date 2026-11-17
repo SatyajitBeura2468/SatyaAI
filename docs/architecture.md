@@ -20,6 +20,10 @@ Nano, Fast, Smart, and Deep Think are product modes, not model identities. Runti
 
 The Nano model weights are fetched from the MLC Hugging Face model repository on first use and cached by WebLLM in the browser. They are intentionally not committed to Git: the repository contains the model identifier and routing integration, not hundreds of megabytes of binary weights.
 
+## Thinking-line rotation
+
+The response-generation indicator uses a curated set of 30 English-first Hinglish phrases. It displays only while a model/provider is actively generating a response, not while model weights are downloading or during deterministic identity replies. A shuffled deck runs through all phrases before reshuffling, and the next deck starts with a different phrase from the previous deck’s last phrase. The same UI indicator is shared by Nano, Fast, Smart, and Deep Think.
+
 ## Memory layers
 
 1. **SATYA CORE:** permanent application identity, institutional facts, philosophy, and behavioural rules.

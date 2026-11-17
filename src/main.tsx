@@ -27,6 +27,7 @@ import "./cosmos.css";
 import "./reasoning-profile.css";
 import { Starfield } from "./Starfield";
 import { freshStarters } from "./starters";
+import { createThinkingPhraseOrder, THINKING_PHRASES } from "./thinking-phrases";
 import {
   hasWebGPU,
   localWebLLM,
@@ -60,13 +61,6 @@ type Message = {
 type Chat = { id: string; title: string; updatedAt: number; messages: Message[] };
 type SavedAnswer = { id: string; question: string; answer: string; savedAt: number };
 type SidebarView = "chats" | "saved";
-
-const thinkingPhrases = [
-  "Zara vichaar kar raha hoon…",
-  "Mastishk ko kaam par laga raha hoon…",
-  "Soch ko sahi disha de raha hoon…",
-  "Vichaaron ko jod raha hoon…",
-];
 
 function formatDuration(seconds: number | null): string | null {
   if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
@@ -261,7 +255,14 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
   const [thinkingActive, setThinkingActive] = useState(false);
-  const [thinkingPhraseIndex, setThinkingPhraseIndex] = useState(0);
+  // Keep a shuffled deck for the whole session so all phrases get a turn
+  // before reshuffling, without repeating across deck boundaries.
+  const thinkingPhraseOrderRef = useRef<number[] | null>(null);
+  if (thinkingPhraseOrderRef.current === null) {
+    thinkingPhraseOrderRef.current = createThinkingPhraseOrder();
+  }
+  const thinkingPhrasePositionRef = useRef(0);
+  const [thinkingPhrasePosition, setThinkingPhrasePosition] = useState(0);
   const [memory, setMemory] = useState<UserMemory>(readSavedMemory);
   const [memoryNameDraft, setMemoryNameDraft] = useState(memory.name);
   const [memoryNotesDraft, setMemoryNotesDraft] = useState(memory.notes);
@@ -408,9 +409,17 @@ function App() {
     if (!thinkingActive) return;
 
     const interval = window.setInterval(() => {
-      setThinkingPhraseIndex((currentIndex) =>
-        (currentIndex + 1) % thinkingPhrases.length,
-      );
+      const currentOrder = thinkingPhraseOrderRef.current ?? createThinkingPhraseOrder();
+      if (thinkingPhrasePositionRef.current >= THINKING_PHRASES.length - 1) {
+        // Start a fresh random cycle, but don't repeat the previous cycle's last line.
+        thinkingPhraseOrderRef.current = createThinkingPhraseOrder(
+          currentOrder[currentOrder.length - 1],
+        );
+        thinkingPhrasePositionRef.current = 0;
+      } else {
+        thinkingPhrasePositionRef.current += 1;
+      }
+      setThinkingPhrasePosition(thinkingPhrasePositionRef.current);
     }, 2300);
 
     return () => window.clearInterval(interval);
@@ -1173,7 +1182,7 @@ function App() {
                     )}
                     {message.pending && thinkingActive && (
                       <p className="thinking-aside" aria-live="polite">
-                        {thinkingPhrases[thinkingPhraseIndex]}
+                        {THINKING_PHRASES[thinkingPhraseOrderRef.current?.[thinkingPhrasePosition] ?? 0]}
                       </p>
                     )}
                   </div>
