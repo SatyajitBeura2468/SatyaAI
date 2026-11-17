@@ -18,8 +18,9 @@ describe("creator identity is internal; user memory belongs to the user", () => 
   it("the model is told who created SatyaAI, even with an empty user profile", () => {
     const prompt = buildSatyaSystemPrompt(DEFAULT_USER_MEMORY);
     expect(prompt).toContain(`created and developed by ${APP_IDENTITY.creator}`);
-    expect(prompt).toContain("Model publisher/authorship and the creator");
-    expect(prompt).toContain("Never identify yourself as Meta AI");
+    expect(prompt).toContain("Never identify yourself as, impersonate, or describe yourself as another AI product");
+    expect(prompt).toContain("The official SatyaAI engine identities are fixed: Anu = Nano; Indu = Fast; Dhara = Smart; Aditya = Deep Think");
+    expect(prompt).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     expect(prompt).toContain("The user has not shared their name");
   });
 
@@ -35,6 +36,33 @@ describe("creator identity is internal; user memory belongs to the user", () => 
     expect(getIdentityReply("Who founded SatyaAI?", DEFAULT_USER_MEMORY)).toContain("21 February 2026");
     expect(getIdentityReply("When was SatyaAI founded?", DEFAULT_USER_MEMORY)).toContain("21 February 2026");
     expect(getIdentityReply("who are you", DEFAULT_USER_MEMORY)).toContain("SatyaAI");
+  });
+
+
+
+  it("answers abbreviated creator + foundational-engine questions using the selected brand only", () => {
+    const answer = getIdentityReply("who made u, n which model u run at the foundational level?", DEFAULT_USER_MEMORY, "smart")!;
+    expect(answer).toContain("Satyajit Beura");
+    expect(answer).toContain("Dhara");
+    expect(answer).toContain("Smart");
+    expect(answer).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
+  });
+
+  it("uses the selected SatyaAI engine for all four mode identity answers", () => {
+    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "nano")).toContain("Anu");
+    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "fast")).toContain("Indu");
+    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "smart")).toContain("Dhara");
+    expect(getIdentityReply("Which engine are you?", DEFAULT_USER_MEMORY, "deep")).toContain("Aditya");
+  });
+
+  it("corrects earlier leaks and external-model identity questions without repeating them", () => {
+    const correction = getIdentityReply('But you just said "my core model is Llama"', DEFAULT_USER_MEMORY, "smart")!;
+    expect(correction).toContain("incorrect");
+    expect(correction).toContain("Dhara");
+    expect(correction).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
+    const identity = getIdentityReply("Are you Llama?", DEFAULT_USER_MEMORY, "fast")!;
+    expect(identity).toContain("Indu");
+    expect(identity).not.toMatch(/Llama/i);
   });
 
   it("answers contributor and capability questions from the canonical registry", () => {
