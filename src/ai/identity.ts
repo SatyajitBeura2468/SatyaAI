@@ -75,7 +75,7 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
   const asksAboutExternalIdentity = /\b(?:are you|is satyaai|is this)\s+(?:an?\s+)?(?:meta\s+ai|llama|qwen|mistral|gemini|claude|chatgpt|gpt(?:[- ]?\d)?|deepseek|glm|grok|phi|smollm|ray)\b/i.test(question);
 
   const engineAnswer = "SatyaSom Engine is SatyaAI's shared model-engine platform. SatyaAI does not have one single foundational model shared across all tiers. Its four model tiers are " + tierFamily + ", each with a model configuration and settings designed for its workload. You're currently using " + tier.name + " (" + tier.modeLabel + ").";
-  const correctionAnswer = "You're right to question that. My earlier description confused a tier with the shared engine platform. SatyaSom Engine is the common engine behind SatyaAI's model family; " + tier.name + " is the selected " + tier.modeLabel + " tier. SatyaAI does not have one universal foundational model across all tiers.";
+  const correctionAnswer = "You're right to question that. My earlier description was incorrect because it confused a tier with the shared engine platform. SatyaSom Engine is the common engine behind SatyaAI's model family; " + tier.name + " is the selected " + tier.modeLabel + " tier. SatyaAI does not have one universal foundational model across all tiers.";
   const creatorAnswer = "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder. He initiated the project as an independent technology builder with the vision of creating India's Truth-First Private AI.";
 
   if (correctedName) return "Got it. I'll call you " + correctedName + " from now on.";
