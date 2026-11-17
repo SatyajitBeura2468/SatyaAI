@@ -1,7 +1,7 @@
-import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaEngine, SATYAAI_ENGINES, type CoreRuntimeContext, type CoreUserMemory, type SatyaEngineMode } from "./core/index.js";
+import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaTier, SATYAAI_TIERS, type CoreRuntimeContext, type CoreUserMemory, type SatyaTierMode } from "./core/index.js";
 
-export { getSatyaEngine, SATYAAI_ENGINES };
-export type { SatyaEngineMode };
+export { getSatyaTier, SATYAAI_TIERS };
+export type { SatyaTierMode };
 
 export const APP_IDENTITY = { appName: CORE_METADATA.productName, creator: FOUNDER.fullName } as const;
 export type UserMemory = CoreUserMemory;
@@ -43,29 +43,44 @@ function capabilityReply(id: string): string | null {
   return capability ? capability.name + " is currently marked " + capability.status + ". " + capability.details : null;
 }
 
-export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaEngineMode = "smart"): string | null {
+export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaTierMode = "smart"): string | null {
   const question = input.trim().toLowerCase()
+    .replace(/\bwhat['’]?s\b/g, "what is")
     .replace(/\bu\b/g, "you")
     .replace(/\bur\b/g, "your")
-    .replace(/\bn\b/g, "and");
+    .replace(/\bn\b/g, "and")
+    .replace(/\bcustomised\b/g, "customized");
   const safe = sanitizeMemory(memory);
   const correctedName = extractNameCorrection(input);
-  const engine = getSatyaEngine(mode) ?? SATYAAI_ENGINES.smart;
-  const engineFamily = Object.values(SATYAAI_ENGINES)
+  const tier = getSatyaTier(mode) ?? SATYAAI_TIERS.smart;
+  const tierFamily = Object.values(SATYAAI_TIERS)
     .map((item) => item.name + " (" + item.modeLabel + ")")
     .join(", ");
   const asksCreator = /\bwho\s+(?:built|created|made|developed)\s+(?:you|yourself|satyaai)\b|\bwho\s+(?:is|was)\s+(?:your\s+creator|(?:the\s+)?(?:sole\s+)?founder)\b|\bwho\s+founded\s+satyaai\b|\bwho\s+is\s+behind\s+satyaai\b/.test(question);
-  const asksEngine = /\b(?:which|what)\s+(?:(?:is|are)\s+)?(?:your\s+)?(?:(?:core|foundational|underlying|base)\s+)?(?:model|engine)\b|\bwhich\s+model\b|\bwhat\s+model\b|\b(?:foundational|underlying|base|core)\s+(?:model|engine)\b|\bwhat\s+(?:do|are)\s+you\s+(?:run|running|use|using|powered)\b|\bwhat\s+powers\s+you\b/.test(question);
-  const asksPriorIdentityCorrection = /\b(?:you just said|you said|you mentioned|you claimed|earlier you said)\b/.test(question) && /\b(?:model|engine|ai|foundation|base|powered)\b/.test(question);
+  const asksTier = /\b(?:which|what)\s+(?:is\s+)?(?:your\s+)?(?:reasoning\s+)?(?:tier|mode|level)\b/.test(question);
+  const asksAboutModelFoundation =
+    /\b(?:what|which)\s+(?:(?:is|are)\s+)?(?:your\s+)?(?:(?:core|foundational|underlying|base|foundation)\s+)?(?:model|engine|architecture)\b/.test(question) ||
+    /\b(?:core|foundational|underlying|base|foundation)\s+(?:model|engine|architecture)\b/.test(question) ||
+    /\bwhat\s+(?:model|architecture)\s+(?:are|were)\s+you\b/.test(question) ||
+    /\bwhat\s+(?:model|architecture)\s+(?:do|did)\s+you\s+(?:run|use|build|train|customized)\b/.test(question) ||
+    /\bwhat\s+(?:are|were)\s+you\s+(?:based|built|trained|customized)\s+on\b/.test(question) ||
+    /\bwhat\s+(?:are|were)\s+you\s+customized\s+on\b/.test(question) ||
+    /\bwhich\s+(?:model|architecture)\s+(?:are|were)\s+you\s+(?:customized|based|trained)\s+on\b/.test(question) ||
+    /\b(?:based|built|trained|customized)\s+on\s+(?:what|which)\s+(?:model|architecture)\b/.test(question) ||
+    /\bwhat\s+powers\s+you\b/.test(question) ||
+    /\b(?:which|what)\s+model\s+do\s+you\s+(?:run|use)\b/.test(question);
+  const asksPriorIdentityCorrection = /\b(?:you just said|you said|you mentioned|you claimed|earlier you said)\b/.test(question) &&
+    /\b(?:model|engine|ai|foundation|base|powered|customized)\b/.test(question);
   const asksAboutExternalIdentity = /\b(?:are you|is satyaai|is this)\s+(?:an?\s+)?(?:meta\s+ai|llama|qwen|mistral|gemini|claude|chatgpt|gpt(?:[- ]?\d)?|deepseek|glm|grok|phi|smollm|ray)\b/i.test(question);
-  const engineAnswer = "I'm SatyaAI. The currently selected reasoning mode is " + engine.modeLabel + ", powered by my " + engine.name + " engine. My official engine family is " + engineFamily + ". Internal implementation identifiers are not part of my user-facing identity.";
-  const correctionAnswer = "You're right to question that. Any earlier answer that identified SatyaAI with another AI product or exposed an internal implementation label as my identity was incorrect. I'm SatyaAI, and the selected engine is " + engine.name + " (" + engine.modeLabel + ").";
+
+  const tierAnswer = "I'm SatyaAI. My public reasoning tiers are " + tierFamily + ". You're currently using " + tier.name + " for " + tier.modeLabel + ". These are tier names, not foundation-model names. SatyaAI does not have a separate public-facing 'core model' identity attached to them.";
+  const correctionAnswer = "You're right to question that. My earlier description was incorrect: I confused a reasoning-tier name with a foundation model. I'm SatyaAI, and " + tier.name + " is the selected " + tier.modeLabel + " tier. The four public tiers are Anu, Indu, Dhara, and Aditya.";
   const creatorAnswer = "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder. He initiated the project as an independent technology builder with the vision of creating India's Truth-First Private AI.";
 
   if (correctedName) return "Got it. I'll call you " + correctedName + " from now on.";
   if (asksPriorIdentityCorrection || asksAboutExternalIdentity) return correctionAnswer;
-  if (asksCreator && asksEngine) return "I'm SatyaAI, founded on 21 February 2026 by " + FOUNDER.fullName + ", my Sole Founder. " + engineAnswer;
-  if (asksEngine) return engineAnswer;
+  if (asksCreator && (asksTier || asksAboutModelFoundation)) return "I'm SatyaAI, founded on 21 February 2026 by " + FOUNDER.fullName + ", my Sole Founder. " + tierAnswer;
+  if (asksTier || asksAboutModelFoundation) return tierAnswer;
   if (asksCreator) return creatorAnswer;
   if (/\b(when was satyaai founded|when did satyaai start|satyaai founding date|what is satyaai'?s founding date)\b/.test(question)) {
     return "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder.";
@@ -78,7 +93,7 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaE
     return "SatyaAI's current team records are: " + TEAM.map((member) => member.name + " (" + member.designation + ")").join("; ") + ".";
   }
   if (/\b(who are you|what is satyaai|what are you|what is your purpose|what is your mission|why were you created)\b/.test(question)) {
-    return "I'm SatyaAI, India's Truth-First Private AI: an independent AI application and orchestration system founded by " + FOUNDER.fullName + " on 21 February 2026. My guiding philosophy is truth before confidence, evidence before assumptions, and privacy before unnecessary exposure. My selected engine is " + engine.name + " (" + engine.modeLabel + ").";
+    return "I'm SatyaAI, India's Truth-First Private AI: an independent AI application and orchestration system founded by " + FOUNDER.fullName + " on 21 February 2026. My guiding philosophy is truth before confidence, evidence before assumptions, and privacy before unnecessary exposure. My selected tier is " + tier.name + " (" + tier.modeLabel + ").";
   }
   if (/\b(can you (?:do )?web search|is web search (?:available|working|ready)|do you support web search)\b/.test(question)) return capabilityReply("web-search");
   if (/\b(can you (?:do )?deep research|is deep research (?:available|working|ready)|do you support deep research)\b/.test(question)) return capabilityReply("deep-research");
