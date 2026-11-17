@@ -10,9 +10,11 @@ src/ai/identity.ts is the application-facing adapter. It keeps user-editable pro
 
 ## SatyaSom Engine and reasoning tiers
 
-SatyaSom Engine is the shared model-engine platform for SatyaAI, not a foundation model or checkpoint. SatyaAI does not have one single foundational model shared by all tiers. The four tiers are Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think), each with a configuration suited to its workload. A tier name identifies the active reasoning level, not the underlying checkpoint.
+SatyaAI's model family is built on the **SatyaSom Engine Architecture**, an architecture designed and developed from scratch. SatyaSom Engine is the shared architecture and engine framework, not one single foundation model. The four purpose-built model variants are Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). Each variant is intended for its own workload and is configured with its own model scale, parameter settings, capabilities, and use cases.
 
-This repository currently routes inference to pre-existing configured checkpoints and does not contain a model-training pipeline. Do not claim the current checkpoint weights were trained from scratch inside SatyaSom Engine. The actual training pipeline and provenance must be documented separately when implemented.
+There is no single universal foundation model shared by the four variants, and no one tier is the foundation model for another. The public tier names identify the selected variant; the Nano, Fast, Smart, and Deep Think labels identify its reasoning mode.
+
+**Runtime implementation note:** the current provider configuration still contains legacy WebLLM checkpoint identifiers. Those identifiers are inference-loader references, not the public SatyaAI identity. They must be replaced or mapped to the correct SatyaSom-built artifacts as those runtime artifacts become available, so the deployed weights and the documented architecture stay aligned.
 
 ## Inference routes
 
