@@ -8,15 +8,19 @@ The src/ai/core directory contains the canonical, versioned application identity
 
 src/ai/identity.ts is the application-facing adapter. It keeps user-editable profile memory, explicit name corrections, and deterministic identity replies separate from SATYA CORE. The user profile is sanitized, length-bounded, and serialized as explicitly untrusted data.
 
+## SatyaSom Engine and reasoning tiers
+
+SatyaSom Engine is SatyaAI's foundational engine identity. The four named tiers are Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). The tier name communicates the selected reasoning level; it is not a separate foundation-model or architecture name. Runtime identity answers must keep the foundation and selected tier distinct.
+
 ## Inference routes
 
 - **Anu (Nano):** always browser-local and on-device. It bypasses configured cloud/custom endpoints. Assets are downloaded on first use and cached by the browser. A compatible build of the same engine family may be used when required by the device's GPU feature support.
 - **Indu (Fast), Dhara (Smart), and Aditya (Deep Think):** use their selected mode configuration and the configured local, custom-compatible, or remote-gateway route. Deep Think has a higher generation budget than Smart.
-- **Browser-local inference:** the provider loads the selected mode's configured engine and builds runtime context using the public SatyaAI engine identity only.
+- **Browser-local inference:** the provider loads the selected mode's configured engine and builds runtime context using the public SatyaAI tier identity only.
 - **Configured compatible endpoint:** the client sends the selected mode and SatyaAI system identity to the configured endpoint. Privacy depends on that endpoint's terms and configuration.
 - **Vercel remote gateway:** the browser sends conversation turns, a validated mode, and optional profile data. api/chat.js discards browser-supplied system messages and constructs SATYA CORE using trusted server code.
 
-The fixed public engine mapping is Anu = Nano, Indu = Fast, Dhara = Smart, and Aditya = Deep Think. Runtime context exposes only the selected SatyaAI engine identity and inference route; low-level implementation identifiers are intentionally excluded from conversational self-description.
+The fixed public engine mapping is Anu = Nano, Indu = Fast, Dhara = Smart, and Aditya = Deep Think. Runtime context exposes only the selected SatyaAI tier identity and inference route; low-level implementation identifiers are intentionally excluded from conversational self-description.
 
 ## Loading-message rotation
 
