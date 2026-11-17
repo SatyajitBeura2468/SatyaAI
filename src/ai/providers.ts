@@ -1,5 +1,6 @@
 import { buildSatyaSystemPrompt, type UserMemory } from "./identity";
 import type { LoadingMessageStage } from "../loading-phrases";
+import { getSatyaEngine } from "./core/index.js";
 
 export type SatyaMode = "nano" | "fast" | "smart" | "deep";
 export type ChatMessage = {
@@ -84,7 +85,7 @@ let localWorker: Worker | null = null;
 let loadedLocalModel: string | null = null;
 let activeProgressCallback: ModelProgressHandler | undefined;
 let activeModelCacheHit = false;
-let activeModelLabel = "local";
+let activeEngineName = "local";
 
 let localOperationQueue: Promise<void> = Promise.resolve();
 let remoteGatewayReadyPromise: Promise<boolean> | null = null;
@@ -142,14 +143,6 @@ async function hasConfiguredRemoteGateway(): Promise<boolean> {
   return remoteGatewayReadyPromise;
 }
 
-function modelLabel(model: string): string {
-  if (model.includes("360M")) return "Nano 360M";
-  if (model.includes("1B")) return "Tvarit 1B";
-  if (model.includes("3B")) return "Pragya 3B";
-  if (model.includes("0.5B")) return "Laghu 0.5B";
-  return model;
-}
-
 function formatModelProgress(report: {
   progress: number;
   timeElapsed: number;
@@ -182,8 +175,8 @@ function formatModelProgress(report: {
 
   return {
     message: complete
-      ? activeModelLabel + " · model taiyaar hai"
-      : activeModelLabel + " · " + action + "…",
+      ? activeEngineName + " · model taiyaar hai"
+      : activeEngineName + " · " + action + "…",
     details: {
       percent,
       elapsedSeconds,
@@ -237,8 +230,6 @@ async function ensureLocalModel(
 ): Promise<WebLLMEngine> {
   const webllm = await getWebLLMModule();
   activeProgressCallback = onProgress;
-  activeModelLabel = modelLabel(model);
-
   // Reusing the resident model needs no cache check or model reload.
   if (localEngine && loadedLocalModel === model) return localEngine;
 
@@ -421,28 +412,26 @@ export async function localWebLLM(
       ? (await supportsShaderF16() ? [primary, nanoF32] : [nanoF32])
       : [primary];
     // q4f32 is the compatibility build for adapters without shader-f16.
-    const models = [
-      ...nanoCandidates,
-      "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-    ].filter((value, index, all) => all.indexOf(value) === index);
+    // Never silently substitute a different model for the selected SatyaAI engine.
+    // Nano may use its q4f32 compatibility build, which is the same engine family.
+    const models = nanoCandidates;
     let lastError: unknown;
 
     for (let index = 0; index < models.length; index += 1) {
       const model = models[index];
 
       try {
+        activeEngineName = getSatyaEngine(mode)?.name ?? "SatyaAI";
         onProgress?.(
           index === 0
             ? "Is device ka model cache dekh raha hoon…"
-            : "GPU recovery · " + modelLabel(model) + " ko load karne ki koshish…",
+            : "GPU recovery · trying the selected engine again…",
         );
 
         const engine = await ensureLocalModel(model, onProgress);
         const systemPrompt = buildSatyaSystemPrompt(userMemory, {
           mode,
           inferenceRoute: "browser-local",
-          provider: "WebLLM in a browser worker",
-          activeModel: model,
           localInferenceAvailable: true,
           remoteInferenceAvailable: false,
         });
@@ -489,6 +478,9 @@ export async function localWebLLM(
       );
     }
 
-    throw new Error(raw);
+    console.error("[SatyaAI] Selected engine initialization failed:", lastError);
+    throw new Error(
+      "SatyaAI couldn't initialize the selected " + (getSatyaEngine(mode)?.name ?? "reasoning") + " engine. Check your connection or browser compatibility, then try again.",
+    );
   });
 }
