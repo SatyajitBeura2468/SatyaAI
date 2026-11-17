@@ -1,14 +1,16 @@
+export type SatyaEngineMode = "nano" | "fast" | "smart" | "deep";
+export type SatyaEngineIdentity = Readonly<{ name: string; symbol: string; modeLabel: string }>;
 export type CoreCapabilityStatus = "AVAILABLE" | "IN_DEVELOPMENT" | "PLANNED" | "UNAVAILABLE";
 export type CoreRuntimeContext = {
-  mode?: "nano" | "fast" | "smart" | "deep" | null;
+  mode?: SatyaEngineMode | null;
   inferenceRoute?: "browser-local" | "remote-gateway" | "custom-compatible" | "unknown";
-  provider?: string | null;
-  activeModel?: string | null;
   availableTools?: string[];
   localInferenceAvailable?: boolean | null;
   remoteInferenceAvailable?: boolean | null;
 };
 export type CoreUserMemory = { name: string; notes: string };
+export declare const SATYAAI_ENGINES: Readonly<Record<SatyaEngineMode, SatyaEngineIdentity>>;
+export declare function getSatyaEngine(mode: SatyaEngineMode | null | undefined): SatyaEngineIdentity | null;
 export declare const CORE_METADATA: Readonly<{
   name: string; version: string; lastUpdated: string; productName: string; positioning: string; foundedOn: string;
 }>;
@@ -34,9 +36,12 @@ export declare const PERSONALITY: Readonly<{
   description: string; traits: readonly string[]; contextStyles: Readonly<Record<string, string>>; boundaries: readonly string[];
 }>;
 export declare function normalizeRuntimeContext(input?: CoreRuntimeContext): Readonly<{
-  mode: "nano" | "fast" | "smart" | "deep" | null;
-  inferenceRoute: string; provider: string | null; activeModel: string | null;
-  availableTools: string[]; localInferenceAvailable: boolean | null; remoteInferenceAvailable: boolean | null;
+  mode: SatyaEngineMode | null;
+  inferenceRoute: string;
+  engine: SatyaEngineIdentity | null;
+  availableTools: string[];
+  localInferenceAvailable: boolean | null;
+  remoteInferenceAvailable: boolean | null;
 }>;
 export declare function formatRuntimeContext(input?: CoreRuntimeContext): string;
 export declare function sanitizeCoreUserMemory(value: unknown): CoreUserMemory;
