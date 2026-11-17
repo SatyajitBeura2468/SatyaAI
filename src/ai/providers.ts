@@ -1,6 +1,6 @@
 import { buildSatyaSystemPrompt, type UserMemory } from "./identity";
 import type { LoadingMessageStage } from "../loading-phrases";
-import { getSatyaEngine } from "./core/index.js";
+import { getSatyaTier } from "./core/index.js";
 
 export type SatyaMode = "nano" | "fast" | "smart" | "deep";
 export type ChatMessage = {
@@ -85,7 +85,7 @@ let localWorker: Worker | null = null;
 let loadedLocalModel: string | null = null;
 let activeProgressCallback: ModelProgressHandler | undefined;
 let activeModelCacheHit = false;
-let activeEngineName = "local";
+let activeTierName = "local";
 
 let localOperationQueue: Promise<void> = Promise.resolve();
 let remoteGatewayReadyPromise: Promise<boolean> | null = null;
@@ -175,8 +175,8 @@ function formatModelProgress(report: {
 
   return {
     message: complete
-      ? activeEngineName + " · model taiyaar hai"
-      : activeEngineName + " · " + action + "…",
+      ? activeTierName + " · model taiyaar hai"
+      : activeTierName + " · " + action + "…",
     details: {
       percent,
       elapsedSeconds,
@@ -421,7 +421,7 @@ export async function localWebLLM(
       const model = models[index];
 
       try {
-        activeEngineName = getSatyaEngine(mode)?.name ?? "SatyaAI";
+        activeTierName = getSatyaTier(mode)?.name ?? "SatyaAI";
         onProgress?.(
           index === 0
             ? "Is device ka model cache dekh raha hoon…"
@@ -478,9 +478,9 @@ export async function localWebLLM(
       );
     }
 
-    console.error("[SatyaAI] Selected engine initialization failed:", lastError);
+    console.error("[SatyaAI] Selected tier initialization failed:", lastError);
     throw new Error(
-      "SatyaAI couldn't initialize the selected " + (getSatyaEngine(mode)?.name ?? "reasoning") + " engine. Check your connection or browser compatibility, then try again.",
+      "SatyaAI couldn't initialize the selected " + (getSatyaTier(mode)?.name ?? "reasoning") + " engine. Check your connection or browser compatibility, then try again.",
     );
   });
 }
