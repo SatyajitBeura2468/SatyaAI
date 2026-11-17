@@ -127,13 +127,24 @@ describe("SatyaAI reasoning-tier identity", () => {
     ]) {
       const answer = getIdentityReply(question, DEFAULT_USER_MEMORY, "smart")!;
       expect(answer, question).toContain("Dhara");
-      expect(answer, question).toContain("tier names, not foundation-model names");
+      expect(answer, question).toContain("SatyaSom Engine");
       expect(answer, question).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
     }
   });
 
-  it("explains that tier labels are not foundation-model identities", () => {
+  it("identifies SatyaSom Engine as the foundation and keeps the selected tier separate", () => {
     const answer = getIdentityReply("What's your core model?", DEFAULT_USER_MEMORY, "smart")!;
-    expect(answer).toContain("does not have a separate public-facing 'core model' identity");
+    expect(answer).toContain("SatyaSom Engine");
+    expect(answer).toContain("Dhara (Smart)");
+    expect(answer).toContain("foundational engine");
+    expect(answer).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
   });
 });
+
+
+  it("handles the original customization phrasing and reports the SatyaSom foundation", () => {
+    const answer = getIdentityReply("what was the one u were customised on? llama or anything else? mistral?", DEFAULT_USER_MEMORY, "smart")!;
+    expect(answer).toContain("SatyaSom Engine");
+    expect(answer).toContain("Dhara");
+    expect(answer).not.toMatch(/Llama|Mistral|Qwen|SmolLM/i);
+  });
