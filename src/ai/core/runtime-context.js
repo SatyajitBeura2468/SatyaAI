@@ -27,6 +27,7 @@ export function formatRuntimeContext(input) {
     "RUNTIME CONTEXT (trusted SatyaAI application configuration)",
     "Product identity: SatyaAI (permanent and unchanging)",
     "Shared model engine: " + SATYASOM_ENGINE_NAME + ".",
+    "Shared architecture: " + SATYASOM_ARCHITECTURE + ", designed and developed from scratch.",
     "Shared architecture: " + SATYASOM_ARCHITECTURE + ", developed from scratch by SatyaAI.",
     "Selected reasoning mode: " + (runtime.tier?.modeLabel || "Not supplied"),
     "Selected SatyaAI tier: " + (runtime.tier?.name || "Not supplied by trusted runtime metadata; do not guess"),
