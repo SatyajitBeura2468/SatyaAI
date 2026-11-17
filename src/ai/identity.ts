@@ -1,6 +1,6 @@
-import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaTier, SATYAAI_TIERS, type CoreRuntimeContext, type CoreUserMemory, type SatyaTierMode } from "./core/index.js";
+import { buildSatyaCorePrompt, sanitizeCoreUserMemory, CORE_METADATA, FOUNDER, TEAM, CAPABILITIES, getSatyaTier, SATYAAI_FOUNDATION, SATYAAI_TIERS, type CoreRuntimeContext, type CoreUserMemory, type SatyaTierMode } from "./core/index.js";
 
-export { getSatyaTier, SATYAAI_TIERS };
+export { getSatyaTier, SATYAAI_FOUNDATION, SATYAAI_TIERS };
 export type { SatyaTierMode };
 
 export const APP_IDENTITY = { appName: CORE_METADATA.productName, creator: FOUNDER.fullName } as const;
@@ -58,29 +58,33 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
     .join(", ");
   const asksCreator = /\bwho\s+(?:built|created|made|developed)\s+(?:you|yourself|satyaai)\b|\bwho\s+(?:is|was)\s+(?:your\s+creator|(?:the\s+)?(?:sole\s+)?founder)\b|\bwho\s+founded\s+satyaai\b|\bwho\s+is\s+behind\s+satyaai\b/.test(question);
   const asksTier = /\b(?:which|what)\s+(?:is\s+)?(?:your\s+)?(?:reasoning\s+)?(?:tier|mode|level)\b/.test(question);
-  const asksAboutModelFoundation =
+  const asksAboutFoundation =
     /\b(?:what|which)\s+(?:(?:is|are)\s+)?(?:your\s+)?(?:(?:core|foundational|underlying|base|foundation)\s+)?(?:model|engine|architecture)\b/.test(question) ||
     /\b(?:core|foundational|underlying|base|foundation)\s+(?:model|engine|architecture)\b/.test(question) ||
     /\bwhat\s+(?:model|architecture)\s+(?:are|were)\s+you\b/.test(question) ||
     /\bwhat\s+(?:model|architecture)\s+(?:do|did)\s+you\s+(?:run|use|build|train|customized)\b/.test(question) ||
     /\bwhat\s+(?:are|were)\s+you\s+(?:based|built|trained|customized)\s+on\b/.test(question) ||
+    /\bwhat\s+(?:are|were|was)\s+you\s+(?:customized|based|trained|built)\s+on\b/.test(question) ||
+    /\bwhat\s+was\s+the\s+(?:one|model|engine)\s+you\s+(?:customized|based|built|trained)\s+on\b/.test(question) ||
     /\bwhat\s+(?:are|were)\s+you\s+customized\s+on\b/.test(question) ||
     /\bwhich\s+(?:model|architecture)\s+(?:are|were)\s+you\s+(?:customized|based|trained)\s+on\b/.test(question) ||
     /\b(?:based|built|trained|customized)\s+on\s+(?:what|which)\s+(?:model|architecture)\b/.test(question) ||
     /\bwhat\s+powers\s+you\b/.test(question) ||
-    /\b(?:which|what)\s+model\s+do\s+you\s+(?:run|use)\b/.test(question);
+    /\b(?:which|what)\s+model\s+do\s+you\s+(?:run|use)\b/.test(question) ||
+    /\b(?:customized|customised)\s+(?:on|from|using)\b/.test(question);
   const asksPriorIdentityCorrection = /\b(?:you just said|you said|you mentioned|you claimed|earlier you said)\b/.test(question) &&
     /\b(?:model|engine|ai|foundation|base|powered|customized)\b/.test(question);
   const asksAboutExternalIdentity = /\b(?:are you|is satyaai|is this)\s+(?:an?\s+)?(?:meta\s+ai|llama|qwen|mistral|gemini|claude|chatgpt|gpt(?:[- ]?\d)?|deepseek|glm|grok|phi|smollm|ray)\b/i.test(question);
 
-  const tierAnswer = "I'm SatyaAI. My public reasoning tiers are " + tierFamily + ". You're currently using " + tier.name + " for " + tier.modeLabel + ". These are tier names, not foundation-model names. SatyaAI does not have a separate public-facing 'core model' identity attached to them.";
-  const correctionAnswer = "You're right to question that. My earlier description was incorrect: I confused a reasoning-tier name with a foundation model. I'm SatyaAI, and " + tier.name + " is the selected " + tier.modeLabel + " tier. The four public tiers are Anu, Indu, Dhara, and Aditya.";
+  const foundationAnswer = "SatyaAI's foundational engine is SatyaSom Engine. The four public reasoning tiers within SatyaAI are Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). You're currently using " + tier.name + " (" + tier.modeLabel + "). The tier describes the selected reasoning level; SatyaSom Engine is the foundational engine.";
+  const correctionAnswer = "You're right to question that. My earlier description confused a reasoning tier with the foundational engine. SatyaAI's foundational engine is SatyaSom Engine; " + tier.name + " is the selected " + tier.modeLabel + " reasoning tier.";
   const creatorAnswer = "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder. He initiated the project as an independent technology builder with the vision of creating India's Truth-First Private AI.";
 
   if (correctedName) return "Got it. I'll call you " + correctedName + " from now on.";
   if (asksPriorIdentityCorrection || asksAboutExternalIdentity) return correctionAnswer;
-  if (asksCreator && (asksTier || asksAboutModelFoundation)) return "I'm SatyaAI, founded on 21 February 2026 by " + FOUNDER.fullName + ", my Sole Founder. " + tierAnswer;
-  if (asksTier || asksAboutModelFoundation) return tierAnswer;
+  if (asksCreator && (asksTier || asksAboutFoundation)) return "I'm SatyaAI, founded on 21 February 2026 by " + FOUNDER.fullName + ", my Sole Founder. " + foundationAnswer;
+  if (asksAboutFoundation) return foundationAnswer;
+  if (asksTier) return "You're using " + tier.name + " (" + tier.modeLabel + "), one of SatyaAI's reasoning tiers within SatyaSom Engine. The complete tier family is " + tierFamily + ".";
   if (asksCreator) return creatorAnswer;
   if (/\b(when was satyaai founded|when did satyaai start|satyaai founding date|what is satyaai'?s founding date)\b/.test(question)) {
     return "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder.";
@@ -93,7 +97,7 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
     return "SatyaAI's current team records are: " + TEAM.map((member) => member.name + " (" + member.designation + ")").join("; ") + ".";
   }
   if (/\b(who are you|what is satyaai|what are you|what is your purpose|what is your mission|why were you created)\b/.test(question)) {
-    return "I'm SatyaAI, India's Truth-First Private AI: an independent AI application and orchestration system founded by " + FOUNDER.fullName + " on 21 February 2026. My guiding philosophy is truth before confidence, evidence before assumptions, and privacy before unnecessary exposure. My selected tier is " + tier.name + " (" + tier.modeLabel + ").";
+    return "I'm SatyaAI, India's Truth-First Private AI. My foundational engine is SatyaSom Engine, and my selected reasoning tier is " + tier.name + " (" + tier.modeLabel + "). SatyaAI was founded by " + FOUNDER.fullName + ".";
   }
   if (/\b(can you (?:do )?web search|is web search (?:available|working|ready)|do you support web search)\b/.test(question)) return capabilityReply("web-search");
   if (/\b(can you (?:do )?deep research|is deep research (?:available|working|ready)|do you support deep research)\b/.test(question)) return capabilityReply("deep-research");
