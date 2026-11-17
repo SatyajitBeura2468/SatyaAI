@@ -1,4 +1,4 @@
-export const SATYAAI_FOUNDATION = "SatyaSom Engine";
+export const SATYASOM_ENGINE_NAME = "SatyaSom Engine";
 
 export const SATYAAI_TIERS = Object.freeze({
   nano: Object.freeze({ name: "Anu", symbol: "⚛", modeLabel: "Nano" }),
