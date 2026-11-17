@@ -6,3 +6,4 @@ export { CAPABILITY_STATUS, CAPABILITIES, capabilityById } from "./capabilities.
 export { PERSONALITY } from "./personality.js";
 export { normalizeRuntimeContext, formatRuntimeContext } from "./runtime-context.js";
 export { sanitizeCoreUserMemory, buildSatyaCorePrompt } from "./build-core-prompt.js";
+export { SATYAAI_ENGINES, getSatyaEngine } from "./engines.js";
