@@ -1476,10 +1476,15 @@ function App() {
                 active model occupies GPU memory.
               </p>
               <div className="diag-row">
-                <span>Current provider</span>
+                <span>Inference route</span>
                 <strong>
-                  {provider.model ||
-                    (gateway === "online" ? "Hosted model" : "Browser WebLLM")}
+                  {mode === "nano"
+                    ? "Browser-local · Anu"
+                    : provider.baseUrl && provider.model
+                      ? "Custom-compatible endpoint"
+                      : gateway === "online"
+                        ? "Configured remote gateway"
+                        : "Browser-local · " + current.name}
                 </strong>
               </div>
               <div className="diag-row">
@@ -1488,7 +1493,7 @@ function App() {
               </div>
               <div className="diag-row">
                 <span>Selected mode</span>
-                <strong>{current.label}</strong>
+                <strong>{current.modeLabel} · {current.name}</strong>
               </div>
             </div>
 
