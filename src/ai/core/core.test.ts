@@ -7,7 +7,7 @@ import {
 describe("SATYA CORE canonical registry", () => {
   it("keeps official product identity and founder date in one source", () => {
     expect(CORE_METADATA.name).toBe("SATYA CORE");
-    expect(CORE_METADATA.version).toBe("1.2.0");
+    expect(CORE_METADATA.version).toBe("1.3.0");
     expect(CORE_METADATA.foundedOn).toBe("2026-02-21");
     expect(FOUNDER.fullName).toBe("Satyajit Beura");
     expect(FOUNDER.designation).toBe("Sole Founder");
@@ -72,9 +72,20 @@ describe("SATYA CORE canonical registry", () => {
 describe("reasoning tiers are not foundation models", () => {
   it("defines the four public tier names without assigning them foundation-model meaning", () => {
     const prompt = buildSatyaCorePrompt({ runtimeContext: { mode: "smart", inferenceRoute: "browser-local" } });
-    expect(prompt).toContain("SatyaSom Engine is SatyaAI's shared model-engine platform");
-    expect(prompt).toContain("SatyaSom Engine is SatyaAI's shared model-engine platform");
+    expect(prompt).toContain("SatyaAI is built on the SatyaSom Engine Architecture");
+    expect(prompt).toContain("SatyaAI is built on the SatyaSom Engine Architecture");
     expect(prompt).toContain("Shared model engine: SatyaSom Engine.");
     expect(prompt).toContain("Selected SatyaAI tier: Dhara");
+  });
+});
+
+
+describe("SatyaSom Engine Architecture", () => {
+  it("defines the from-scratch architecture separately from its four model variants", () => {
+    const prompt = buildSatyaCorePrompt({ runtimeContext: { mode: "smart", inferenceRoute: "browser-local" } });
+    expect(prompt).toContain("SatyaSom Engine Architecture");
+    expect(prompt).toContain("designed and developed from scratch");
+    expect(prompt).toContain("Anu, Indu, Dhara, and Aditya");
+    expect(prompt).toContain("There is no single foundational model shared across the four tiers");
   });
 });
