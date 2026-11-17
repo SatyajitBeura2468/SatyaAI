@@ -1195,7 +1195,7 @@ function App() {
               {messages.map((message, index) => (
                 <div
                   className={"message " + message.role + (message.error ? " error" : "")}
-                  key={index + "-" + message.text.slice(0, 10)}
+                  key={index}
                 >
                   <div className="message-avatar">
                     {message.role === "ai" ? (
@@ -1212,7 +1212,7 @@ function App() {
                     </div>
                     {message.role === "ai" && !message.pending ? (
                       <Markdown text={message.text} />
-                    ) : (
+                    ) : message.pending && message.modelProgress ? null : (
                       <p className={message.pending ? "pending-copy" : ""}>
                         {message.text}
                       </p>
@@ -1244,20 +1244,8 @@ function App() {
                     {message.pending && message.modelProgress && (
                       <div className="model-progress">
                         <div className="model-progress-heading">
-                          <span>
-                            {message.modelProgress.messagePhase === "cache-check"
-                              ? "Checking model cache"
-                              : message.modelProgress.messagePhase === "cache-load"
-                                ? "Loading cached model"
-                                : message.modelProgress.messagePhase === "switching"
-                                  ? "Switching model"
-                                  : message.modelProgress.messagePhase === "recovery"
-                                    ? "Recovering model"
-                                    : message.modelProgress.stage === "download"
-                                      ? "Model files aa rahi hain"
-                                      : message.modelProgress.stage === "complete"
-                                        ? "Model taiyaar"
-                                        : "Model taiyaar ho raha hai"}
+                          <span className="model-progress-copy pending-copy" aria-live="polite">
+                            {message.text}
                           </span>
                           <strong>
                             {message.modelProgress.percent === null
