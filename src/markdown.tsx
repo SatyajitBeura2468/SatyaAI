@@ -1,4 +1,5 @@
 import React from "react";
+import { Copy } from "lucide-react";
 
 // Tiny, dependency-free markdown renderer for chat answers.
 // It builds React elements only (never innerHTML), so model output cannot inject HTML or scripts.
@@ -26,7 +27,7 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
   return out;
 }
 
-export function Markdown({ text }: { text: string }) {
+export function Markdown({ text, onCopy }: { text: string; onCopy?: (code: string) => void }) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const blocks: React.ReactNode[] = [];
   let i = 0;
@@ -43,10 +44,20 @@ export function Markdown({ text }: { text: string }) {
         i += 1;
       }
       i += 1; // closing fence; may be absent while the answer is still streaming
+      const codeText = code.join("\n");
+      const codeKey = key++;
       blocks.push(
-        <pre key={key++}>
-          <code>{code.join("\n")}</code>
-        </pre>,
+        <div key={codeKey} className="code-block">
+          <div className="code-toolbar">
+            <span>Code</span>
+            <button type="button" onClick={() => onCopy?.(codeText)} aria-label="Copy code block">
+              <Copy size={13} /> Copy
+            </button>
+          </div>
+          <pre>
+            <code>{codeText}</code>
+          </pre>
+        </div>,
       );
       continue;
     }
