@@ -125,7 +125,12 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             <h3>Accessibility & input</h3>
                             <label className="setting-toggle"><span><strong>Reduce motion</strong><small>Reduce interface animations and transitions.</small></span><input type="checkbox" checked={preferences.reduceMotion} onChange={(event) => setPreferences((p) => ({ ...p, reduceMotion: event.target.checked }))} /></label>
                             <label className="setting-toggle"><span><strong>Show message timestamps</strong><small>Show the local time beside each message.</small></span><input type="checkbox" checked={preferences.showTimestamps} onChange={(event) => setPreferences((p) => ({ ...p, showTimestamps: event.target.checked }))} /></label>
-                            <label className="setting-toggle"><span><strong>Enter sends a message</strong><small>Use Shift + Enter for a new line.</small></span><input type="checkbox" checked={preferences.enterToSend} onChange={(event) => setPreferences((p) => ({ ...p, enterToSend: event.target.checked }))} /></label>
+                            <label className="setting-toggle"><span><strong>Enter sends a message</strong><small>Off by default on touch devices. Use Shift + Enter for a new line.</small></span><input type="checkbox" checked={preferences.enterToSend} onChange={(event) => {
+                        if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) {
+                          try { localStorage.setItem("satya-enter-to-send-touch", String(event.target.checked)); } catch { /* keep the session setting */ }
+                        }
+                        setPreferences((p) => ({ ...p, enterToSend: event.target.checked }));
+                      }} /></label>
                           </div>
                         </>
                       )}
@@ -201,7 +206,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             <label className="setting-field">API key
                               <input type="password" value={provider.apiKey || ""} onChange={(event) => setProvider((p) => ({ ...p, apiKey: event.target.value || undefined }))} placeholder="Optional bearer token" autoComplete="off" />
                             </label>
-                            <div className="memory-footnote">Endpoint URL and model are saved on this device. The API key is kept in session storage only and is cleared when the browser session ends. Nano always stays on-device.</div>
+                            <div className="memory-footnote">Endpoint URL and model are saved on this device. The API key remains in memory only and is never written to browser storage. Nano always stays on-device.</div>
                             <div className="setting-actions">
                               <button className="save-btn" onClick={saveEndpointSettings}>Save endpoint</button>
                               <button className="ghost-btn" onClick={clearEndpointSettings}>Clear endpoint</button>
