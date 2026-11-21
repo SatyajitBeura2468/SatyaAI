@@ -16,7 +16,6 @@ internal sealed class CompanionForm : Form
         "https://satyaai-teamsatyajitbeura.vercel.app," +
         "https://satyaai-git-main-teamsatyajitbeura.vercel.app";
 
-    private readonly string[] _args;
     private readonly bool _startOnLaunch;
     private readonly bool _backgroundMode;
     private readonly string _dataRoot = Path.Combine(
@@ -38,9 +37,8 @@ internal sealed class CompanionForm : Form
 
     public CompanionForm(string[] args)
     {
-        _args = args;
         _startOnLaunch = args.Any(IsStartArgument);
-        _backgroundMode = args.Any(a => string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase));
+        _backgroundMode = args.Any(a => string.Equals(a, "--background", StringComparison.OrdinalIgnoreCase) || a.StartsWith("satyaai-drishti:", StringComparison.OrdinalIgnoreCase));
 
         Text = "SatyaAI · Drishti Companion";
         StartPosition = FormStartPosition.CenterScreen;
@@ -151,7 +149,7 @@ internal sealed class CompanionForm : Form
     private static bool IsStartArgument(string value) =>
         string.Equals(value, "--install", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(value, "--background", StringComparison.OrdinalIgnoreCase) ||
-        value.StartsWith("satyaai-drishiti:", StringComparison.OrdinalIgnoreCase);
+        value.StartsWith("satyaai-drishti:", StringComparison.OrdinalIgnoreCase);
 
     private void OnFirstShown(object? sender, EventArgs e)
     {
@@ -184,7 +182,6 @@ internal sealed class CompanionForm : Form
                 {
                     BeginInvoke(new Action(() =>
                     {
-                        ShowFromTray();
                         _ = StartRuntimeAsync();
                     }));
                 }
@@ -601,7 +598,7 @@ internal sealed class CompanionForm : Form
     private static bool IsStartArgument(string value) =>
         string.Equals(value, "--install", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(value, "--background", StringComparison.OrdinalIgnoreCase) ||
-        value.StartsWith("satyaai-drishiti:", StringComparison.OrdinalIgnoreCase);
+        value.StartsWith("satyaai-drishti:", StringComparison.OrdinalIgnoreCase);
 
     private static void OpenUrl(string url)
     {
