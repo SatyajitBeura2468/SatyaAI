@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  cancelDrishtiGeneration,
   checkDrishtiRuntime,
   DRISHTI_RUNTIME_URL,
   generateDrishtiImage,
@@ -98,6 +99,20 @@ describe("Drishti local runtime client", () => {
           height: 512,
         }),
       }),
+    );
+  });
+
+  it("posts cancellation to the loopback image runtime", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ accepted: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await expect(cancelDrishtiGeneration()).resolves.toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:7860/v1/cancel",
+      expect.objectContaining({ method: "POST", targetAddressSpace: "loopback", credentials: "omit" }),
     );
   });
 
