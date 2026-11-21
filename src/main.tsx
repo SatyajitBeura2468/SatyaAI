@@ -1107,17 +1107,26 @@ function App() {
   }
 
   async function connectDrishtiRuntime() {
+    if (drishtiAbortRef.current) return;
+    const controller = new AbortController();
+    drishtiAbortRef.current = controller;
     setDrishtiChecking(true);
     try {
-      const health = await ensureDrishtiRuntimeReady();
+      const health = await ensureDrishtiRuntimeReady(controller.signal);
+      if (controller.signal.aborted) return;
       const availability = health.models?.[drishtiModelId];
       if (!availability?.available) {
         setDrishtiRuntimeError(availability?.reason || "This Drishti tier is not available on the detected hardware.");
       }
     } catch (error) {
-      setDrishtiRuntimeHealth(null);
-      setDrishtiRuntimeError(error instanceof Error ? error.message : "Could not start the local Drishti companion.");
+      if (controller.signal.aborted) {
+        setStatus("Local engine connection stopped.");
+      } else {
+        setDrishtiRuntimeHealth(null);
+        setDrishtiRuntimeError(error instanceof Error ? error.message : "Could not start the local Drishti companion.");
+      }
     } finally {
+      if (drishtiAbortRef.current === controller) drishtiAbortRef.current = null;
       setDrishtiChecking(false);
     }
   }
@@ -1230,7 +1239,7 @@ function App() {
 
   function varyDrishti() {
     if (!drishtiResult) return;
-    const prompt = "Create a fresh visual variation of this image prompt while preserving its main subject and intent: " + drishtiResult.prompt + " Use a different composition, lighting arrangement, and visual details.";
+    const prompt = ("Create a fresh visual variation of this image prompt while preserving its main subject and intent: " + drishtiResult.prompt + " Use a different composition, lighting arrangement, and visual details.").slice(0, 4000);
     setQuery(prompt);
     void generateDrishti(prompt);
   }
