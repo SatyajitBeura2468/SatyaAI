@@ -9,9 +9,9 @@ Drishti is SatyaAI's image-generation workspace. The web app is a static interfa
 | Drishti Lite 1.0 | `segmind/SSD-1B` | Apache-2.0 | 1.3B parameters; a primary safetensors file is about 4.47 GB. CUDA is recommended; CPU is best-effort only. |
 | Drishti Core 1.5 | `black-forest-labs/FLUX.2-klein-4B` | Apache-2.0 | 4B parameters; BF16 transformer weights are about 7.75 GB; upstream guidance cites about 13 GB VRAM. |
 | Drishti Ultra 2.0 | `Qwen/Qwen-Image-2512` | Apache-2.0 | 20B parameters; an upstream BF16 serving benchmark reports about 59 GiB peak VRAM on an A800. |
-| Drishti X 3.0 MAX | `MiniMaxAI/MiniMax-H3-Image` | MiniMax-H3-Image Community License Agreement | 33.1B image-transformer parameters; the model card describes about 68.65 GB of image model files plus a separate 66.7 GB text encoder. |
+| Drishti X 3.0 MAX | `MiniMaxAI/MiniMax-H3-Image` | MiniMax-H3-Image Community License Agreement | 33.1B image-transformer parameters; the model card lists about 66.28 GB of transformer files, 2.34 GB of VAE files and a separate 66.7 GB text encoder. Conservative gate: about 140 GB free VRAM and 150 GB free disk. |
 
-MiniMax-H3-Image is open-weight, but it is **not** Apache-2.0 and should not be described as an unrestricted open-source model. Its license must be read and accepted separately before the X tier is enabled. The companion leaves it disabled by default.
+MiniMax-H3-Image is open-weight, but it is **not** Apache-2.0 and should not be described as an unrestricted open-source model. Its license must be read and accepted separately before the X tier is enabled. The companion leaves it disabled by default. The licence excludes the EU, UK, South Korea and the United States; do not enable the model unless the full agreement confirms that your use and territory are permitted.
 
 ## Runtime architecture
 
@@ -33,7 +33,7 @@ Set `VITE_DRISHTI_RUNTIME_URL` only when intentionally changing the local servic
 - Lite: uses SSD-1B. A CUDA GPU is recommended; a low-resolution CPU fallback is best-effort and can be slow.
 - Core: the local profile requires a CUDA device with about 13 GB free VRAM.
 - Ultra: the local BF16 profile requires about 60 GB free VRAM. This is a conservative gate based on a published A800 serving benchmark, not a universal minimum for every quantized pipeline.
-- X: the local profile conservatively requires about 80 GB free VRAM and 140 GB free disk. The MiniMax model card lists very large transformer and text-encoder assets. The tier stays disabled unless the user explicitly acknowledges its community license in the local runtime environment.
+- X: the local profile conservatively requires about 140 GB free VRAM and 150 GB free disk. The MiniMax model card lists very large transformer and text-encoder assets. The tier stays disabled unless the user explicitly acknowledges its community license in the local runtime environment.
 
 These are conservative runtime gates, not guarantees that every GPU of a listed capacity will work. Actual memory use varies with driver, precision, resolution and library versions. If model loading fails or the GPU runs out of memory, the companion returns an error and the UI does not silently fall back to a cloud model.
 
