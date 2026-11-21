@@ -25,6 +25,7 @@ export type DrishtiRuntimeHealth = {
   loaded_model: DrishtiModelId | null;
   busy: boolean;
   models: Record<DrishtiModelId, DrishtiModelAvailability>;
+  video_models?: Record<string, DrishtiModelAvailability>;
 };
 
 function loopbackInit(init: RequestInit): RequestInit {

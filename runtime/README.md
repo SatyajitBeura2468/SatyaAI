@@ -61,3 +61,20 @@ The model files are not downloaded during setup. The companion loads only the se
 - **CUDA out of memory:** use Lite or a machine with more VRAM. The runtime returns an explicit error and does not silently route to a hosted provider.
 - **First generation is slow:** the selected model is being downloaded and loaded into the local cache. Later generations reuse the loaded pipeline.
 - **Diffusers pipeline class missing:** the companion's next setup check will reconcile missing dependencies; for development, rerun the developer setup above.
+
+
+## Chakshu local video runtime
+
+The same signed-in Windows companion now serves image generation and the Chakshu video family from the same loopback-only process. SatyaAI sends prompts to `127.0.0.1:7860`; video bytes are returned directly to the browser as an MP4. The Vercel deployment hosts only the interface. Video generation never falls back to a hosted API.
+
+| SatyaAI tier | Upstream weights | Licence | Conservative local hardware gate |
+|---|---|---|---|
+| Chakshu Light | `Wan-AI/Wan2.1-T2V-1.3B-Diffusers` | Apache-2.0 | NVIDIA CUDA GPU with 9 GB free VRAM, 12 GB available RAM, 15 GB free disk; 480p |
+| Chakshu | `Wan-AI/Wan2.2-TI2V-5B-Diffusers` | Apache-2.0 | NVIDIA CUDA GPU with 24 GB free VRAM, 24 GB available RAM, 45 GB free disk; 720p-class output |
+| Divya Chakshu 1 | `Lightricks/LTX-2.5-Diffusers` | LTX-2.x Community License | High-memory NVIDIA CUDA workstation with 48 GB free VRAM, 48 GB available RAM, 120 GB free disk; synchronized audio/video |
+
+The app checks free GPU memory, available system RAM, and free cache storage before it attempts to load a video model. The thresholds are deliberately conservative application gates, not universal claims about every quantized or third-party runtime. Light is the smallest tier in this family, but it is not a CPU-only model: integrated graphics and CPU-only laptops will be shown as unsupported rather than silently starting a generation that is unlikely to finish.
+
+Wan2.1 and Wan2.2 model weights are Apache-2.0. LTX-2.5 is open-weight, but its weights are under Lightricks' separate LTX-2.x Community License, not Apache-2.0. Divya Chakshu 1 therefore requires the user to open and acknowledge that model licence in the UI before generation. Review the full terms at the model repository before use.
+
+Model files download only when a tier is first selected for generation and remain in the private Hugging Face cache. Image and video pipelines share the local GPU lock; the companion releases the other pipeline before loading a new tier to avoid deliberately keeping both large models resident at once. Video generation writes an MP4 to a temporary file and streams it back to the browser; the temporary file is removed after transfer.

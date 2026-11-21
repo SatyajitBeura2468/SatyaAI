@@ -8,6 +8,7 @@ import secrets
 import shutil
 import threading
 import time
+import tempfile
 from pathlib import Path
 from typing import Literal
 
@@ -15,6 +16,8 @@ import diffusers
 import psutil
 import torch
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from PIL import Image
@@ -48,6 +51,34 @@ MODEL_INFO = {
     },
 }
 
+VIDEO_MODEL_IDS = ("light", "chakshu", "divya")
+VIDEO_MODEL_INFO = {
+    "light": {
+        "repo": "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+        "license": "Apache-2.0",
+        "disk_gb": 15,
+        "vram_gb": 9,
+        "ram_gb": 12,
+        "hardware": "NVIDIA CUDA GPU with about 9 GB free VRAM, 12 GB available system RAM and 15 GB free disk. Lightest tier; CPU-only generation is not supported.",
+    },
+    "chakshu": {
+        "repo": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+        "license": "Apache-2.0",
+        "disk_gb": 45,
+        "vram_gb": 24,
+        "ram_gb": 24,
+        "hardware": "NVIDIA CUDA GPU with about 24 GB free VRAM, 24 GB available system RAM and 45 GB free disk. Wan's official 720p recipe targets a 24 GB-class GPU.",
+    },
+    "divya": {
+        "repo": "Lightricks/LTX-2.5-Diffusers",
+        "license": "LTX-2.x Community License",
+        "disk_gb": 120,
+        "vram_gb": 48,
+        "ram_gb": 48,
+        "hardware": "High-memory NVIDIA CUDA workstation with about 48 GB free VRAM, 48 GB available system RAM and 120 GB free disk. This is a conservative local profile for the 22B audio-video model.",
+    },
+}
+
 app = FastAPI(
     title="SatyaAI Drishti Local Runtime",
     version=SERVICE_VERSION,
@@ -78,11 +109,14 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Accept", "Content-Type", "X-SatyaAI-Client"],
+    expose_headers=["X-SatyaAI-Model", "X-SatyaAI-Elapsed", "X-SatyaAI-Seed"],
 )
 
 
 _pipeline = None
 _loaded_model: str | None = None
+_video_pipeline = None
+_loaded_video_model: str | None = None
 _generation_lock = threading.Lock()
 
 _runtime_state = {
@@ -93,6 +127,33 @@ _runtime_state = {
     "total_steps": 0,
     "model_id": None,
 }
+
+_video_runtime_state = {
+    "phase": "idle",
+    "message": "Ready for a local video request.",
+    "progress": 0,
+    "step": 0,
+    "total_steps": 0,
+    "model_id": None,
+}
+
+
+def _set_video_runtime_state(
+    phase: str,
+    message: str,
+    progress: int | None = None,
+    step: int = 0,
+    total_steps: int = 0,
+    model_id: str | None = None,
+) -> None:
+    _video_runtime_state.update({
+        "phase": phase,
+        "message": message,
+        "progress": progress,
+        "step": step,
+        "total_steps": total_steps,
+        "model_id": model_id,
+    })
 
 
 def _set_runtime_state(
@@ -119,6 +180,15 @@ def runtime_status():
         **_runtime_state,
         "busy": _generation_lock.locked(),
         "loaded_model": _loaded_model,
+    }
+
+
+@app.get("/v1/video/status")
+def video_runtime_status():
+    return {
+        **_video_runtime_state,
+        "busy": _generation_lock.locked(),
+        "loaded_model": _loaded_video_model,
     }
 
 
@@ -210,6 +280,37 @@ def _model_availability(
     }
 
 
+def _video_model_availability(
+    model_id: str,
+    device: str,
+    vram_free: float | None,
+    ram_available: float,
+    free_disk: float,
+) -> dict:
+    info = VIDEO_MODEL_INFO[model_id]
+    if free_disk < info["disk_gb"]:
+        available = False
+        reason = f"Not enough free disk space in the local model cache. This tier reserves at least {info['disk_gb']} GB."
+    elif device != "cuda":
+        available = False
+        reason = "Video generation requires a supported NVIDIA CUDA GPU. This computer is running without CUDA; CPU-only video generation is not enabled."
+    elif (vram_free or 0) < info["vram_gb"]:
+        available = False
+        reason = f"{model_id.title()} needs about {info['vram_gb']} GB of currently free GPU memory for this conservative profile."
+    elif ram_available < info["ram_gb"]:
+        available = False
+        reason = f"This tier needs at least {info['ram_gb']} GB of currently available system RAM."
+    else:
+        available = True
+        reason = "Compatible hardware and storage detected. Model weights download only when this tier is first used."
+    return {
+        "available": available,
+        "reason": reason,
+        "license": info["license"],
+        "recommended_hardware": info["hardware"],
+    }
+
+
 def _health_payload() -> dict:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     vram_total, vram_free, device_name = _gpu_stats()
@@ -220,6 +321,10 @@ def _health_payload() -> dict:
             model_id, device, vram_total, vram_free, ram_available, free_disk
         )
         for model_id in MODEL_IDS
+    }
+    video_models = {
+        model_id: _video_model_availability(model_id, device, vram_free, ram_available, free_disk)
+        for model_id in VIDEO_MODEL_IDS
     }
     return {
         "ok": True,
@@ -234,6 +339,7 @@ def _health_payload() -> dict:
         "loaded_model": _loaded_model,
         "busy": _generation_lock.locked(),
         "models": models,
+        "video_models": video_models,
     }
 
 
@@ -252,6 +358,17 @@ class GenerateRequest(BaseModel):
     height: int = Field(default=512, ge=256, le=1024)
 
 
+def _release_video_pipeline() -> None:
+    global _video_pipeline, _loaded_video_model
+    old = _video_pipeline
+    _video_pipeline = None
+    _loaded_video_model = None
+    del old
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def _release_pipeline() -> None:
     global _pipeline, _loaded_model
     old = _pipeline
@@ -268,6 +385,7 @@ def _load_pipeline(model_id: str):
     if _pipeline is not None and _loaded_model == model_id:
         return _pipeline
 
+    _release_video_pipeline()
     _release_pipeline()
     use_cuda = torch.cuda.is_available()
     dtype = (
@@ -439,6 +557,174 @@ def generate(request: GenerateRequest):
     except Exception as error:
         message = f"Drishti could not generate this image: {type(error).__name__}: {error}"
         _set_runtime_state("error", message, None, model_id=request.model_id)
+        raise HTTPException(status_code=500, detail=message) from error
+    finally:
+        _generation_lock.release()
+
+
+class VideoGenerateRequest(BaseModel):
+    model_id: Literal["light", "chakshu", "divya"]
+    prompt: str = Field(min_length=1, max_length=4000)
+    accept_license: bool = False
+
+
+def _load_video_pipeline(model_id: str):
+    global _video_pipeline, _loaded_video_model
+    if _video_pipeline is not None and _loaded_video_model == model_id:
+        return _video_pipeline
+
+    # Image and video share the GPU. Keep only one diffusion pipeline resident.
+    _release_pipeline()
+    _release_video_pipeline()
+    dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    repo = VIDEO_MODEL_INFO[model_id]["repo"]
+
+    if model_id in ("light", "chakshu"):
+        from diffusers import WanPipeline
+
+        pipeline = WanPipeline.from_pretrained(
+            repo,
+            torch_dtype=dtype,
+            low_cpu_mem_usage=True,
+        )
+        pipeline.enable_model_cpu_offload(device="cuda")
+    else:
+        from diffusers import LTX2Pipeline
+
+        pipeline = LTX2Pipeline.from_pretrained(repo, dtype=dtype)
+        pipeline.enable_sequential_cpu_offload(device="cuda")
+        pipeline.vae.enable_tiling()
+
+    _video_pipeline = pipeline
+    _loaded_video_model = model_id
+    return pipeline
+
+
+@app.post("/v1/video/generate")
+def generate_video(request: VideoGenerateRequest):
+    prompt = request.prompt.strip()
+    if not prompt:
+        raise HTTPException(status_code=422, detail="Write a video prompt first.")
+    if request.model_id == "divya" and not request.accept_license:
+        raise HTTPException(status_code=403, detail="Review and accept the LTX-2.x Community License before using Divya Chakshu 1.")
+    if not _generation_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Another local image or video generation is already running on this device.")
+
+    started = time.perf_counter()
+    output_path = None
+    seed = secrets.randbelow(2**31)
+    try:
+        _set_video_runtime_state(
+            "checking",
+            "Checking local GPU memory, storage and model eligibility…",
+            0,
+            model_id=request.model_id,
+        )
+        health_snapshot = _health_payload()
+        availability = health_snapshot["video_models"][request.model_id]
+        if not availability["available"]:
+            raise HTTPException(status_code=409, detail=availability["reason"])
+
+        _set_video_runtime_state(
+            "loading_model",
+            "Downloading model files if needed, then loading the selected Chakshu tier. First use can take a while.",
+            None,
+            model_id=request.model_id,
+        )
+        pipeline = _load_video_pipeline(request.model_id)
+
+        descriptor, output_path = tempfile.mkstemp(prefix="satyaai-chakshu-", suffix=".mp4")
+        os.close(descriptor)
+        generator = torch.Generator(device="cuda").manual_seed(seed)
+
+        _set_video_runtime_state(
+            "generating",
+            "Rendering video locally. This can take several minutes on consumer hardware…",
+            0,
+            0,
+            30,
+            request.model_id,
+        )
+
+        with torch.inference_mode():
+            if request.model_id == "divya":
+                from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES
+                from diffusers.utils import encode_video
+
+                frame_rate = 24.0
+                video, audio = pipeline(
+                    prompt=prompt,
+                    width=768,
+                    height=512,
+                    num_frames=49,
+                    frame_rate=frame_rate,
+                    sigmas=DISTILLED_SIGMA_VALUES,
+                    guidance_scale=1.0,
+                    audio_guidance_scale=1.0,
+                    generator=generator,
+                    output_type="np",
+                    return_dict=False,
+                )
+                encode_video(
+                    video[0],
+                    fps=frame_rate,
+                    audio=audio[0].float().cpu(),
+                    audio_sample_rate=pipeline.vocoder.config.output_sampling_rate,
+                    output_path=output_path,
+                )
+            else:
+                from diffusers.utils import export_to_video
+
+                is_light = request.model_id == "light"
+                width, height = (832, 480) if is_light else (1280, 704)
+                fps = 16 if is_light else 24
+                steps = 25 if is_light else 30
+                result = pipeline(
+                    prompt=prompt,
+                    height=height,
+                    width=width,
+                    num_frames=49,
+                    num_inference_steps=steps,
+                    generator=generator,
+                )
+                frames = result.frames[0]
+                export_to_video(frames, output_path, fps=fps)
+
+        if not output_path or not os.path.isfile(output_path) or os.path.getsize(output_path) < 1024:
+            raise RuntimeError("The local video pipeline did not produce a valid MP4 file.")
+
+        elapsed = round(time.perf_counter() - started, 2)
+        _set_video_runtime_state("complete", f"Video generated in {elapsed} seconds.", 100, 30, 30, request.model_id)
+        headers = {
+            "X-SatyaAI-Model": request.model_id,
+            "X-SatyaAI-Elapsed": str(elapsed),
+            "X-SatyaAI-Seed": str(seed),
+        }
+        return FileResponse(
+            output_path,
+            media_type="video/mp4",
+            filename=f"satyaai-chakshu-{seed}.mp4",
+            headers=headers,
+            background=BackgroundTask(os.unlink, output_path),
+        )
+    except HTTPException as error:
+        _set_video_runtime_state("error", str(error.detail), None, model_id=request.model_id)
+        if output_path and os.path.exists(output_path):
+            os.unlink(output_path)
+        raise
+    except torch.cuda.OutOfMemoryError as error:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        message = "This video tier exceeded the available GPU memory. Choose Chakshu Light or use a workstation with more VRAM."
+        _set_video_runtime_state("error", message, None, model_id=request.model_id)
+        if output_path and os.path.exists(output_path):
+            os.unlink(output_path)
+        raise HTTPException(status_code=507, detail=message) from error
+    except Exception as error:
+        message = f"Chakshu could not generate this video: {type(error).__name__}: {error}"
+        _set_video_runtime_state("error", message, None, model_id=request.model_id)
+        if output_path and os.path.exists(output_path):
+            os.unlink(output_path)
         raise HTTPException(status_code=500, detail=message) from error
     finally:
         _generation_lock.release()

@@ -9,3 +9,6 @@ psutil>=6.0.0
 Pillow>=10.0.0
 sentencepiece>=0.2.0
 protobuf>=5.0.0
+imageio[ffmpeg]>=2.37.0
+av>=14.0.0
+ftfy>=6.2.0

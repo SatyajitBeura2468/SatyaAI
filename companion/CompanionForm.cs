@@ -268,7 +268,7 @@ internal sealed class CompanionForm : Form
 
             if (torchMissing || wrongBackend)
             {
-                SetStatus("Installing the image engine", "Selecting the best supported PyTorch backend for this computer.");
+                SetStatus("Preparing the local creative engine", "Selecting the best supported PyTorch backend for this computer.");
                 AppendLog("Installing PyTorch with automatic CPU/CUDA/Intel accelerator selection.");
                 var torchArguments = new List<string>
                 {
@@ -295,7 +295,7 @@ internal sealed class CompanionForm : Form
 
             var dependenciesCheck = await CaptureCommandAsync(
                 venvPython,
-                new[] { "-c", "import fastapi, uvicorn, diffusers, transformers, psutil, PIL" });
+                new[] { "-c", "import fastapi, uvicorn, diffusers, transformers, psutil, PIL, imageio, av, ftfy" });
             if (dependenciesCheck.ExitCode != 0)
             {
                 SetStatus("Installing Drishti components", "Downloading the image pipeline libraries. They are cached for future launches.");
