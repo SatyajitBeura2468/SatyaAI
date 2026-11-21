@@ -1,7 +1,7 @@
 # SATYA CORE
 
 **Core version:** 1.1.0  
-**Last updated:** 16 November 2026  
+**Last updated:** 21 November 2026  
 **Founding date:** 21 February 2026
 
 SATYA CORE is SatyaAI's permanent, application-level identity and behavioural architecture. It is not user-customizable memory and does not imply that SatyaAI is itself the underlying foundation model.
@@ -50,7 +50,7 @@ The registry uses AVAILABLE, IN_DEVELOPMENT, PLANNED, and UNAVAILABLE.
 - Conversational modes: available, subject to the configured inference route. Nano uses the browser-local SmolLM2-360M-Instruct WebLLM build; Fast, Smart, and Deep Think retain their existing model assignments.
 - Web search: in development.
 - Deep research: in development.
-- Image creation: planned and deferred.
+- Image creation: in development. The Drishti Image workspace and product-facing model registry are being integrated; local inference and actual image generation are not yet operational.
 - Local inference: available conditionally on WebGPU, a compatible model, suitable hardware, and successful initialization.
 - Remote inference: available only when a compatible endpoint is configured and reachable.
 - Text-file attachments: available for supported text formats and the size limits implemented in the interface; this is not general multimodal document understanding.
