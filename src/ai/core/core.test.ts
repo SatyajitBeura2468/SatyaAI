@@ -25,7 +25,7 @@ describe("SATYA CORE canonical registry", () => {
   it("keeps unshipped features clearly marked", () => {
     expect(CAPABILITIES.find((item) => item.id === "web-search")?.status).toBe("IN_DEVELOPMENT");
     expect(CAPABILITIES.find((item) => item.id === "deep-research")?.status).toBe("IN_DEVELOPMENT");
-    expect(CAPABILITIES.find((item) => item.id === "image-creation")?.status).toBe("PLANNED");
+    expect(CAPABILITIES.find((item) => item.id === "image-creation")?.status).toBe("IN_DEVELOPMENT");
   });
   it("includes personality without forcing humour", () => {
     expect(PERSONALITY.description).toContain("naturally funny");
