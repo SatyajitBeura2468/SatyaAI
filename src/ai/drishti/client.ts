@@ -1,6 +1,9 @@
 import type { DrishtiModelId } from "./registry";
 
 export const DRISHTI_RUNTIME_URL = "http://127.0.0.1:7860";
+export const DRISHTI_COMPANION_SCHEME = "satyaai-drishiti://start";
+export const DRISHTI_COMPANION_INSTALL_URL =
+  "https://github.com/SatyajitBeura2468/SatyaAI/releases/download/drishti-companion-latest/SatyaAI-Drishti-Setup.exe";
 
 export type DrishtiModelAvailability = {
   available: boolean;
@@ -27,6 +30,17 @@ export type DrishtiRuntimeHealth = {
 function loopbackInit(init: RequestInit): RequestInit {
   return { ...init, targetAddressSpace: "loopback" } as RequestInit;
 }
+
+export type DrishtiRuntimeStatus = {
+  phase: "idle" | "checking" | "loading_model" | "generating" | "complete" | "error";
+  message: string;
+  progress: number | null;
+  step: number;
+  total_steps: number;
+  model_id: DrishtiModelId | null;
+  busy: boolean;
+  loaded_model: DrishtiModelId | null;
+};
 
 export type DrishtiGenerationResult = {
   image_data_url: string;
@@ -71,6 +85,33 @@ export async function checkDrishtiRuntime(
     throw new Error("The address responded, but it is not a compatible Drishti runtime.");
   }
   return health;
+}
+
+export function requestDrishtiCompanionStart(): void {
+  const link = document.createElement("a");
+  link.href = DRISHTI_COMPANION_SCHEME;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+export async function getDrishtiRuntimeStatus(): Promise<DrishtiRuntimeStatus | null> {
+  try {
+    const response = await fetch(
+      DRISHTI_RUNTIME_URL + "/v1/status",
+      loopbackInit({
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        credentials: "omit",
+      }),
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as DrishtiRuntimeStatus;
+  } catch {
+    return null;
+  }
 }
 
 export async function generateDrishtiImage(
