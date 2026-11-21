@@ -26,7 +26,9 @@ This companion is the image-inference process used by SatyaAI's Image workspace.
 
 The `start.ps1` launcher can be used after PyTorch is installed in the runtime virtual environment.
 
-6. Keep the runtime window open and return to SatyaAI Image mode. The app checks `http://127.0.0.1:7860/health` and enables Generate only when the selected model passes the local hardware check.
+6. Keep the runtime window open and return to SatyaAI Image mode. Click **Connect local engine**. On the first connection, recent Edge/Chrome versions may show a Local Network Access permission prompt; choose **Allow**. Generate is enabled only when the selected model passes the local hardware check.
+
+If permission was denied in Edge, open Settings → Privacy, search, and services → Site permissions → All permissions → Local network access, then change the permission for SatyaAI and click **Connect local engine** again.
 
 For a GPU installation, use the exact command produced by the PyTorch selector instead of the CPU example above. Do not install a random CUDA wheel.
 
