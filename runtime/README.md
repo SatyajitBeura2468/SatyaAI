@@ -37,11 +37,11 @@ For a GPU installation, use the exact command produced by the PyTorch selector i
 | Lite 1.0 | `segmind/SSD-1B` | Apache-2.0 | CUDA recommended; best-effort CPU fallback at 512px |
 | Core 1.5 | `black-forest-labs/FLUX.2-klein-4B` | Apache-2.0 | About 13 GB free VRAM recommended |
 | Ultra 2.0 | `Qwen/Qwen-Image-2512` | Apache-2.0 | Conservative BF16 profile requires about 60 GB free VRAM |
-| X 3.0 MAX | `MiniMaxAI/MiniMax-H3-Image` | MiniMax-H3-Image Community License Agreement | About 140 GB free VRAM and 150 GB free disk; experimental |
+| X 3.0 MAX | `MiniMaxAI/MiniMax-H3-Image` | MiniMax-H3-Image Community License Agreement | About 70 GB free VRAM on an 80 GB-class GPU and 140 GB free disk; experimental |
 
 The model files are not downloaded during setup. The companion loads only the selected checkpoint when the first generation request is made, then reuses it while the service stays running. Hugging Face's local cache prevents repeat downloads unless files are removed.
 
-**Important license note:** MiniMax-H3-Image is not under Apache-2.0. Read the current license at https://huggingface.co/MiniMaxAI/MiniMax-H3-Image before enabling that tier. Only after independently reviewing and accepting its terms, and confirming your territory is not excluded by the licence, set both `SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE=1` and `SATYAAI_MINIMAX_H3_TERRITORY_ALLOWED=1` in the local environment before starting the companion. The default is disabled.
+**Important license note:** MiniMax-H3-Image is not under Apache-2.0. Read the current license at https://huggingface.co/MiniMaxAI/MiniMax-H3-Image before enabling that tier. Only after independently reviewing and accepting its terms, and confirming your territory is not excluded by the licence, set both `SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE=1` and `SATYAAI_MINIMAX_H3_TERRITORY_ALLOWED=1` in the local environment before starting the companion. The official Diffusers modular implementation uses automatic component offloading and documents about 65 GB peak VRAM; the runtime gate reserves about 70 GB free VRAM. The default is disabled.
 
 ## Privacy and network boundary
 
