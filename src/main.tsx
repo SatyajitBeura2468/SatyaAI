@@ -372,7 +372,6 @@ function App() {
   const conversationRef = useRef<HTMLElement>(null);
   const settingsRef = useRef<HTMLElement>(null);
   const activeAbortRef = useRef<AbortController | null>(null);
-  const drishtiAbortRef = useRef<AbortController | null>(null);
   const partialAnswerRef = useRef("");
   const followLatestRef = useRef(true);
   const activeRef = useRef(activeId);
@@ -1015,23 +1014,18 @@ function App() {
       return;
     }
 
-    const controller = new AbortController();
-    drishtiAbortRef.current = controller;
     setDrishtiGenerating(true);
     setDrishtiError("");
     setDrishtiResult(null);
     setStatus("Generating locally with " + currentDrishti.name + "…");
     try {
-      const result = await generateDrishtiImage(drishtiModelId, prompt, controller.signal);
+      const result = await generateDrishtiImage(drishtiModelId, prompt);
       setDrishtiResult(result);
       setQuery("");
       setStatus("Image generated locally.");
     } catch (error) {
-      if (!controller.signal.aborted) {
-        setDrishtiError(error instanceof Error ? error.message : "Drishti image generation failed.");
-      }
+      setDrishtiError(error instanceof Error ? error.message : "Drishti image generation failed.");
     } finally {
-      if (drishtiAbortRef.current === controller) drishtiAbortRef.current = null;
       setDrishtiGenerating(false);
     }
   }
