@@ -68,7 +68,7 @@ describe("creator identity is internal; user memory belongs to the user", () => 
   it("answers contributor and capability questions from the canonical registry", () => {
     expect(getIdentityReply("Who is the project lead?", DEFAULT_USER_MEMORY)).toContain("Amit Kumar Panigrahi");
     expect(getIdentityReply("Who is the collaborator?", DEFAULT_USER_MEMORY)).toContain("Krishna Sharma");
-    expect(getIdentityReply("Can you generate images?", DEFAULT_USER_MEMORY)).toContain("PLANNED");
+    expect(getIdentityReply("Can you generate images?", DEFAULT_USER_MEMORY)).toContain("IN_DEVELOPMENT");
     expect(getIdentityReply("Can you do web search?", DEFAULT_USER_MEMORY)).toContain("IN_DEVELOPMENT");
   });
 

@@ -31,10 +31,14 @@ flowchart TD
 
 ## Honest V0.1 boundaries
 
-Browser-local text inference is implemented when the browser and device support WebGPU. Anu (Nano) is always on-device. Engine identity and reasoning-mode labels are application-owned; low-level implementation identifiers are kept separate from the user-facing product identity. The Drishti Image workspace and model registry are being integrated; local image generation is not yet operational. Web search, SearXNG integration, citation-backed research, audio transcription, video keyframe extraction, and general multimodal document understanding remain separate capabilities that require additional implementation.
+Browser-local text inference is implemented when the browser and device support WebGPU. Anu (Nano) is always on-device. Engine identity and reasoning-mode labels are application-owned; low-level implementation identifiers are kept separate from the user-facing product identity. The Drishti Image workspace now has a loopback-only local Diffusers generation pipeline. Install and start the companion in `runtime/` on the same computer before generating; model availability is checked against the actual device, storage and license. Vercel hosts only the UI, not image inference. Web search, SearXNG integration, citation-backed research, audio transcription, video keyframe extraction, and general multimodal document understanding remain separate capabilities that require additional implementation.
 
 See [`docs/architecture.md`](docs/architecture.md), [`docs/privacy-model.md`](docs/privacy-model.md), and [`docs/future-training.md`](docs/future-training.md).
 
+
+## Drishti local image runtime
+
+See [`runtime/README.md`](runtime/README.md) for Windows setup. The companion runs on `127.0.0.1:7860`, loads only the selected model and keeps model downloads in the local Hugging Face cache. Image prompts go directly to that local service, never through the SatyaSom chat pipeline. Model licenses and hardware requirements are tier-specific; Drishti X 3.0 MAX uses the MiniMax community license, not Apache-2.0.
 
 ## SATYA CORE
 

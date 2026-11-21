@@ -66,6 +66,7 @@ import {
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
 import { DEFAULT_DRISHTI_MODEL_ID, DRISHTI_MODELS, getDrishtiModel, isDrishtiModelId, type DrishtiModelId } from "./ai/drishti/registry";
+import { checkDrishtiRuntime, generateDrishtiImage, type DrishtiGenerationResult, type DrishtiRuntimeHealth } from "./ai/drishti/client";
 import { Markdown } from "./markdown";
 
 type Mode = SatyaTierMode;
@@ -287,6 +288,12 @@ function App() {
       return DEFAULT_DRISHTI_MODEL_ID;
     }
   });
+  const [drishtiRuntimeHealth, setDrishtiRuntimeHealth] = useState<DrishtiRuntimeHealth | null>(null);
+  const [drishtiChecking, setDrishtiChecking] = useState(false);
+  const [drishtiRuntimeError, setDrishtiRuntimeError] = useState("");
+  const [drishtiGenerating, setDrishtiGenerating] = useState(false);
+  const [drishtiError, setDrishtiError] = useState("");
+  const [drishtiResult, setDrishtiResult] = useState<DrishtiGenerationResult | null>(null);
   const [theme, setTheme] = useState<Theme>(readSavedTheme);
   const [query, setQuery] = useState("");
   const [chats, setChats] = useState<Chat[]>(() =>
@@ -373,6 +380,8 @@ function App() {
   activeRef.current = activeId;
   const current = getSatyaTier(mode)!;
   const currentDrishti = getDrishtiModel(drishtiModelId);
+  const drishtiModelRuntime = drishtiRuntimeHealth?.models?.[drishtiModelId];
+  const drishtiCanGenerate = Boolean(!drishtiChecking && !drishtiGenerating && drishtiRuntimeHealth?.ok && drishtiModelRuntime?.available);
   const initials = getInitials(memory.name);
 
   const capability = useMemo(
@@ -963,7 +972,59 @@ function App() {
     textareaRef.current?.focus();
   }
 
+  async function refreshDrishtiRuntime() {
+    setDrishtiChecking(true);
+    setDrishtiRuntimeError("");
+    try {
+      const health = await checkDrishtiRuntime();
+      setDrishtiRuntimeHealth(health);
+    } catch (error) {
+      setDrishtiRuntimeHealth(null);
+      setDrishtiRuntimeError(error instanceof Error ? error.message : "Could not check the local Drishti runtime.");
+    } finally {
+      setDrishtiChecking(false);
+    }
+  }
+
+  async function generateDrishti() {
+    const prompt = query.trim();
+    if (!prompt || drishtiGenerating) return;
+    if (!drishtiCanGenerate) {
+      setDrishtiError(drishtiModelRuntime?.reason || drishtiRuntimeError || "The selected Drishti model is not ready on this device.");
+      return;
+    }
+
+    setDrishtiGenerating(true);
+    setDrishtiError("");
+    setDrishtiResult(null);
+    setStatus("Generating locally with " + currentDrishti.name + "…");
+    try {
+      const result = await generateDrishtiImage(drishtiModelId, prompt);
+      setDrishtiResult(result);
+      setQuery("");
+      setStatus("Image generated locally.");
+    } catch (error) {
+      setDrishtiError(error instanceof Error ? error.message : "Drishti image generation failed.");
+    } finally {
+      setDrishtiGenerating(false);
+    }
+  }
+
+  function downloadDrishtiImage() {
+    if (!drishtiResult) return;
+    const anchor = document.createElement("a");
+    anchor.href = drishtiResult.image_data_url;
+    anchor.download = "satyaai-drishti-" + drishtiResult.seed + ".png";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+
   function send() {
+    if (workspaceMode === "image") {
+      void generateDrishti();
+      return;
+    }
     void sendMessage(query, file);
   }
 
@@ -1490,8 +1551,11 @@ function App() {
                       role="option"
                       aria-selected={drishtiModelId === model.id}
                       className={"reasoning-option" + (drishtiModelId === model.id ? " chosen" : "")}
+                      disabled={drishtiGenerating || drishtiChecking}
                       onClick={() => {
                         setDrishtiModelId(model.id);
+                        setDrishtiResult(null);
+                        setDrishtiError("");
                         setReasoningOpen(false);
                       }}
                     >
@@ -1562,7 +1626,7 @@ function App() {
               <div className="drishti-studio-copy">
                 <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
                 <h1>Let’s create <em>something.</em></h1>
-                <p>Start with an idea, choose a direction, and make it yours. Drishti is ready when its local image engine is connected.</p>
+                <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Start the local Drishti companion on this computer to generate images privately."}</p>
               </div>
               <div className="drishti-ideas-heading">
                 <div>
@@ -1596,8 +1660,29 @@ function App() {
                   </button>
                 ))}
               </div>
+              {drishtiResult && (
+                <div className="drishti-result">
+                  <img src={drishtiResult.image_data_url} alt="Image generated locally by Drishti" />
+                  <div className="drishti-result-footer">
+                    <span>Generated locally · {drishtiResult.elapsed_seconds}s · Seed {drishtiResult.seed}</span>
+                    <button type="button" className="drishti-download" onClick={downloadDrishtiImage}>
+                      <Download size={15} /> Download PNG
+                    </button>
+                  </div>
+                </div>
+              )}
+              {drishtiError && <div className="drishti-runtime-error" role="alert">{drishtiError}</div>}
               <div className="drishti-studio-note" role="status">
-                Your prompt stays in the image workspace. Local image generation will become available when the Drishti runtime is connected.
+                {drishtiChecking
+                  ? "Checking the local Drishti runtime…"
+                  : drishtiRuntimeHealth
+                    ? drishtiModelRuntime?.available
+                      ? "Local runtime ready for this tier. Your image prompt is sent only to this device."
+                      : drishtiModelRuntime?.reason || "This model is not available on the detected hardware."
+                    : drishtiRuntimeError || "Connect the local companion on this computer. Your image prompts stay on this device and never go through SatyaSom chat."}
+                <button type="button" onClick={() => void refreshDrishtiRuntime()} disabled={drishtiChecking || drishtiGenerating}>
+                  {drishtiChecking ? "Connecting…" : drishtiRuntimeHealth ? "Recheck" : "Connect local engine"}
+                </button>
               </div>
             </div>
           )}
@@ -1803,9 +1888,11 @@ function App() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
-                  if (workspaceMode === "chat" && event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
+                  if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
                     event.preventDefault();
-                    if (!busy) void send();
+                    if (workspaceMode === "image") {
+                      if (drishtiCanGenerate && !drishtiGenerating) void send();
+                    } else if (!busy) void send();
                   }
                 }}
                 placeholder={workspaceMode === "image" ? "Describe the image you want Drishti to create…" : busy ? status : "Ask anything…"}
@@ -1851,12 +1938,12 @@ function App() {
                   </button>
                   <button
                     className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
+                    disabled={busy || drishtiGenerating}
                     onClick={() => {
-                      if (busy) return;
+                      if (busy || drishtiGenerating) return;
                       setWorkspaceMode((currentMode) => currentMode === "chat" ? "image" : "chat");
                       setReasoningOpen(false);
                     }}
-                    disabled={busy}
                     aria-pressed={workspaceMode === "image"}
                     aria-label={workspaceMode === "image" ? "Switch to Chat mode" : "Switch to Image mode"}
                     title={workspaceMode === "image" ? "Return to Chat" : "Create an image with Drishti"}
@@ -1865,13 +1952,23 @@ function App() {
                   </button>
                 </div>
                 <button
-                  className={"send " + (busy ? "stop " : query.trim() ? "ready " : "mic ") + (listening ? "listening" : "")}
-                  disabled={workspaceMode === "image" || (!busy && (!query.trim() && !canSpeak))}
-                  onClick={() => busy ? stopGeneration() : (query.trim() ? void send() : toggleMic())}
-                  aria-label={workspaceMode === "image" ? "Drishti image generation is not connected yet" : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn't supported in this browser"}
-                  title={workspaceMode === "image" ? "Drishti image generation is being integrated" : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
+                  className={"send " + (workspaceMode === "image" ? (drishtiGenerating ? "stop " : query.trim() ? "ready " : "mic ") : busy ? "stop " : query.trim() ? "ready " : "mic ") + (listening ? "listening" : "")}
+                  disabled={workspaceMode === "image"
+                    ? (drishtiGenerating || !query.trim() || !drishtiCanGenerate)
+                    : (!busy && (!query.trim() && !canSpeak))}
+                  onClick={() => workspaceMode === "image"
+                    ? void send()
+                    : busy
+                      ? stopGeneration()
+                      : (query.trim() ? void send() : toggleMic())}
+                  aria-label={workspaceMode === "image"
+                    ? drishtiGenerating ? "Generating image locally" : drishtiCanGenerate ? "Generate image locally" : drishtiModelRuntime?.reason || "Local Drishti runtime is unavailable"
+                    : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn\'t supported in this browser"}
+                  title={workspaceMode === "image"
+                    ? drishtiGenerating ? "Generation in progress" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : drishtiModelRuntime?.reason || drishtiRuntimeError || "Start the local Drishti companion"
+                    : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
                 >
-                  {workspaceMode === "image" ? <ImageIcon size={17} /> : busy ? <Square size={17} /> : query.trim() ? <ArrowUp size={18} /> : <Mic size={18} />}
+                  {workspaceMode === "image" ? drishtiGenerating ? <Square size={17} /> : <ImageIcon size={17} /> : busy ? <Square size={17} /> : query.trim() ? <ArrowUp size={18} /> : <Mic size={18} />}
                 </button>
               </div>
             </div>
@@ -1884,7 +1981,11 @@ function App() {
             <div className="composer-meta">
               <span>
                 {workspaceMode === "image"
-                  ? "Drishti image generation is being integrated. Your prompt is not sent to the text model."
+                  ? drishtiGenerating
+                    ? "Generating locally on this device…"
+                    : drishtiCanGenerate
+                      ? "Local runtime connected. Image prompts stay on this device."
+                      : drishtiRuntimeError || drishtiModelRuntime?.reason || "Start the local Drishti companion to enable image generation."
                   : busy
                     ? status + " Keep this tab open."
                     : "SatyaAI can make mistakes. Verify important information."}

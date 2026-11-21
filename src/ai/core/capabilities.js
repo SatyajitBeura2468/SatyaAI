@@ -28,7 +28,7 @@ export const CAPABILITIES = Object.freeze([
     id: "image-creation",
     name: "Image creation",
     status: CAPABILITY_STATUS.IN_DEVELOPMENT,
-    details: "The Drishti image workspace and model registry are being integrated. Local image inference and generation are not yet operational.",
+    details: "The frontend-to-local-companion request path and Diffusers service are implemented. A model can generate only after the companion is installed on the user device, the selected checkpoint passes local hardware/license checks, and the actual Diffusers pipeline successfully loads.",
   }),
   Object.freeze({
     id: "local-inference",
