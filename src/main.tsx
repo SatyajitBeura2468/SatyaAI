@@ -1960,11 +1960,10 @@ function App() {
                     className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
                     disabled={busy || drishtiGenerating}
                     onClick={() => {
-                      if (busy) return;
+                      if (busy || drishtiGenerating) return;
                       setWorkspaceMode((currentMode) => currentMode === "chat" ? "image" : "chat");
                       setReasoningOpen(false);
                     }}
-                    disabled={busy}
                     aria-pressed={workspaceMode === "image"}
                     aria-label={workspaceMode === "image" ? "Switch to Chat mode" : "Switch to Image mode"}
                     title={workspaceMode === "image" ? "Return to Chat" : "Create an image with Drishti"}
