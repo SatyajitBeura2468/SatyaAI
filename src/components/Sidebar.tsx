@@ -8,7 +8,7 @@ export type SidebarChat = {
   id: string;
   title: string;
   updatedAt: number;
-  messages: Array<{ text: string }>;
+  messages: Array<{ role: "user" | "ai"; text: string }>;
 };
 export type SidebarSavedAnswer = {
   id: string;
