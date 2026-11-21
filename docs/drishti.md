@@ -26,7 +26,7 @@ MiniMax-H3-Image is open-weight, but it is **not** Apache-2.0 and should not be 
 
 See [`runtime/README.md`](../runtime/README.md) for Windows setup and troubleshooting. Python, PyTorch and the current Diffusers source package are required. The companion binds to loopback only, uses a strict CORS allowlist, and exposes no LAN listener.
 
-Set `VITE_DRISHTI_RUNTIME_URL` only when intentionally changing the local service address. The default is `http://127.0.0.1:7860`.
+The browser client is intentionally pinned to `http://127.0.0.1:7860`; it does not accept a remote runtime URL. This prevents image prompts from silently leaving the user's device.
 
 ## Hardware gates
 
