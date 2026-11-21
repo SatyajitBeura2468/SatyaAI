@@ -10,7 +10,7 @@
   --glass:rgba(17,19,32,.52); --glass-strong:rgba(14,16,28,.86);
   --surface:rgba(255,255,255,.045); --surface-hover:rgba(255,255,255,.085);
   --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.17);
-  --text:#eef0f7; --text-2:#a6adc2; --text-3:#6d748b;
+  --text:#eef0f7; --text-2:#c6cee0; --text-3:#8792aa;
   --accent:#8b7bff; --accent-2:#5ec8ff; --glow:rgba(139,123,255,.45);
   --grad:linear-gradient(135deg,#9a8bff 0%,#5ec8ff 100%);
   --ok:#4ade80; --warn:#fbbf24; --bad:#fb7185;
@@ -109,7 +109,8 @@ button:disabled{cursor:not-allowed}
 .icon-btn{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;color:var(--text-2);background:var(--surface);border:1px solid var(--border);transition:background .2s,color .2s,transform .25s var(--ease)}
 .icon-btn:hover{background:var(--surface-hover);color:var(--text);transform:translateY(-1px)}
 .icon-btn:active{transform:scale(.94)}
-.avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-weight:700;font-size:12px;color:#fff;background:var(--grad);box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--border-strong),0 8px 20px -8px var(--glow)}
+.avatar{position:relative;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;font-weight:700;font-size:12px;color:#fff;background:var(--grad);box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--border-strong),0 8px 20px -8px var(--glow);cursor:pointer}
+.avatar-edit-hint{position:absolute;right:-3px;bottom:-2px;display:grid;place-items:center;width:17px;height:17px;border:2px solid var(--bg);border-radius:50%;color:var(--text);background:var(--surface-hover)}
 
 /* ---------- conversation ---------- */
 .conversation{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;width:100%;padding:0 max(22px,calc((100% - 836px)/2));overflow-y:auto;overscroll-behavior:contain;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 26px);mask-image:linear-gradient(to bottom,transparent 0,#000 26px)}
@@ -215,20 +216,6 @@ button:disabled{cursor:not-allowed}
 .attachment button{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--surface-hover);color:var(--text-2);transition:background .2s,transform .2s}
 .attachment button:hover{background:var(--border-strong);transform:rotate(90deg)}
 
-/* ---------- mode dock (sliding segmented control) ---------- */
-.mode-dock{position:relative;z-index:3;flex:none;align-self:center;width:min(440px,calc(100% - 28px));margin:4px 0 max(14px,env(safe-area-inset-bottom));padding:10px 10px 9px;border-radius:22px;background:var(--glass);-webkit-backdrop-filter:blur(24px) saturate(1.5);backdrop-filter:blur(24px) saturate(1.5);border:1px solid var(--border);box-shadow:var(--shadow),var(--hi)}
-.mode-label{margin:0 0 8px;text-align:center;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text-3)}
-.mode-switch{position:relative;display:grid;grid-template-columns:repeat(3,1fr);padding:4px;border-radius:15px;background:var(--surface);border:1px solid var(--border)}
-.mode-switch::before{content:"";position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px)/3);border-radius:11px;background:linear-gradient(135deg,rgba(139,123,255,.34),rgba(94,200,255,.2));border:1px solid var(--border-strong);box-shadow:0 8px 22px -10px var(--glow),var(--hi);transition:transform .5s var(--ease)}
-.mode-switch:has(button:nth-child(2).chosen)::before{transform:translateX(100%)}
-.mode-switch:has(button:nth-child(3).chosen)::before{transform:translateX(200%)}
-.mode-switch button{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 6px;border-radius:11px;font-size:13px;font-weight:560;color:var(--text-3);transition:color .3s}
-.mode-switch button:hover{color:var(--text)}
-.mode-switch button.chosen{color:var(--text)}
-.mode-switch button.chosen svg{color:var(--accent-2);filter:drop-shadow(0 0 6px var(--glow))}
-@supports not selector(:has(*)){.mode-switch::before{display:none}.mode-switch button.chosen{background:var(--surface-hover);border:1px solid var(--border-strong)}}
-.mode-description{margin-top:8px;text-align:center;font-size:12px;color:var(--text-3)}
-
 /* ---------- settings modal ---------- */
 .scrim{position:fixed;inset:0;z-index:15;background:rgba(2,3,10,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:fade .3s both}
 .modal-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(2,3,10,.62);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);animation:fade .3s both}
@@ -313,7 +300,7 @@ button:disabled{cursor:not-allowed}
 
 
 /* ---------- chat controls, workspace settings and accessibility ---------- */
-:root{--text-3:#9aa4bc}
+:root{--text-3:#8792aa}
 :root[data-theme="light"]{--text-3:#555f75}
 .chat-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px;min-width:0}
 .chat-entry .chat-row{min-width:0}
@@ -409,4 +396,32 @@ button:disabled{cursor:not-allowed}
   .chat-entry-actions .icon-btn{width:25px;height:25px}
   .jump-latest{bottom:156px}
   .message-actions .msg-action{padding:0 9px}
+}
+
+/* Touch-safe controls and mode affordances */
+@media (pointer: coarse) {
+  .chat-entry-actions .icon-btn,
+  .chat-rename button,
+  .saved-row > .icon-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  .chat-entry-actions { gap: 8px; opacity: 1; visibility: visible; }
+  .chat-entry-actions .icon-btn svg { width: 16px; height: 16px; }
+  .settings .save-btn,
+  .settings .ghost-btn,
+  .settings .danger-btn { min-height: 44px; font-size: 13.5px; }
+  .tool-btn { min-width: 44px; min-height: 44px; }
+}
+@media (max-width: 860px) {
+  .drishti-mode-hint { display: none !important; }
+  .composer-tools { gap: 6px; min-width: 0; }
+  .composer-tools .tool-btn {
+    width: 44px; min-width: 44px; height: 44px; min-height: 44px;
+    padding: 0; justify-content: center; overflow: hidden; font-size: 0; gap: 0;
+  }
+  .composer-tools .tool-btn svg { flex: none; width: 17px; height: 17px; }
+  .composer-tools .tool-btn em { display: none; }
 }
