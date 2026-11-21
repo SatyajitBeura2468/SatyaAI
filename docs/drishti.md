@@ -9,7 +9,7 @@ Drishti is SatyaAI's image-generation workspace. The web app is a static interfa
 | Drishti Lite 1.0 | `segmind/SSD-1B` | Apache-2.0 | 1.3B parameters; a primary safetensors file is about 4.47 GB. CUDA is recommended; CPU is best-effort only. |
 | Drishti Core 1.5 | `black-forest-labs/FLUX.2-klein-4B` | Apache-2.0 | 4B parameters; BF16 transformer weights are about 7.75 GB; upstream guidance cites about 13 GB VRAM. |
 | Drishti Ultra 2.0 | `Qwen/Qwen-Image-2512` | Apache-2.0 | 20B parameters; an upstream BF16 serving benchmark reports about 59 GiB peak VRAM on an A800. |
-| Drishti X 3.0 MAX | `MiniMaxAI/MiniMax-H3-Image` | MiniMax-H3-Image Community License Agreement | 33.1B image-transformer parameters; the model card lists about 66.28 GB of transformer files, 2.34 GB of VAE files and a separate 66.7 GB text encoder. Conservative gate: about 140 GB free VRAM and 150 GB free disk. |
+| Drishti X 3.0 MAX | `MiniMaxAI/MiniMax-H3-Image` | MiniMax-H3-Image Community License Agreement | 33.1B image-transformer parameters; the model card lists about 66.28 GB of transformer files, 2.34 GB of VAE files and a separate 66.7 GB text encoder. Conservative gate: about 70 GB free VRAM on an 80 GB-class GPU and 140 GB free disk, using the official component-offload implementation. |
 
 MiniMax-H3-Image is open-weight, but it is **not** Apache-2.0 and should not be described as an unrestricted open-source model. Its license must be read and accepted separately before the X tier is enabled. The companion leaves it disabled by default. The licence excludes the EU, UK, South Korea and the United States; do not enable the model unless the full agreement confirms that your use and territory are permitted.
 
