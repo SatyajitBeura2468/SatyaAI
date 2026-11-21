@@ -74,7 +74,7 @@ export async function checkDrishtiRuntime(
       signal,
     }));
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
     throw new Error(
       "Could not reach the local Drishti companion. Start it on this device and allow this site’s Local Network Access permission when your browser asks.",
     );
