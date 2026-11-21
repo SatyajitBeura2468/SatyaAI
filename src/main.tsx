@@ -974,20 +974,6 @@ function App() {
     textareaRef.current?.focus();
   }
 
-  async function refreshDrishtiRuntime() {
-    setDrishtiChecking(true);
-    setDrishtiRuntimeError("");
-    try {
-      const health = await checkDrishtiRuntime();
-      setDrishtiRuntimeHealth(health);
-    } catch (error) {
-      setDrishtiRuntimeHealth(null);
-      setDrishtiRuntimeError(error instanceof Error ? error.message : "Could not check the local Drishti runtime.");
-    } finally {
-      setDrishtiChecking(false);
-    }
-  }
-
   async function ensureDrishtiRuntimeReady(): Promise<DrishtiRuntimeHealth> {
     setDrishtiStarting(true);
     setDrishtiRuntimeError("");
@@ -1007,7 +993,7 @@ function App() {
         // The companion may still be starting. Retry below.
       }
 
-      for (let attempt = 0; attempt < 45; attempt++) {
+      for (let attempt = 0; attempt < 480; attempt++) {
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
         try {
           const health = await checkDrishtiRuntime();
@@ -1020,7 +1006,7 @@ function App() {
       }
 
       throw new Error(
-        "The SatyaAI desktop companion did not respond. Install it once using the Windows companion installer below; after installation, SatyaAI can start it automatically.",
+        "The local companion is still not responding. Install the Windows companion once using the installer link in the workspace. Initial Python and runtime setup can take several minutes; keep the companion running and retry.",
       );
     } finally {
       setDrishtiStarting(false);
@@ -1799,7 +1785,7 @@ function App() {
                       ? drishtiModelRuntime?.available
                         ? "Local runtime ready for this tier. Your image prompt is sent only to this device."
                         : drishtiModelRuntime?.reason || "This model is not available on the detected hardware."
-                      : drishtiRuntimeError || "Install the companion once. Subsequent image prompts can wake it automatically."}
+                      : drishtiRuntimeError || "First install the companion once. Later prompts start it automatically and wait while it prepares the local engine."}
               </div>
             </div>
           )}
