@@ -1627,6 +1627,14 @@ function App() {
                 <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
                 <h1>Let’s create <em>something.</em></h1>
                 <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Start the local Drishti companion on this computer to generate images privately."}</p>
+                <button
+                  type="button"
+                  className="drishti-connect-primary"
+                  onClick={() => void refreshDrishtiRuntime()}
+                  disabled={drishtiChecking || drishtiGenerating}
+                >
+                  {drishtiChecking ? "Connecting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Connect local engine"}
+                </button>
               </div>
               <div className="drishti-ideas-heading">
                 <div>
@@ -1672,17 +1680,14 @@ function App() {
                 </div>
               )}
               {drishtiError && <div className="drishti-runtime-error" role="alert">{drishtiError}</div>}
-              <div className="drishti-studio-note" role="status">
+              <div className="drishti-studio-note" role="status" aria-live="polite">
                 {drishtiChecking
                   ? "Checking the local Drishti runtime…"
                   : drishtiRuntimeHealth
                     ? drishtiModelRuntime?.available
                       ? "Local runtime ready for this tier. Your image prompt is sent only to this device."
                       : drishtiModelRuntime?.reason || "This model is not available on the detected hardware."
-                    : drishtiRuntimeError || "Connect the local companion on this computer. Your image prompts stay on this device and never go through SatyaSom chat."}
-                <button type="button" onClick={() => void refreshDrishtiRuntime()} disabled={drishtiChecking || drishtiGenerating}>
-                  {drishtiChecking ? "Connecting…" : drishtiRuntimeHealth ? "Recheck" : "Connect local engine"}
-                </button>
+                    : drishtiRuntimeError || "Local runtime disconnected. Start the companion and use Connect local engine above."}
               </div>
             </div>
           )}

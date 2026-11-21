@@ -271,3 +271,36 @@
   color: var(--text-3);
   font-size: 10px;
 }
+
+
+.drishti-connect-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  margin: 16px auto 0;
+  padding: 9px 16px;
+  border: 1px solid rgba(94, 200, 255, .45);
+  border-radius: 12px;
+  color: var(--text);
+  background: linear-gradient(135deg, rgba(139,123,255,.24), rgba(94,200,255,.16));
+  box-shadow: 0 0 0 1px rgba(94,200,255,.08) inset, 0 8px 24px -16px var(--glow);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, opacity .18s ease;
+}
+.drishti-connect-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--accent-2);
+}
+.drishti-connect-primary:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+.drishti-studio-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
