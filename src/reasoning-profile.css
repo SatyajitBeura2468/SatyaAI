@@ -189,3 +189,14 @@ button.avatar:active{transform:scale(.95)}
 .suggestions{translate:calc(var(--tx,0)*-7px) calc(var(--ty,0)*-5px);transition:translate .8s var(--ease)}
 @media (prefers-reduced-motion:reduce){.hero>*,.suggestions{translate:none!important}}
 @media (pointer:coarse){.hero>*,.suggestions{translate:none}}
+
+
+/* Keep the active reasoning tier visible on narrow phones. */
+@media (max-width:480px){
+  .reasoning-full-label{display:none}
+  .reasoning-current{display:inline!important;font-size:11px}
+  .reasoning-btn{gap:7px;padding:7px 10px}
+}
+@media (max-width:360px){
+  .reasoning-current{max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

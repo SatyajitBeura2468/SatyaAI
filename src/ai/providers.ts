@@ -91,6 +91,10 @@ let localOperationQueue: Promise<void> = Promise.resolve();
 let remoteGatewayReadyPromise: Promise<boolean> | null = null;
 let persistentStoragePromise: Promise<void> | null = null;
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
+}
+
 function withLocalEngineLock<T>(operation: () => Promise<T>): Promise<T> {
   const result = localOperationQueue.then(operation, operation);
   localOperationQueue = result.then(
@@ -227,8 +231,11 @@ async function ensureLocalModel(
   model: string,
   onProgress?: ModelProgressHandler,
   recoveryAttempt = false,
+  signal?: AbortSignal,
 ): Promise<WebLLMEngine> {
+  throwIfAborted(signal);
   const webllm = await getWebLLMModule();
+  throwIfAborted(signal);
   activeProgressCallback = onProgress;
   // Reusing the resident model needs no cache check or model reload.
   if (localEngine && loadedLocalModel === model) return localEngine;
@@ -247,7 +254,9 @@ async function ensureLocalModel(
   });
 
   await requestPersistentStorage();
+  throwIfAborted(signal);
   activeModelCacheHit = await getModelCacheStatus(webllm, model);
+  throwIfAborted(signal);
 
   if (activeModelCacheHit) {
     onProgress?.("Loading the saved model files…", {
@@ -273,6 +282,8 @@ async function ensureLocalModel(
     });
 
     try {
+      const terminateOnAbort = () => worker.terminate();
+      signal?.addEventListener("abort", terminateOnAbort, { once: true });
       const engine = await webllm.CreateWebWorkerMLCEngine(worker, model, {
         appConfig: webllm.prebuiltAppConfig,
         initProgressCallback: (progress) => {
@@ -280,6 +291,8 @@ async function ensureLocalModel(
           activeProgressCallback?.(update.message, update.details);
         },
       });
+      signal?.removeEventListener("abort", terminateOnAbort);
+      throwIfAborted(signal);
       localWorker = worker;
       localEngine = engine;
       loadedLocalModel = model;
@@ -292,15 +305,31 @@ async function ensureLocalModel(
 
   // reload() replaces the resident model. Downloaded files remain in the
   // browser cache, so switching back can reuse them without another download.
-  await localEngine.reload(model);
-  loadedLocalModel = model;
-  return localEngine;
+  const worker = localWorker;
+  const terminateOnAbort = () => {
+    worker?.terminate();
+    if (localWorker === worker) {
+      localWorker = null;
+      localEngine = null;
+      loadedLocalModel = null;
+    }
+  };
+  signal?.addEventListener("abort", terminateOnAbort, { once: true });
+  try {
+    await localEngine.reload(model);
+    throwIfAborted(signal);
+    loadedLocalModel = model;
+    return localEngine;
+  } finally {
+    signal?.removeEventListener("abort", terminateOnAbort);
+  }
 }
 
 export async function openAICompatible(
   settings: ProviderSettings,
   messages: ChatMessage[],
   mode: SatyaMode,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!settings.baseUrl || !settings.model) {
     throw new Error("Configure a compatible endpoint and model in Settings first.");
@@ -315,6 +344,7 @@ export async function openAICompatible(
         ? { Authorization: "Bearer " + settings.apiKey }
         : {}),
     },
+    signal,
     body: JSON.stringify({
       model: settings.model,
       messages,
@@ -364,7 +394,9 @@ export async function localWebLLM(
   onToken?: (partialText: string) => void,
   onThinking?: (active: boolean) => void,
   userMemory: UserMemory = { name: "", notes: "" },
+  signal?: AbortSignal,
 ): Promise<string> {
+  throwIfAborted(signal);
   // Nano is deliberately on-device and never silently routes to a cloud provider.
   if (mode !== "nano" && (await hasConfiguredRemoteGateway())) {
     try {
@@ -372,6 +404,7 @@ export async function localWebLLM(
       const online = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal,
         body: JSON.stringify({
           messages,
           mode,
@@ -393,12 +426,14 @@ export async function localWebLLM(
       const content = data.choices?.[0]?.message?.content;
       if (!content) throw new Error("Remote provider returned no assistant content.");
       return content;
-    } catch {
+    } catch (error) {
       onThinking?.(false);
+      if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
       onProgress?.("Remote model unavailable; ab browser par local inference…");
     }
   }
 
+  throwIfAborted(signal);
   if (!hasWebGPU()) {
     throw new Error(
       "WebGPU is unavailable in this browser, so the on-device model cannot run. Try a recent version of Chrome or Edge.",
@@ -406,6 +441,7 @@ export async function localWebLLM(
   }
 
   return withLocalEngineLock(async () => {
+    throwIfAborted(signal);
     const primary = MODE_CONFIG[mode].model;
     const nanoF32 = "SmolLM2-360M-Instruct-q4f32_1-MLC";
     const nanoCandidates = mode === "nano"
@@ -428,7 +464,8 @@ export async function localWebLLM(
             : "GPU recovery · trying the selected engine again…",
         );
 
-        const engine = await ensureLocalModel(model, onProgress);
+        const engine = await ensureLocalModel(model, onProgress, false, signal);
+        throwIfAborted(signal);
         const systemPrompt = buildSatyaSystemPrompt(userMemory, {
           mode,
           inferenceRoute: "browser-local",
@@ -446,18 +483,30 @@ export async function localWebLLM(
           stream: true,
         });
 
+        const iterator = stream[Symbol.asyncIterator]();
+        const closeStream = () => { void iterator.return?.(); };
+        signal?.addEventListener("abort", closeStream, { once: true });
         let answer = "";
-        for await (const chunk of stream) {
-          const piece = chunk.choices?.[0]?.delta?.content;
-          if (typeof piece === "string" && piece.length > 0) {
-            answer += piece;
-            onToken?.(answer);
+        try {
+          while (true) {
+            throwIfAborted(signal);
+            const next = await iterator.next();
+            if (next.done) break;
+            const piece = next.value.choices?.[0]?.delta?.content;
+            if (typeof piece === "string" && piece.length > 0) {
+              answer += piece;
+              onToken?.(answer);
+            }
           }
+        } finally {
+          signal?.removeEventListener("abort", closeStream);
         }
+        throwIfAborted(signal);
 
         if (answer.trim()) return answer;
         throw new Error("The local model returned an empty response.");
       } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
         lastError = error;
         await discardLocalEngine();
       }
