@@ -27,8 +27,8 @@ export const CAPABILITIES = Object.freeze([
   Object.freeze({
     id: "image-creation",
     name: "Image creation",
-    status: CAPABILITY_STATUS.IN_DEVELOPMENT,
-    details: "The Drishti image workspace and model registry are being integrated. Local image inference and generation are not yet operational.",
+    status: CAPABILITY_STATUS.AVAILABLE,
+    details: "Image prompts can run through the optional loopback-only Drishti Diffusers companion. Generation is enabled only after a real local health check and a hardware/license gate for the selected checkpoint; Vercel does not host the image models.",
   }),
   Object.freeze({
     id: "local-inference",
