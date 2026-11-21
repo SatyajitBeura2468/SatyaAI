@@ -24,6 +24,10 @@ export type DrishtiRuntimeHealth = {
   models: Record<DrishtiModelId, DrishtiModelAvailability>;
 };
 
+function loopbackInit(init: RequestInit): RequestInit {
+  return { ...init, targetAddressSpace: "loopback" } as RequestInit;
+}
+
 export type DrishtiGenerationResult = {
   image_data_url: string;
   model_id: DrishtiModelId;
@@ -47,17 +51,17 @@ export async function checkDrishtiRuntime(
 ): Promise<DrishtiRuntimeHealth> {
   let response: Response;
   try {
-    response = await fetch(DRISHTI_RUNTIME_URL + "/health", {
+    response = await fetch(DRISHTI_RUNTIME_URL + "/health", loopbackInit({
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store",
       credentials: "omit",
       signal,
-    });
+    }));
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new Error(
-      "Local Drishti runtime not detected. Start the companion service on this device, then check again.",
+      "Could not reach the local Drishti companion. Start it on this device and allow this site’s Local Network Access permission when your browser asks.",
     );
   }
 
@@ -82,7 +86,7 @@ export async function generateDrishtiImage(
 
   let response: Response;
   try {
-    response = await fetch(DRISHTI_RUNTIME_URL + "/v1/generate", {
+    response = await fetch(DRISHTI_RUNTIME_URL + "/v1/generate", loopbackInit({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -97,11 +101,11 @@ export async function generateDrishtiImage(
         width: 512,
         height: 512,
       }),
-    });
+    }));
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new Error(
-      "Could not reach the local image runtime. Check that it is still running on this device.",
+      "Could not reach the local image runtime. Confirm it is running and that this site has Local Network Access permission.",
     );
   }
 
