@@ -16,7 +16,7 @@ MiniMax-H3-Image is open-weight, but it is **not** Apache-2.0 and should not be 
 ## Runtime architecture
 
 1. Vercel hosts the UI only. It does not receive prompts for image generation and does not store image model weights.
-2. The browser probes `http://127.0.0.1:7860/health` when Image mode is opened or the selected Drishti tier changes.
+2. The user presses **Connect local engine**. Only that user action triggers the browser's first request to `http://127.0.0.1:7860/health`, allowing the browser to show its Loopback/Local Network Access permission prompt.
 3. The Generate control is enabled only when the local companion responds and reports that the selected tier passes its disk, hardware and license checks.
 4. The browser sends the prompt to `http://127.0.0.1:7860/v1/generate`. It does not call the SatyaSom chat route, the text model, or a hosted generation API.
 5. The companion loads only the selected model. Hugging Face's local cache is reused across generations and model restarts; switching models releases the previous pipeline to limit memory use.
@@ -25,6 +25,10 @@ MiniMax-H3-Image is open-weight, but it is **not** Apache-2.0 and should not be 
 ## Local companion setup
 
 See [`runtime/README.md`](../runtime/README.md) for Windows setup and troubleshooting. Python, PyTorch and the current Diffusers source package are required. The companion binds to loopback only, uses a strict CORS allowlist, and exposes no LAN listener.
+
+### First connection in Edge or Chrome
+
+On the first **Connect local engine** click, a recent Chromium browser may ask whether SatyaAI can access your local device/network. Choose **Allow**. Edge 143+ enables Local Network Access restrictions by default; if permission was denied, open Edge Settings → Privacy, search, and services → Site permissions → All permissions → Local network access, and change SatyaAI's permission. Reopen Image mode and click Connect local engine again. The app intentionally does not trigger this request automatically on page load.
 
 The browser client is intentionally pinned to `http://127.0.0.1:7860`; it does not accept a remote runtime URL. This prevents image prompts from silently leaving the user's device.
 
