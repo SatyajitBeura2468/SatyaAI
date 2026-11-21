@@ -43,8 +43,8 @@ MODEL_INFO = {
     "max": {
         "repo": "MiniMaxAI/MiniMax-H3-Image",
         "license": "MiniMax-H3-Image Community License Agreement",
-        "hardware": "At least about 140 GB of free VRAM and 150 GB of free disk, plus explicit licence and territory acknowledgement.",
-        "disk_gb": 150,
+        "hardware": "About 70 GB free VRAM on an 80 GB-class GPU and at least 140 GB free disk, plus explicit licence and territory acknowledgement.",
+        "disk_gb": 140,
     },
 }
 
@@ -164,13 +164,14 @@ def _model_availability(
         )
         available = (
             device == "cuda"
-            and (vram_free or 0) >= 140
+            and (vram_free or 0) >= 70
+            and torch.cuda.is_bf16_supported()
             and license_accepted
         )
         if not license_accepted:
             reason = "This checkpoint is under the MiniMax-H3-Image Community License Agreement, not Apache-2.0. Review the complete licence, confirm your territory is not excluded, then set both SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE=1 and SATYAAI_MINIMAX_H3_TERRITORY_ALLOWED=1."
-        elif device != "cuda" or (vram_free or 0) < 80:
-            reason = "Drishti X uses a 33.1B-parameter image transformer plus a separate 66.7 GB text encoder. The official model card lists about 133 GB of model assets; this conservative local profile requires about 140 GB free VRAM and 150 GB free disk."
+        elif device != "cuda" or (vram_free or 0) < 70 or not torch.cuda.is_bf16_supported():
+            reason = "Drishti X uses a 33.1B-parameter image transformer and a separate 66.7 GB text encoder. The official Diffusers example uses automatic component offloading and reports about 65 GB peak GPU memory; this local profile requires BF16 support and about 70 GB free VRAM."
         else:
             reason = "License acknowledgement and high-memory CUDA hardware detected. The model will download only when first selected."
     return {
@@ -274,11 +275,14 @@ def _load_pipeline(model_id: str):
         pipeline = pipeline_type.from_pretrained(repo, **common)
         pipeline.to("cuda")
     else:
-        pipeline = diffusers.DiffusionPipeline.from_pretrained(
-            repo,
-            torch_dtype=torch.bfloat16,
-            device_map="cuda",
-        )
+        components_manager_type = getattr(diffusers, "ComponentsManager", None)
+        modular_pipeline_type = getattr(diffusers, "ModularPipeline", None)
+        if components_manager_type is None or modular_pipeline_type is None:
+            raise RuntimeError("Update the local Diffusers installation; MiniMax H3 Image modular components are unavailable.")
+        manager = components_manager_type()
+        manager.enable_auto_cpu_offload(device="cuda")
+        pipeline = modular_pipeline_type.from_pretrained(repo, components_manager=manager)
+        pipeline.load_components(dtype=torch.bfloat16)
 
     _pipeline = pipeline
     _loaded_model = model_id
@@ -307,7 +311,7 @@ def generate(request: GenerateRequest):
             raise HTTPException(status_code=400, detail="CPU generation is limited to 512 × 512 pixels.")
 
         pipeline = _load_pipeline(request.model_id)
-        steps = {"lite": 30, "core": 4, "ultra": 50, "max": 6}[request.model_id]
+        steps = {"lite": 30, "core": 4, "ultra": 50}.get(request.model_id)
         seed = secrets.randbelow(2**31)
         generator_device = "cuda" if torch.cuda.is_available() else "cpu"
         generator = torch.Generator(device=generator_device).manual_seed(seed)
@@ -322,13 +326,22 @@ def generate(request: GenerateRequest):
             }
             if request.model_id == "lite":
                 call_args["guidance_scale"] = 9.0
+                call_args["negative_prompt"] = "low quality, blurry, distorted, malformed anatomy, artifacts"
             elif request.model_id == "core":
                 call_args["guidance_scale"] = 1.0
-            elif request.model_id == "ultra":
-                call_args["true_cfg_scale"] = 4.0
-            output = pipeline(**call_args)
-
-        image: Image.Image = output.images[0]
+            if request.model_id == "max":
+                output = pipeline(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    generator=generator,
+                    output="images",
+                    min_generation_area=1024,
+                )
+                image: Image.Image = output[0]
+            else:
+                output = pipeline(**call_args)
+                image = output.images[0]
         buffer = io.BytesIO()
         image.save(buffer, format="PNG", optimize=True)
         encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
