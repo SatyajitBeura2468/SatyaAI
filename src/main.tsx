@@ -73,7 +73,7 @@ import {
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
 import { DEFAULT_DRISHTI_MODEL_ID, DRISHTI_MODELS, getDrishtiModel, isDrishtiModelId, type DrishtiModelId } from "./ai/drishti/registry";
-import { cancelDrishtiGeneration, checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, DRISHTI_COMPANION_INSTALL_URL, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
+import { cancelDrishtiGeneration, checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
 import { CHAKSHU_MODELS, DEFAULT_CHAKSHU_MODEL_ID, getChakshuModel, isChakshuModelId, type ChakshuModelId } from "./ai/chakshu/registry";
 import { generateChakshuVideo, getChakshuRuntimeStatus, type ChakshuRuntimeStatus } from "./ai/chakshu/client";
 import { loadChakshuHistory, saveChakshuHistoryItem, type ChakshuHistoryItem } from "./ai/chakshu/history";
@@ -151,7 +151,14 @@ const DEFAULT_PREFERENCES: AppPreferences = {
 };
 function readPreferences(): AppPreferences {
   const stored = loadJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
-  return { ...DEFAULT_PREFERENCES, ...stored };
+  const touchDevice = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  let touchOptIn = false;
+  try { touchOptIn = localStorage.getItem("satya-enter-to-send-touch") === "true"; } catch { /* default off on touch devices */ }
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...stored,
+    enterToSend: touchDevice ? touchOptIn : (stored.enterToSend ?? DEFAULT_PREFERENCES.enterToSend),
+  };
 }
 const MAX_SAVED = 100;
 const AVATAR_KEY = "satya-avatar";
@@ -413,7 +420,7 @@ function App() {
       // Older builds persisted the key with the rest of the provider settings.
       // Remove it from persistent storage on the next load.
       localStorage.setItem("satya-provider", JSON.stringify({ baseUrl, model }));
-      return { baseUrl, model, apiKey: sessionStorage.getItem("satya-provider-key") || undefined };
+      return { baseUrl, model };
     } catch {
       return {};
     }
@@ -523,9 +530,7 @@ function App() {
     }
     try {
       localStorage.setItem("satya-provider", JSON.stringify({ baseUrl, model }));
-      if (provider.apiKey) sessionStorage.setItem("satya-provider-key", provider.apiKey);
-      else sessionStorage.removeItem("satya-provider-key");
-      setEndpointFeedback("Endpoint settings saved. The API key is kept only for this browser session.");
+      setEndpointFeedback("Endpoint URL and model saved. The API key remains in memory only and is never written to browser storage.");
     } catch {
       setEndpointFeedback("Endpoint settings could not be saved in this browser.");
     }
@@ -535,7 +540,6 @@ function App() {
     setProvider({});
     try {
       localStorage.removeItem("satya-provider");
-      sessionStorage.removeItem("satya-provider-key");
     } catch { /* state is still cleared */ }
     setEndpointFeedback("Custom endpoint and session key removed.");
   }
@@ -2178,7 +2182,7 @@ function App() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend && !isCoarsePointer()) {
+                  if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
                     event.preventDefault();
                     if (workspaceMode === "image") {
                       if (!drishtiGenerating && !drishtiStarting) void send();
