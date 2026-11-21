@@ -27,8 +27,8 @@ export const CAPABILITIES = Object.freeze([
   Object.freeze({
     id: "image-creation",
     name: "Image creation",
-    status: CAPABILITY_STATUS.PLANNED,
-    details: "Planned and deferred; do not claim it is currently operational.",
+    status: CAPABILITY_STATUS.IN_DEVELOPMENT,
+    details: "The Drishti image workspace and model registry are being integrated. Local image inference and generation are not yet operational.",
   }),
   Object.freeze({
     id: "local-inference",
