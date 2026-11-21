@@ -139,6 +139,7 @@ export async function generateDrishtiImage(
   modelId: DrishtiModelId,
   prompt: string,
   signal?: AbortSignal,
+  seed?: number,
 ): Promise<DrishtiGenerationResult> {
   const cleanPrompt = prompt.trim();
   if (!cleanPrompt) throw new Error("Write an image prompt first.");
@@ -162,6 +163,7 @@ export async function generateDrishtiImage(
         prompt: cleanPrompt,
         width: 512,
         height: 512,
+        ...(seed === undefined ? {} : { seed }),
       }),
     }));
   } catch (error) {
