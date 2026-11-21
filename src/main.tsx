@@ -1423,6 +1423,7 @@ function App() {
   function switchWorkspaceMode(nextMode: WorkspaceMode) {
     if (file && nextMode !== "chat" && !window.confirm("Switching workspace will remove the attached text file from the composer. Continue?")) return;
     if (file && nextMode !== "chat") setFile(null);
+    if (nextMode === "chat" && workspaceMode !== "chat") setQuery("");
     setWorkspaceMode(nextMode);
     setReasoningOpen(false);
   }
@@ -1786,6 +1787,18 @@ function App() {
             <button
               className={"crumb reasoning-btn" + (reasoningOpen ? " open" : "")}
               onClick={() => setReasoningOpen((open) => !open)}
+              onKeyDown={(event) => {
+                if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                if (!reasoningOpen) setReasoningOpen(true);
+                window.requestAnimationFrame(() => {
+                  const options = Array.from(reasoningRef.current?.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)') ?? []);
+                  if (!options.length) return;
+                  const index = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1
+                    : event.key === "ArrowUp" ? options.length - 1 : 0;
+                  options[index].focus();
+                });
+              }}
               aria-haspopup="listbox"
               aria-expanded={reasoningOpen}
               aria-label={workspaceMode === "image"
