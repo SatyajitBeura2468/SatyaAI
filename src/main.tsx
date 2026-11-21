@@ -1343,30 +1343,74 @@ function App() {
   async function generateChakshu() {
     const prompt = query.trim();
     if (!prompt || chakshuGenerating || drishtiStarting) return;
+    if (!drishtiWindowsDesktopSupported) {
+      setChakshuError("Chakshu video generation currently requires a Windows desktop and the SatyaAI companion.");
+      return;
+    }
     if (chakshuModelId === "divya" && !divyaLicenseAccepted) {
       setChakshuError("Review and accept the LTX-2.x Community License before using Divya Chakshu 1.");
       return;
     }
+    const controller = new AbortController();
+    chakshuAbortRef.current = controller;
     setChakshuGenerating(true);
     setChakshuRuntimeStatus(null);
     setChakshuError("");
-    setChakshuResult(null);
     setStatus("Preparing local video generation…");
     try {
-      const health = await ensureDrishtiRuntimeReady();
+      const health = await ensureDrishtiRuntimeReady(controller.signal);
+      if (controller.signal.aborted) return;
       const availability = health.video_models?.[chakshuModelId];
       if (!availability?.available) throw new Error(availability?.reason || "The selected video model is not available on this computer.");
       setStatus("Generating locally with " + currentChakshu.name + "…");
-      const result = await generateChakshuVideo(chakshuModelId, prompt, divyaLicenseAccepted);
+      const result = await generateChakshuVideo(chakshuModelId, prompt, divyaLicenseAccepted, controller.signal);
+      if (controller.signal.aborted) return;
       const videoUrl = URL.createObjectURL(result.blob);
-      setChakshuResult({ ...result, video_url: videoUrl });
-      setQuery("");
+      chakshuObjectUrlsRef.current.add(videoUrl);
+      const historyItem: ChakshuHistoryItem = {
+        id: newId(),
+        prompt,
+        blob: result.blob,
+        model_id: result.model_id,
+        elapsed_seconds: result.elapsed_seconds,
+        seed: result.seed,
+        created_at: Date.now(),
+      };
+      const displayItem = { ...historyItem, video_url: videoUrl };
+      setChakshuResult(displayItem);
+      setChakshuActiveHistoryId(historyItem.id);
+      setChakshuHistory((previous) => [displayItem, ...previous].slice(0, 12));
+      void saveChakshuHistoryItem(historyItem).catch(() => {
+        setChakshuHistoryWarning("This video was generated, but the browser could not save it to history.");
+      });
       setStatus("Video generated locally.");
     } catch (error) {
-      setChakshuError(error instanceof Error ? error.message : "Chakshu video generation failed.");
+      if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        setChakshuError("");
+        setStatus("Video generation stopped.");
+      } else {
+        setChakshuError(error instanceof Error ? error.message : "Chakshu video generation failed.");
+      }
     } finally {
+      if (chakshuAbortRef.current === controller) chakshuAbortRef.current = null;
       setChakshuGenerating(false);
     }
+  }
+
+  function stopChakshuGeneration() {
+    const controller = chakshuAbortRef.current;
+    if (!controller) return;
+    setStatus("Stopping video generation…");
+    void cancelDrishtiGeneration();
+    controller.abort();
+  }
+
+  function selectChakshuHistory(item: ChakshuHistoryItem & { video_url: string }) {
+    setChakshuResult(item);
+    setChakshuActiveHistoryId(item.id);
+    setChakshuModelId(item.model_id);
+    setQuery(item.prompt);
+    setChakshuError("");
   }
 
   function send() {
@@ -1696,7 +1740,7 @@ function App() {
         <i className="nebula n1" />
         <i className="nebula n2" />
         <i className="nebula n3" />
-        <Starfield active={theme === "dark" && !preferences.reduceMotion} busy={busy} />
+        <Starfield active={theme === "dark" && !preferences.reduceMotion} busy={busy || drishtiStarting || drishtiGenerating || chakshuGenerating} />
         <i className="vignette" />
         <i className="grain" />
       </div>
@@ -1876,7 +1920,22 @@ function App() {
               <ChevronDown size={14} className="chev" />
             </button>
             {reasoningOpen && (
-              <div className="reasoning-menu" role="listbox" aria-label={workspaceMode === "image" ? "Drishti image model" : workspaceMode === "video" ? "Chakshu video model" : "Reasoning mode"}>
+              <div
+                className="reasoning-menu"
+                role="listbox"
+                aria-label={workspaceMode === "image" ? "Drishti image model" : workspaceMode === "video" ? "Chakshu video model" : "Reasoning mode"}
+                onKeyDown={(event) => {
+                  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                  const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)'));
+                  if (!options.length) return;
+                  event.preventDefault();
+                  const currentIndex = options.indexOf(document.activeElement as HTMLButtonElement);
+                  const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1
+                    : event.key === "ArrowDown" ? (currentIndex + 1 + options.length) % options.length
+                    : (currentIndex - 1 + options.length) % options.length;
+                  options[nextIndex].focus();
+                }}
+              >
                 {workspaceMode === "chat" ? (
                   (Object.keys(modes) as Mode[]).map((key) => (
                     <button
@@ -1933,7 +1992,7 @@ function App() {
                     <button key={model.id} role="option" aria-selected={chakshuModelId === model.id}
                       className={"reasoning-option" + (chakshuModelId === model.id ? " chosen" : "")}
                       disabled={chakshuGenerating || drishtiChecking}
-                      onClick={() => { setChakshuModelId(model.id); setChakshuResult(null); setChakshuError(""); setReasoningOpen(false); }}>
+                      onClick={() => { setChakshuModelId(model.id); setChakshuError(""); setReasoningOpen(false); }}>
                       <span className="ro-icon ro-symbol" aria-hidden="true"><VideoIcon size={19} /></span>
                       <span className="ro-text"><span className="ro-primary"><strong>{model.name}</strong>{model.experimental && <small className="drishti-experimental">FLAGSHIP</small>}</span><small>{model.description}</small></span>
                       {chakshuModelId === model.id && <Check size={15} className="ro-check" />}
@@ -2097,12 +2156,18 @@ function App() {
               <div className="drishti-studio-copy">
                 <span className="drishti-kicker">SATYAAI · CHAKSHU VIDEO STUDIO</span>
                 <h1>Turn words into <em>motion.</em></h1>
-                <p>{drishtiChecking ? "Checking the local creative engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". Video weights download only when a tier is first used." : "Generate video on this computer. SatyaAI hosts the studio; the companion performs local inference."}</p>
+                <p>{drishtiChecking ? "Checking the local creative engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". Video weights download only when a tier is first used." : "Generate video locally on a Windows desktop. Phone, Mac and Linux generation are not currently supported."}</p>
+                {!drishtiWindowsDesktopSupported && (
+                  <div className="drishti-platform-note" role="note">
+                    <strong>Desktop · Windows required</strong>
+                    <span>Chakshu needs the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate video.</span>
+                  </div>
+                )}
                 <div className="drishti-connect-actions">
-                  <button type="button" className="drishti-connect-primary" onClick={() => void connectChakshuRuntime()} disabled={drishtiChecking || drishtiStarting || chakshuGenerating}>
+                  <button type="button" className="drishti-connect-primary" onClick={() => void connectChakshuRuntime()} disabled={!drishtiWindowsDesktopSupported || drishtiChecking || drishtiStarting || chakshuGenerating}>
                     {drishtiStarting ? "Starting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Start local engine"}
                   </button>
-                  {!drishtiRuntimeHealth && <a className="drishti-install-link" href={DRISHTI_COMPANION_INSTALL_URL} target="_blank" rel="noreferrer">Install companion once</a>}
+                  {!drishtiRuntimeHealth && drishtiWindowsDesktopSupported && <a className="drishti-install-link" href={DRISHTI_COMPANION_INSTALL_URL} target="_blank" rel="noreferrer">Install companion once</a>}
                 </div>
               </div>
               <div className="chakshu-model-summary">
@@ -2123,19 +2188,35 @@ function App() {
               )}
               {chakshuResult && (
                 <div className="drishti-result chakshu-result">
-                  <video src={chakshuResult.video_url} controls playsInline preload="metadata" aria-label="Video generated locally by Chakshu" />
+                  <video src={chakshuResult.video_url} controls playsInline preload="metadata" aria-label={"Video generated by Chakshu: " + chakshuResult.prompt} />
+                  <div className="drishti-result-prompt"><strong>Prompt</strong><p>{chakshuResult.prompt}</p></div>
                   <div className="drishti-result-footer">
-                    <span>Generated locally · {chakshuResult.elapsed_seconds}s · Seed {chakshuResult.seed}</span>
+                    <span>{currentChakshu.name} · Generated locally · {chakshuResult.elapsed_seconds}s · Seed {chakshuResult.seed}</span>
                     <a className="drishti-download" href={chakshuResult.video_url} download={"satyaai-chakshu-" + chakshuResult.seed + ".mp4"}><Download size={15} /> Download MP4</a>
                   </div>
                 </div>
               )}
+              {chakshuHistory.length > 0 && (
+                <div className="drishti-history">
+                  <div className="drishti-history-heading"><strong>Recent videos</strong><span>Saved in this browser · {chakshuHistory.length}</span></div>
+                  <div className="drishti-history-grid">
+                    {chakshuHistory.map((item) => (
+                      <button key={item.id} type="button" className={"drishti-history-item" + (chakshuActiveHistoryId === item.id ? " active" : "")} onClick={() => selectChakshuHistory(item)} aria-pressed={chakshuActiveHistoryId === item.id} title={item.prompt}>
+                        <video src={item.video_url} muted playsInline preload="metadata" />
+                        <span>{item.prompt}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {chakshuHistoryWarning && <div className="drishti-history-warning">{chakshuHistoryWarning}</div>}
               {chakshuError && <div className="drishti-runtime-error" role="alert">{chakshuError}</div>}
               {(drishtiStarting || chakshuGenerating) && (
                 <div className="drishti-loading-card" role="status" aria-live="polite">
                   <div className="drishti-loading-head"><strong>{drishtiStarting ? "Starting the local video engine" : chakshuRuntimeStatus?.phase === "loading_model" ? "Preparing the selected video model" : "Rendering your video"}</strong><span>{chakshuRuntimeStatus?.progress != null ? chakshuRuntimeStatus.progress + "%" : "Working"}</span></div>
                   <div className={"drishti-progress-track" + (chakshuRuntimeStatus?.progress == null ? " indeterminate" : "")}><span style={chakshuRuntimeStatus?.progress != null ? { width: chakshuRuntimeStatus.progress + "%" } : undefined} /></div>
                   <small>{drishtiStarting ? "Waking the installed companion and checking this computer…" : chakshuRuntimeStatus?.message || "Downloading the selected weights if needed, then generating locally…"}</small>
+                  <button type="button" className="drishti-cancel-button" onClick={stopChakshuGeneration}><Square size={13} /> Stop generation</button>
                 </div>
               )}
               <div className="drishti-studio-note" role="status" aria-live="polite">
@@ -2420,7 +2501,7 @@ function App() {
                     aria-pressed={workspaceMode === "video"}
                     aria-label={workspaceMode === "video" ? "Return to Chat mode" : "Switch to Video mode"}
                     title={workspaceMode === "video" ? "Return to Chat" : "Create a video with Chakshu"}
-                  ><VideoIcon size={16} /> Video</button>
+                  ><VideoIcon size={16} /> Video <small className="drishti-mode-hint">Desktop · Windows</small></button>
                 </div>
                 <button
                   className={"send " + (workspaceMode === "image"
@@ -2431,22 +2512,22 @@ function App() {
                   disabled={workspaceMode === "image"
                     ? (!drishtiGenerating && !drishtiStarting && (!query.trim() || !drishtiWindowsDesktopSupported))
                     : workspaceMode === "video"
-                      ? (!query.trim() || chakshuGenerating || drishtiStarting || (chakshuModelId === "divya" && !divyaLicenseAccepted))
+                      ? (!chakshuGenerating && !drishtiStarting && (!query.trim() || !drishtiWindowsDesktopSupported || (chakshuModelId === "divya" && !divyaLicenseAccepted)))
                       : (!busy && (!query.trim() && !canSpeak))}
                   onClick={() => workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? stopDrishtiGeneration() : void send()
                     : workspaceMode === "video"
-                      ? void send()
+                      ? chakshuGenerating ? stopChakshuGeneration() : void send()
                       : busy ? stopGeneration() : (query.trim() ? void send() : toggleMic())}
                   aria-label={workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? "Stop image generation" : !drishtiWindowsDesktopSupported ? "Image generation requires Windows desktop" : drishtiCanGenerate ? "Generate image locally" : "Start local engine and generate image"
                     : workspaceMode === "video"
-                      ? chakshuGenerating ? "Generating video locally" : drishtiStarting ? "Starting local video engine" : chakshuCanGenerate ? "Generate video locally" : "Start local engine and generate video"
+                      ? chakshuGenerating || drishtiStarting ? "Stop video generation" : !drishtiWindowsDesktopSupported ? "Video generation requires Windows desktop" : chakshuCanGenerate ? "Generate video locally" : "Start local engine and generate video"
                       : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn't supported in this browser"}
                   title={workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? "Stop image generation" : !drishtiWindowsDesktopSupported ? "Windows desktop required" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : "Start the local companion and generate"
                     : workspaceMode === "video"
-                      ? chakshuGenerating ? "Generation in progress" : drishtiStarting ? "Starting the local companion" : chakshuCanGenerate ? "Generate locally with " + currentChakshu.name : "Start the local companion and generate"
+                      ? chakshuGenerating || drishtiStarting ? "Stop video generation" : !drishtiWindowsDesktopSupported ? "Windows desktop required" : chakshuCanGenerate ? "Generate locally with " + currentChakshu.name : "Start the local companion and generate"
                       : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
                 >
                   {workspaceMode === "image"
