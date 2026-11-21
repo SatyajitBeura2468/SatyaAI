@@ -102,6 +102,18 @@ describe("Drishti local runtime client", () => {
     );
   });
 
+  it("forwards an explicit image seed to the loopback runtime", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        image_data_url: "data:image/png;base64,aGVsbG8=",
+        model_id: "lite", elapsed_seconds: 1, seed: 1234,
+      }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    await generateDrishtiImage("lite", "A nebula", undefined, 1234);
+    const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(init.body))).toMatchObject({ prompt: "A nebula", seed: 1234 });
+  });
+
   it("posts cancellation to the loopback image runtime", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ accepted: true }), {
