@@ -49,7 +49,7 @@ export const DRISHTI_MODELS = [
     sourceModelId: "MiniMaxAI/MiniMax-H3-Image",
     license: "MiniMax-H3-Image Community License Agreement",
     modelSize: "33.1B parameters; approximately 68.65 GB image model plus a separate 66.7 GB text encoder",
-    hardware: "About 140 GB free VRAM and 150 GB free disk; licence and territory acknowledgement required",
+    hardware: "About 70 GB free VRAM on an 80 GB-class GPU and 140 GB free disk; licence and territory acknowledgement required",
     experimental: true,
     readiness: "local-runtime-required",
   },
