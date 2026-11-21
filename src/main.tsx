@@ -1413,6 +1413,13 @@ function App() {
     setChakshuError("");
   }
 
+  function switchWorkspaceMode(nextMode: WorkspaceMode) {
+    if (file && nextMode !== "chat" && !window.confirm("Switching workspace will remove the attached text file from the composer. Continue?")) return;
+    if (file && nextMode !== "chat") setFile(null);
+    setWorkspaceMode(nextMode);
+    setReasoningOpen(false);
+  }
+
   function send() {
     if (workspaceMode === "image") {
       void generateDrishti();
@@ -2017,6 +2024,7 @@ function App() {
               title={memory.name ? memory.name + " · change picture" : "Change profile picture"}
             >
               {avatar ? <img src={avatar} alt="" /> : initials || <User size={16} />}
+              <span className="avatar-edit-hint" aria-hidden="true"><Pencil size={10} /></span>
             </button>
             <input
               ref={avatarInputRef}
@@ -2468,28 +2476,12 @@ function App() {
                       />
                     </>
                   )}
-                  <button
-                    className="tool-btn soon"
-                    disabled
-                    aria-disabled="true"
-                    title="Web search is coming soon"
-                    aria-label="Search Web (coming soon)"
-                  >
-                    <Search size={16} /> Search Web <em>Soon</em>
-                  </button>
-                  <button
-                    className="tool-btn soon"
-                    disabled
-                    aria-disabled="true"
-                    title="Deep research is coming soon"
-                    aria-label="Research (coming soon)"
-                  >
-                    <Library size={16} /> Research <em>Soon</em>
-                  </button>
+                  
+                  
                   <button
                     className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
                     disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setFile(null); setWorkspaceMode((currentMode) => currentMode === "image" ? "chat" : "image"); setReasoningOpen(false); }}
+                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; switchWorkspaceMode(workspaceMode === "image" ? "chat" : "image"); }}
                     aria-pressed={workspaceMode === "image"}
                     aria-label={workspaceMode === "image" ? "Return to Chat mode" : "Switch to Image mode"}
                     title={workspaceMode === "image" ? "Return to Chat" : "Create an image with Drishti"}
@@ -2497,7 +2489,7 @@ function App() {
                   <button
                     className={"tool-btn drishti-mode-btn chakshu-mode-btn" + (workspaceMode === "video" ? " active" : "")}
                     disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setFile(null); setWorkspaceMode((currentMode) => currentMode === "video" ? "chat" : "video"); setReasoningOpen(false); }}
+                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; switchWorkspaceMode(workspaceMode === "video" ? "chat" : "video"); }}
                     aria-pressed={workspaceMode === "video"}
                     aria-label={workspaceMode === "video" ? "Return to Chat mode" : "Switch to Video mode"}
                     title={workspaceMode === "video" ? "Return to Chat" : "Create a video with Chakshu"}
@@ -2707,10 +2699,10 @@ function App() {
                       <label className="setting-field">API key
                         <input type="password" value={provider.apiKey || ""} onChange={(event) => setProvider((p) => ({ ...p, apiKey: event.target.value || undefined }))} placeholder="Optional bearer token" autoComplete="off" />
                       </label>
-                      <div className="memory-footnote">The endpoint URL, model name and key are saved in this browser's local storage. Nano always stays on-device.</div>
+                      <div className="memory-footnote">Endpoint URL and model are saved on this device. The API key is kept in session storage only and is cleared when the browser session ends. Nano always stays on-device.</div>
                       <div className="setting-actions">
-                        <button className="save-btn" onClick={() => setEndpointFeedback("Endpoint settings saved on this device.")}>Save endpoint</button>
-                        <button className="ghost-btn" onClick={() => { setProvider({}); setEndpointFeedback("Custom endpoint removed."); }}>Clear endpoint</button>
+                        <button className="save-btn" onClick={saveEndpointSettings}>Save endpoint</button>
+                        <button className="ghost-btn" onClick={clearEndpointSettings}>Clear endpoint</button>
                       </div>
                       {endpointFeedback && <div className="memory-footnote" role="status">{endpointFeedback}</div>}
                     </div>
