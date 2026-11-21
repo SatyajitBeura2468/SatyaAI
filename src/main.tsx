@@ -1388,7 +1388,7 @@ function App() {
               <small>{capability}</small>
             </div>
           </div>
-          <button className="side-link" onClick={openSettings}>
+          <button className="side-link" onClick={() => openSettings()}>
             <Settings size={16} /> Settings
           </button>
           <button
@@ -1458,7 +1458,7 @@ function App() {
           <div className="top-actions">
             <button
               className="icon-btn"
-              onClick={openSettings}
+              onClick={() => openSettings()}
               aria-label="Settings"
             >
               <Settings size={18} />
