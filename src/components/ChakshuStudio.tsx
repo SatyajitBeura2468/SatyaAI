@@ -1,0 +1,118 @@
+import React from "react";
+import { Download, Square, Video as VideoIcon } from "lucide-react";
+import { DRISHTI_COMPANION_INSTALL_URL, type DrishtiModelAvailability, type DrishtiRuntimeHealth } from "../ai/drishti/client";
+import type { ChakshuRuntimeStatus } from "../ai/chakshu/client";
+import { getChakshuModel, type ChakshuModel } from "../ai/chakshu/registry";
+import type { ChakshuHistoryItem } from "../ai/chakshu/history";
+
+type ChakshuStudioProps = {
+  drishtiChecking: boolean;
+  drishtiStarting: boolean;
+  drishtiRuntimeHealth: DrishtiRuntimeHealth | null;
+  drishtiWindowsDesktopSupported: boolean;
+  connectChakshuRuntime: () => void;
+  chakshuGenerating: boolean;
+  currentChakshu: ChakshuModel;
+  chakshuModelId: ChakshuHistoryItem["model_id"];
+  divyaLicenseAccepted: boolean;
+  setDivyaLicenseAccepted: React.Dispatch<React.SetStateAction<boolean>>;
+  chakshuResult: (ChakshuHistoryItem & { video_url: string }) | null;
+  chakshuHistory: Array<ChakshuHistoryItem & { video_url: string }>;
+  chakshuActiveHistoryId: string | null;
+  selectChakshuHistory: (item: ChakshuHistoryItem & { video_url: string }) => void;
+  chakshuHistoryWarning: string;
+  chakshuError: string;
+  chakshuRuntimeStatus: ChakshuRuntimeStatus | null;
+  stopChakshuGeneration: () => void;
+  chakshuModelRuntime: DrishtiModelAvailability | undefined;
+};
+
+export function ChakshuStudio(props: ChakshuStudioProps) {
+  const {
+    drishtiChecking, drishtiStarting, drishtiRuntimeHealth, drishtiWindowsDesktopSupported,
+    connectChakshuRuntime, chakshuGenerating, currentChakshu, chakshuModelId,
+    divyaLicenseAccepted, setDivyaLicenseAccepted, chakshuResult, chakshuHistory,
+    chakshuActiveHistoryId, selectChakshuHistory, chakshuHistoryWarning, chakshuError,
+    chakshuRuntimeStatus, stopChakshuGeneration, chakshuModelRuntime,
+  } = props;
+  return (
+      <div className="drishti-studio chakshu-studio" aria-label="Chakshu video workspace">
+                    <div className="drishti-studio-mark" aria-hidden="true"><VideoIcon size={31} strokeWidth={1.6} /></div>
+                    <div className="drishti-studio-copy">
+                      <span className="drishti-kicker">SATYAAI · CHAKSHU VIDEO STUDIO</span>
+                      <h1>Turn words into <em>motion.</em></h1>
+                      <p>{drishtiChecking ? "Checking the local creative engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". Video weights download only when a tier is first used." : "Generate video locally on a Windows desktop. Phone, Mac and Linux generation are not currently supported."}</p>
+                      {!drishtiWindowsDesktopSupported && (
+                        <div className="drishti-platform-note" role="note">
+                          <strong>Desktop · Windows required</strong>
+                          <span>Chakshu needs the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate video.</span>
+                        </div>
+                      )}
+                      <div className="drishti-connect-actions">
+                        <button type="button" className="drishti-connect-primary" onClick={() => void connectChakshuRuntime()} disabled={!drishtiWindowsDesktopSupported || drishtiChecking || drishtiStarting || chakshuGenerating}>
+                          {drishtiStarting ? "Starting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Start local engine"}
+                        </button>
+                        {!drishtiRuntimeHealth && drishtiWindowsDesktopSupported && <a className="drishti-install-link" href={DRISHTI_COMPANION_INSTALL_URL} target="_blank" rel="noreferrer">Install companion once</a>}
+                      </div>
+                    </div>
+                    <div className="chakshu-model-summary">
+                      <div>
+                        <span className="drishti-kicker">SELECTED MODEL</span>
+                        <strong>{currentChakshu.name}</strong>
+                        <p>{currentChakshu.description}</p>
+                        <small>{currentChakshu.quality} · {currentChakshu.hardware}</small>
+                        <small>Weights: {currentChakshu.license}</small>
+                      </div>
+                      <span className="chakshu-model-symbol"><VideoIcon size={20} /></span>
+                    </div>
+                    {chakshuModelId === "divya" && (
+                      <div className="chakshu-license">
+                        <label><input type="checkbox" checked={divyaLicenseAccepted} onChange={(event) => setDivyaLicenseAccepted(event.target.checked)} /><span>I have reviewed and agree to the LTX-2.x Community License for the Divya Chakshu 1 model weights.</span></label>
+                        <a href="https://huggingface.co/Lightricks/LTX-2.5-Diffusers/blob/main/LICENSE" target="_blank" rel="noreferrer">Read the model licence</a>
+                      </div>
+                    )}
+                    {chakshuResult && (
+                      <div className="drishti-result chakshu-result">
+                        <video src={chakshuResult.video_url} controls playsInline preload="metadata" aria-label={"Video generated by Chakshu: " + chakshuResult.prompt} />
+                        <div className="drishti-result-prompt"><strong>Prompt</strong><p>{chakshuResult.prompt}</p></div>
+                        <div className="drishti-result-footer">
+                          <span>{getChakshuModel(chakshuResult.model_id).name} · Generated locally · {chakshuResult.elapsed_seconds}s · Seed {chakshuResult.seed}</span>
+                          <a className="drishti-download" href={chakshuResult.video_url} download={"satyaai-chakshu-" + chakshuResult.seed + ".mp4"}><Download size={15} /> Download MP4</a>
+                        </div>
+                      </div>
+                    )}
+                    {chakshuHistory.length > 0 && (
+                      <div className="drishti-history">
+                        <div className="drishti-history-heading"><strong>Recent videos</strong><span>Saved in this browser · {chakshuHistory.length}</span></div>
+                        <div className="drishti-history-grid">
+                          {chakshuHistory.map((item) => (
+                            <button key={item.id} type="button" className={"drishti-history-item" + (chakshuActiveHistoryId === item.id ? " active" : "")} onClick={() => selectChakshuHistory(item)} aria-pressed={chakshuActiveHistoryId === item.id} title={item.prompt}>
+                              <video src={item.video_url} muted playsInline preload="metadata" />
+                              <span>{item.prompt}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {chakshuHistoryWarning && <div className="drishti-history-warning">{chakshuHistoryWarning}</div>}
+                    {chakshuError && <div className="drishti-runtime-error" role="alert">{chakshuError}</div>}
+                    {(drishtiStarting || chakshuGenerating) && (
+                      <div className="drishti-loading-card" role="status" aria-live="polite">
+                        <div className="drishti-loading-head"><strong>{drishtiStarting ? "Starting the local video engine" : chakshuRuntimeStatus?.phase === "loading_model" ? "Preparing the selected video model" : "Rendering your video"}</strong><span>{chakshuRuntimeStatus?.progress != null ? chakshuRuntimeStatus.progress + "%" : "Working"}</span></div>
+                        <div className={"drishti-progress-track" + (chakshuRuntimeStatus?.progress == null ? " indeterminate" : "")}><span style={chakshuRuntimeStatus?.progress != null ? { width: chakshuRuntimeStatus.progress + "%" } : undefined} /></div>
+                        <small>{drishtiStarting ? "Waking the installed companion and checking this computer…" : chakshuRuntimeStatus?.message || "Downloading the selected weights if needed, then generating locally…"}</small>
+                        <button type="button" className="drishti-cancel-button" onClick={stopChakshuGeneration}><Square size={13} /> Stop generation</button>
+                      </div>
+                    )}
+                    <div className="drishti-studio-note" role="status" aria-live="polite">
+                      {drishtiStarting ? "The desktop companion is starting. Your video prompt is sent only after the local health check succeeds."
+                        : drishtiChecking ? "Checking local video model availability…"
+                        : drishtiRuntimeHealth ? chakshuModelRuntime?.available
+                          ? chakshuModelId === "divya" && !divyaLicenseAccepted ? "Review the LTX-2.x Community License and tick the acknowledgement before generating."
+                            : "Local runtime ready for this tier. Your prompt is sent only to this device."
+                          : chakshuModelRuntime?.reason || "This video model is not available on the detected hardware."
+                        : "First install the updated companion once. It prepares its private runtime and caches selected model weights on first use."}
+                    </div>
+                  </div>
+  );
+}

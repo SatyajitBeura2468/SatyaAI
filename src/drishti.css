@@ -160,12 +160,12 @@
 }
 .drishti-idea-text strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 640;
 }
 .drishti-idea-text small {
   color: var(--text-3);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.45;
 }
 .drishti-idea-arrow {
@@ -215,7 +215,7 @@
   border-radius: 11px;
   color: var(--text);
   background: var(--surface);
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition: border-color .2s, background .2s, opacity .2s;
@@ -389,8 +389,8 @@
 }
 .chakshu-model-summary > div { display: grid; gap: 6px; }
 .chakshu-model-summary strong { color: var(--text); font-size: 14px; }
-.chakshu-model-summary p { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.5; }
-.chakshu-model-summary small { color: var(--text-3); font-size: 10px; line-height: 1.55; }
+.chakshu-model-summary p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+.chakshu-model-summary small { color: var(--text-3); font-size: 12.5px; line-height: 1.55; }
 .chakshu-model-symbol {
   flex: none;
   width: 38px;
@@ -454,3 +454,7 @@
   .drishti-result-actions button { flex: 1 1 auto; }
   .drishti-history-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+.drishti-mode-hint { margin-left: 2px; color: var(--text-3); font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.drishti-history-item video { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; object-fit: cover; background: #05070b; }
+.drishti-result-actions .drishti-download { min-height: 38px; font-size: 12.5px; }

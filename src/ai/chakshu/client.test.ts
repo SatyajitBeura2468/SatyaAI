@@ -35,6 +35,16 @@ describe("Chakshu local video client", () => {
     expect(init?.body).toBe(JSON.stringify({ model_id: "light", prompt: "A train crossing a bridge", accept_license: false }));
   });
 
+  it("forwards an AbortSignal for a long-running local video generation", async () => {
+    const controller = new AbortController();
+    vi.mocked(fetch).mockImplementationOnce((_input, init) => {
+      expect(init?.signal).toBe(controller.signal);
+      return Promise.reject(new DOMException("Aborted", "AbortError"));
+    });
+    await expect(generateChakshuVideo("light", "A train", false, controller.signal))
+      .rejects.toHaveProperty("name", "AbortError");
+  });
+
   it("requires an explicit acknowledgement for the flagship model", async () => {
     await expect(generateChakshuVideo("divya", "A cinematic ocean")).rejects.toThrow("Community License");
     expect(fetch).not.toHaveBeenCalled();

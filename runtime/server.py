@@ -205,6 +205,12 @@ def cancel_generation():
         None,
         model_id=_runtime_state.get("model_id"),
     )
+    _set_video_runtime_state(
+        "cancelling",
+        "Stop requested. Chakshu will stop at the next safe inference boundary.",
+        None,
+        model_id=_video_runtime_state.get("model_id"),
+    )
     return {"accepted": True, "message": "Stop request accepted."}
 
 
@@ -381,6 +387,7 @@ class GenerateRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
     width: int = Field(default=512, ge=256, le=1024)
     height: int = Field(default=512, ge=256, le=1024)
+    seed: int | None = Field(default=None, ge=0, le=2**31 - 1)
 
 
 def _release_video_pipeline() -> None:
@@ -508,7 +515,7 @@ def generate(request: GenerateRequest):
             request.model_id,
         )
 
-        seed = secrets.randbelow(2**31)
+        seed = request.seed if request.seed is not None else secrets.randbelow(2**31)
         generator_device = "cuda" if torch.cuda.is_available() else "cpu"
         generator = torch.Generator(device=generator_device).manual_seed(seed)
 
@@ -643,6 +650,7 @@ def generate_video(request: VideoGenerateRequest):
     if not _generation_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="Another local image or video generation is already running on this device.")
 
+    _cancel_generation.clear()
     started = time.perf_counter()
     output_path = None
     seed = secrets.randbelow(2**31)
@@ -665,6 +673,7 @@ def generate_video(request: VideoGenerateRequest):
             model_id=request.model_id,
         )
         pipeline = _load_video_pipeline(request.model_id)
+        _raise_if_generation_cancelled()
 
         descriptor, output_path = tempfile.mkstemp(prefix="satyaai-chakshu-", suffix=".mp4")
         os.close(descriptor)
@@ -678,6 +687,20 @@ def generate_video(request: VideoGenerateRequest):
             30,
             request.model_id,
         )
+
+        def report_video_step_end(pipe, step: int, timestep: int, callback_kwargs: dict):
+            _raise_if_generation_cancelled()
+            total = 8 if request.model_id == "divya" else (25 if request.model_id == "light" else 30)
+            current = step + 1
+            _set_video_runtime_state(
+                "generating",
+                f"Rendering video locally… Step {current} of {total}",
+                min(99, int((current / total) * 100)),
+                current,
+                total,
+                request.model_id,
+            )
+            return callback_kwargs
 
         with torch.inference_mode():
             if request.model_id == "divya":
@@ -697,7 +720,10 @@ def generate_video(request: VideoGenerateRequest):
                     generator=generator,
                     output_type="np",
                     return_dict=False,
+                    callback_on_step_end=report_video_step_end,
                 )
+                _raise_if_generation_cancelled()
+                _raise_if_generation_cancelled()
                 encode_video(
                     video[0],
                     fps=frame_rate,
@@ -719,10 +745,13 @@ def generate_video(request: VideoGenerateRequest):
                     num_frames=49,
                     num_inference_steps=steps,
                     generator=generator,
+                    callback_on_step_end=report_video_step_end,
                 )
+                _raise_if_generation_cancelled()
                 frames = result.frames[0]
                 export_to_video(frames, output_path, fps=fps)
 
+        _raise_if_generation_cancelled()
         if not output_path or not os.path.isfile(output_path) or os.path.getsize(output_path) < 1024:
             raise RuntimeError("The local video pipeline did not produce a valid MP4 file.")
 
@@ -740,6 +769,11 @@ def generate_video(request: VideoGenerateRequest):
             headers=headers,
             background=BackgroundTask(os.unlink, output_path),
         )
+    except GenerationCancelled as error:
+        _set_video_runtime_state("cancelled", str(error), None, model_id=request.model_id)
+        if output_path and os.path.exists(output_path):
+            os.unlink(output_path)
+        raise HTTPException(status_code=499, detail=str(error)) from error
     except HTTPException as error:
         _set_video_runtime_state("error", str(error.detail), None, model_id=request.model_id)
         if output_path and os.path.exists(output_path):

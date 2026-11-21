@@ -1,40 +1,34 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  Archive,
   ArrowUp,
   Bookmark,
   BookmarkCheck,
-  Bot,
   ArrowDown,
   Aperture,
   Check,
   Crown,
   ChevronDown,
   Copy,
-  Cpu,
-  Download,
   FileText,
   Image as ImageIcon,
   Video as VideoIcon,
   Layers,
-  Library,
   Menu,
   Mic,
-  Moon,
   Plus,
-  RefreshCw,
-  Search,
   Settings,
   Sparkles,
   Square,
   Pencil,
-  Trash2,
-  Sun,
   User,
   X,
   Zap,
 } from "lucide-react";
+import { Sidebar } from "./components/Sidebar";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { DrishtiStudio } from "./components/DrishtiStudio";
+import { ChakshuStudio } from "./components/ChakshuStudio";
 import "./cosmos.css";
 import "./reasoning-profile.css";
 import "./drishti.css";
@@ -71,9 +65,10 @@ import {
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
 import { DEFAULT_DRISHTI_MODEL_ID, DRISHTI_MODELS, getDrishtiModel, isDrishtiModelId, type DrishtiModelId } from "./ai/drishti/registry";
-import { cancelDrishtiGeneration, checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, DRISHTI_COMPANION_INSTALL_URL, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
+import { cancelDrishtiGeneration, checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
 import { CHAKSHU_MODELS, DEFAULT_CHAKSHU_MODEL_ID, getChakshuModel, isChakshuModelId, type ChakshuModelId } from "./ai/chakshu/registry";
-import { generateChakshuVideo, getChakshuRuntimeStatus, type ChakshuGenerationResult, type ChakshuRuntimeStatus } from "./ai/chakshu/client";
+import { generateChakshuVideo, getChakshuRuntimeStatus, type ChakshuRuntimeStatus } from "./ai/chakshu/client";
+import { loadChakshuHistory, saveChakshuHistoryItem, type ChakshuHistoryItem } from "./ai/chakshu/history";
 import { Markdown } from "./markdown";
 import { loadDrishtiHistory, saveDrishtiHistoryItem, type DrishtiHistoryItem } from "./ai/drishti/history";
 
@@ -139,7 +134,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   language: "auto",
   responseStyle: "balanced",
   responseLength: "balanced",
-  enterToSend: true,
+  enterToSend: typeof window === "undefined" || !window.matchMedia("(pointer: coarse)").matches,
   compactMode: false,
   showTimestamps: false,
   reduceMotion: false,
@@ -148,7 +143,14 @@ const DEFAULT_PREFERENCES: AppPreferences = {
 };
 function readPreferences(): AppPreferences {
   const stored = loadJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
-  return { ...DEFAULT_PREFERENCES, ...stored };
+  const touchDevice = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  let touchOptIn = false;
+  try { touchOptIn = localStorage.getItem("satya-enter-to-send-touch") === "true"; } catch { /* default off on touch devices */ }
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...stored,
+    enterToSend: touchDevice ? touchOptIn : (stored.enterToSend ?? DEFAULT_PREFERENCES.enterToSend),
+  };
 }
 const MAX_SAVED = 100;
 const AVATAR_KEY = "satya-avatar";
@@ -219,6 +221,15 @@ const isMac =
 const drishtiWindowsDesktopSupported =
   typeof navigator !== "undefined" &&
   /Windows|Win32|Win64|WinCE/i.test(navigator.userAgent + " " + navigator.platform);
+const nextDrishtiSeed = (previous?: number) => {
+  const values = new Uint32Array(1);
+  let seed = 0;
+  do {
+    crypto.getRandomValues(values);
+    seed = values[0] % 2_147_483_647;
+  } while (seed === previous);
+  return seed;
+};
 const DRISHTI_MODEL_ICONS = {
   lite: Sparkles,
   core: Layers,
@@ -326,8 +337,13 @@ function App() {
   });
   const [chakshuGenerating, setChakshuGenerating] = useState(false);
   const [chakshuError, setChakshuError] = useState("");
-  const [chakshuResult, setChakshuResult] = useState<(ChakshuGenerationResult & { video_url: string }) | null>(null);
+  const [chakshuResult, setChakshuResult] = useState<(ChakshuHistoryItem & { video_url: string }) | null>(null);
   const [chakshuRuntimeStatus, setChakshuRuntimeStatus] = useState<ChakshuRuntimeStatus | null>(null);
+  const [chakshuHistory, setChakshuHistory] = useState<Array<ChakshuHistoryItem & { video_url: string }>>([]);
+  const [chakshuActiveHistoryId, setChakshuActiveHistoryId] = useState<string | null>(null);
+  const [chakshuHistoryWarning, setChakshuHistoryWarning] = useState("");
+  const chakshuAbortRef = useRef<AbortController | null>(null);
+  const chakshuObjectUrlsRef = useRef<Set<string>>(new Set());
   const [divyaLicenseAccepted, setDivyaLicenseAccepted] = useState(() => {
     try { return localStorage.getItem(DIVYA_LICENSE_KEY) === "true"; } catch { return false; }
   });
@@ -386,16 +402,15 @@ function App() {
   const [provider, setProvider] = useState<ProviderSettings>(() => {
     try {
       const saved = localStorage.getItem("satya-provider");
-      return saved
-        ? JSON.parse(saved)
-        : {
-            baseUrl:
-              import.meta.env.VITE_OPENAI_COMPATIBLE_BASE_URL ||
-              (import.meta.env.DEV ? "http://127.0.0.1:11434/v1" : undefined),
-            model:
-              import.meta.env.VITE_OPENAI_COMPATIBLE_MODEL ||
-              (import.meta.env.DEV ? "qwen2.5:1.5b" : undefined),
-          };
+      const parsed = saved ? JSON.parse(saved) as Partial<ProviderSettings> : {};
+      const baseUrl = parsed.baseUrl || import.meta.env.VITE_OPENAI_COMPATIBLE_BASE_URL ||
+        (import.meta.env.DEV ? "http://127.0.0.1:11434/v1" : undefined);
+      const model = parsed.model || import.meta.env.VITE_OPENAI_COMPATIBLE_MODEL ||
+        (import.meta.env.DEV ? "qwen2.5:1.5b" : undefined);
+      // Older builds persisted the key with the rest of the provider settings.
+      // Remove it from persistent storage on the next load.
+      localStorage.setItem("satya-provider", JSON.stringify({ baseUrl, model }));
+      return { baseUrl, model };
     } catch {
       return {};
     }
@@ -463,7 +478,6 @@ function App() {
         if (items.length) {
           setDrishtiResult(items[0]);
           setDrishtiActiveHistoryId(items[0].id);
-          setQuery((currentQuery) => currentQuery || items[0].prompt);
         }
       })
       .catch(() => {
@@ -488,18 +502,66 @@ function App() {
     try { localStorage.setItem(DIVYA_LICENSE_KEY, String(divyaLicenseAccepted)); } catch { /* keep acknowledgement for this session */ }
   }, [divyaLicenseAccepted]);
 
-  useEffect(() => {
-    if (chakshuResult?.video_url) return () => URL.revokeObjectURL(chakshuResult.video_url);
-  }, [chakshuResult]);
+  function saveEndpointSettings() {
+    const baseUrl = provider.baseUrl?.trim();
+    const model = provider.model?.trim();
+    if (baseUrl) {
+      try {
+        const parsed = new URL(baseUrl);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Unsupported protocol");
+      } catch {
+        setEndpointFeedback("Enter a valid HTTP or HTTPS endpoint URL before saving.");
+        return;
+      }
+      if (!model) {
+        setEndpointFeedback("Enter the model name before saving this endpoint.");
+        return;
+      }
+    }
+    try {
+      localStorage.setItem("satya-provider", JSON.stringify({ baseUrl, model }));
+      setEndpointFeedback("Endpoint URL and model saved. The API key remains in memory only and is never written to browser storage.");
+    } catch {
+      setEndpointFeedback("Endpoint settings could not be saved in this browser.");
+    }
+  }
 
-  useEffect(() => {
-    try { localStorage.setItem("satya-provider", JSON.stringify(provider)); }
-    catch { setEndpointFeedback("Endpoint settings could not be saved in this browser."); }
-  }, [provider]);
+  function clearEndpointSettings() {
+    setProvider({});
+    try {
+      localStorage.removeItem("satya-provider");
+    } catch { /* state is still cleared */ }
+    setEndpointFeedback("Custom endpoint and session key removed.");
+  }
 
   useEffect(() => {
     saveJSON(SAVED_KEY, saved);
   }, [saved]);
+
+  useEffect(() => {
+    let active = true;
+    void loadChakshuHistory().then((items) => {
+      if (!active) return;
+      const hydrated = items.map((item) => {
+        const video_url = URL.createObjectURL(item.blob);
+        chakshuObjectUrlsRef.current.add(video_url);
+        return { ...item, video_url };
+      });
+      setChakshuHistory(hydrated);
+      if (hydrated.length) {
+        setChakshuResult(hydrated[0]);
+        setChakshuActiveHistoryId(hydrated[0].id);
+      }
+    }).catch(() => {
+      if (active) setChakshuHistoryWarning("Video history could not be loaded in this browser.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => () => {
+    for (const url of chakshuObjectUrlsRef.current) URL.revokeObjectURL(url);
+    chakshuObjectUrlsRef.current.clear();
+  }, []);
 
   useEffect(() => {
     if (provider.baseUrl) return;
@@ -918,6 +980,7 @@ function App() {
   }
 
   function clearConversationData() {
+    if (!window.confirm("Delete all local conversations and saved answers from this browser? This action cannot be undone.")) return;
     activeAbortRef.current?.abort();
     setBusy(false);
     setChats([]);
@@ -1169,7 +1232,7 @@ function App() {
     return () => window.cancelAnimationFrame(frame);
   }, [workspaceMode, drishtiStarting, drishtiGenerating, drishtiResult, drishtiError, preferences.reduceMotion]);
 
-  async function generateDrishti(promptOverride?: string) {
+  async function generateDrishti(promptOverride?: string, seedOverride?: number) {
     const prompt = (promptOverride ?? query).trim();
     if (!prompt || drishtiGenerating || drishtiStarting) return;
     if (!drishtiWindowsDesktopSupported) {
@@ -1192,7 +1255,7 @@ function App() {
       }
 
       setStatus("Generating locally with " + currentDrishti.name + "…");
-      const result = await generateDrishtiImage(drishtiModelId, prompt, controller.signal);
+      const result = await generateDrishtiImage(drishtiModelId, prompt, controller.signal, seedOverride);
       if (controller.signal.aborted) return;
 
       const historyItem: DrishtiHistoryItem = {
@@ -1239,9 +1302,9 @@ function App() {
 
   function varyDrishti() {
     if (!drishtiResult) return;
-    const prompt = ("Create a fresh visual variation of this image prompt while preserving its main subject and intent: " + drishtiResult.prompt + " Use a different composition, lighting arrangement, and visual details.").slice(0, 4000);
+    const prompt = drishtiResult.prompt;
     setQuery(prompt);
-    void generateDrishti(prompt);
+    void generateDrishti(prompt, nextDrishtiSeed(drishtiResult.seed));
   }
 
   function regenerateDrishti() {
@@ -1261,16 +1324,25 @@ function App() {
   }
 
   async function connectChakshuRuntime() {
+    if (chakshuAbortRef.current) return;
+    const controller = new AbortController();
+    chakshuAbortRef.current = controller;
     setDrishtiChecking(true);
     setChakshuError("");
     try {
-      const health = await ensureDrishtiRuntimeReady();
+      const health = await ensureDrishtiRuntimeReady(controller.signal);
+      if (controller.signal.aborted) return;
       const availability = health.video_models?.[chakshuModelId];
-      if (!availability?.available) setChakshuError(availability?.reason || "This video tier is not available on the detected hardware.");
+      if (!availability?.available) setChakshuError(availability?.reason || "This video tier is not available on this computer.");
     } catch (error) {
-      setDrishtiRuntimeHealth(null);
-      setChakshuError(error instanceof Error ? error.message : "Could not start the local video companion.");
+      if (controller.signal.aborted) {
+        setStatus("Video companion startup stopped.");
+      } else {
+        setDrishtiRuntimeHealth(null);
+        setChakshuError(error instanceof Error ? error.message : "Could not start the local video companion.");
+      }
     } finally {
+      if (chakshuAbortRef.current === controller) chakshuAbortRef.current = null;
       setDrishtiChecking(false);
     }
   }
@@ -1278,30 +1350,82 @@ function App() {
   async function generateChakshu() {
     const prompt = query.trim();
     if (!prompt || chakshuGenerating || drishtiStarting) return;
+    if (!drishtiWindowsDesktopSupported) {
+      setChakshuError("Chakshu video generation currently requires a Windows desktop and the SatyaAI companion.");
+      return;
+    }
     if (chakshuModelId === "divya" && !divyaLicenseAccepted) {
       setChakshuError("Review and accept the LTX-2.x Community License before using Divya Chakshu 1.");
       return;
     }
+    const controller = new AbortController();
+    chakshuAbortRef.current = controller;
     setChakshuGenerating(true);
     setChakshuRuntimeStatus(null);
     setChakshuError("");
-    setChakshuResult(null);
     setStatus("Preparing local video generation…");
     try {
-      const health = await ensureDrishtiRuntimeReady();
+      const health = await ensureDrishtiRuntimeReady(controller.signal);
+      if (controller.signal.aborted) return;
       const availability = health.video_models?.[chakshuModelId];
       if (!availability?.available) throw new Error(availability?.reason || "The selected video model is not available on this computer.");
       setStatus("Generating locally with " + currentChakshu.name + "…");
-      const result = await generateChakshuVideo(chakshuModelId, prompt, divyaLicenseAccepted);
+      const result = await generateChakshuVideo(chakshuModelId, prompt, divyaLicenseAccepted, controller.signal);
+      if (controller.signal.aborted) return;
       const videoUrl = URL.createObjectURL(result.blob);
-      setChakshuResult({ ...result, video_url: videoUrl });
-      setQuery("");
+      chakshuObjectUrlsRef.current.add(videoUrl);
+      const historyItem: ChakshuHistoryItem = {
+        id: newId(),
+        prompt,
+        blob: result.blob,
+        model_id: result.model_id,
+        elapsed_seconds: result.elapsed_seconds,
+        seed: result.seed,
+        created_at: Date.now(),
+      };
+      const displayItem = { ...historyItem, video_url: videoUrl };
+      setChakshuResult(displayItem);
+      setChakshuActiveHistoryId(historyItem.id);
+      setChakshuHistory((previous) => [displayItem, ...previous].slice(0, 12));
+      void saveChakshuHistoryItem(historyItem).catch(() => {
+        setChakshuHistoryWarning("This video was generated, but the browser could not save it to history.");
+      });
       setStatus("Video generated locally.");
     } catch (error) {
-      setChakshuError(error instanceof Error ? error.message : "Chakshu video generation failed.");
+      if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        setChakshuError("");
+        setStatus("Video generation stopped.");
+      } else {
+        setChakshuError(error instanceof Error ? error.message : "Chakshu video generation failed.");
+      }
     } finally {
+      if (chakshuAbortRef.current === controller) chakshuAbortRef.current = null;
       setChakshuGenerating(false);
     }
+  }
+
+  function stopChakshuGeneration() {
+    const controller = chakshuAbortRef.current;
+    if (!controller) return;
+    setStatus("Stopping video generation…");
+    void cancelDrishtiGeneration();
+    controller.abort();
+  }
+
+  function selectChakshuHistory(item: ChakshuHistoryItem & { video_url: string }) {
+    setChakshuResult(item);
+    setChakshuActiveHistoryId(item.id);
+    setChakshuModelId(item.model_id);
+    setQuery(item.prompt);
+    setChakshuError("");
+  }
+
+  function switchWorkspaceMode(nextMode: WorkspaceMode) {
+    if (file && nextMode !== "chat" && !window.confirm("Switching workspace will remove the attached text file from the composer. Continue?")) return;
+    if (file && nextMode !== "chat") setFile(null);
+    if (nextMode === "chat" && workspaceMode !== "chat") setQuery("");
+    setWorkspaceMode(nextMode);
+    setReasoningOpen(false);
   }
 
   function send() {
@@ -1605,6 +1729,7 @@ function App() {
   function submitEditedMessage(index: number) {
     const original = messages[index];
     if (!original || original.role !== "user" || !editDraft.trim() || busy) return;
+    if (index < messages.length - 1 && !window.confirm("Resubmitting this message will remove all later messages and replies from this conversation. Continue?")) return;
     setEditingMessageIndex(null);
     void sendMessage(editDraft, original.file ?? null, messages.slice(0, index), false);
   }
@@ -1630,156 +1755,24 @@ function App() {
         <i className="nebula n1" />
         <i className="nebula n2" />
         <i className="nebula n3" />
-        <Starfield active={theme === "dark" && !preferences.reduceMotion} busy={busy} />
+        <Starfield active={theme === "dark" && !preferences.reduceMotion} busy={busy || drishtiStarting || drishtiGenerating || chakshuGenerating} />
         <i className="vignette" />
         <i className="grain" />
       </div>
       {menu && <div className="scrim" onClick={() => setMenu(false)} />}
       <div className={"side-backdrop" + (menu ? " open" : "")} aria-hidden="true" />
-      <aside className={"sidebar " + (menu ? "open" : "")}>
-        <div className="brand">
-          <div className="brand-mark">S</div>
-          <span>SatyaAI</span>
-          <button
-            className="icon-btn mobile-close"
-            onClick={() => setMenu(false)}
-            aria-label="Close menu"
-          >
-            <X size={17} />
-          </button>
-        </div>
-
-        <button className="new-chat" onClick={startNewChat}>
-          <Plus size={17} /> New chat <span>{isMac ? "⌘K" : "Ctrl K"}</span>
-        </button>
-
-        <div className="side-section">
-          <div className="section-label">Workspace</div>
-          <button
-            className={"side-link" + (sidebarView === "chats" ? " active" : "")}
-            onClick={() => setSidebarView("chats")}
-            aria-pressed={sidebarView === "chats"}
-          >
-            <Library size={16} /> Conversations
-            {chats.length > 0 && <span className="side-count">{chats.length}</span>}
-          </button>
-          <button
-            className={"side-link" + (sidebarView === "saved" ? " active" : "")}
-            onClick={() => setSidebarView("saved")}
-            aria-pressed={sidebarView === "saved"}
-          >
-            <Archive size={16} /> Saved answers
-            {saved.length > 0 && <span className="side-count">{saved.length}</span>}
-          </button>
-        </div>
-
-        <div className="side-section history">
-          {sidebarView === "chats" ? (
-            <>
-              <div className="section-label">Recent</div>
-              <label className="chat-list-search">
-                <Search size={14} />
-                <input
-                  value={chatSearch}
-                  onChange={(event) => setChatSearch(event.target.value)}
-                  placeholder="Search conversations"
-                  aria-label="Search conversations"
-                />
-                {chatSearch && <button type="button" onClick={() => setChatSearch("")} aria-label="Clear conversation search"><X size={13} /></button>}
-              </label>
-              {visibleChats.length === 0 && (
-                <div className="empty-history">{chats.length ? "No matching conversations" : "No conversations yet"}</div>
-              )}
-              {visibleChats.map((chat, index) => (
-                <div className="chat-entry" key={chat.id} style={{ "--i": index } as React.CSSProperties}>
-                  {editingChatId === chat.id ? (
-                    <form className="chat-rename" onSubmit={(event) => { event.preventDefault(); saveChatTitle(chat.id); }}>
-                      <input value={chatTitleDraft} onChange={(event) => setChatTitleDraft(event.target.value)} maxLength={80} aria-label="Conversation title" autoFocus />
-                      <button type="submit" aria-label="Save conversation title"><Check size={14} /></button>
-                      <button type="button" onClick={() => setEditingChatId(null)} aria-label="Cancel rename"><X size={14} /></button>
-                    </form>
-                  ) : (
-                    <>
-                      <button
-                        className={"chat-row " + (chat.id === activeId ? "active" : "")}
-                        onClick={() => openChat(chat)}
-                        style={{ "--i": index } as React.CSSProperties}
-                      >
-                        <div>
-                          <strong>{chat.title}</strong>
-                          <small>{preview(chat.messages[chat.messages.length - 1]?.text || "")}</small>
-                        </div>
-                        <time>{dayLabel(chat.updatedAt)}</time>
-                      </button>
-                      <div className="chat-entry-actions">
-                        <button className="icon-btn" onClick={() => beginRenameChat(chat)} aria-label={"Rename " + chat.title} title="Rename"><Pencil size={13} /></button>
-                        <button className="icon-btn" onClick={() => exportChat(chat)} aria-label={"Export " + chat.title} title="Export"><Download size={13} /></button>
-                        <button className="icon-btn danger" onClick={() => deleteChat(chat.id)} disabled={busy && chat.id === activeId} aria-label={"Delete " + chat.title} title="Delete"><Trash2 size={13} /></button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </>
-          ) : (
-            <>
-              <div className="section-label">Saved</div>
-              {saved.length === 0 && (
-                <div className="empty-history">
-                  Nothing saved yet. Tap “Save answer” under any reply.
-                </div>
-              )}
-              {saved.map((item, index) => (
-                <div
-                  className="saved-row"
-                  key={item.id}
-                  style={{ "--i": index } as React.CSSProperties}
-                >
-                  <button className="chat-row" onClick={() => openSaved(item)}>
-                    <div>
-                      <strong>{item.question || "Saved answer"}</strong>
-                      <small>{preview(item.answer)}</small>
-                    </div>
-                  </button>
-                  <button
-                    className="icon-btn saved-remove"
-                    onClick={() => removeSaved(item.id)}
-                    aria-label="Remove saved answer"
-                    title="Remove"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-
-        <div className="sidebar-bottom">
-          <div className="local-state">
-            <span className="status-dot" />
-            <div>
-              <strong>{busy ? status : engineTitle}</strong>
-              <small>{capability}</small>
-            </div>
-          </div>
-          <button className="side-link" onClick={() => openSettings()}>
-            <Settings size={16} /> Settings
-          </button>
-          <button
-            className="side-link"
-            onClick={() =>
-              setTheme((currentTheme) =>
-                currentTheme === "dark" ? "light" : "dark",
-              )
-            }
-            aria-label={appearanceLabel}
-          >
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            {appearanceLabel}
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        menu={menu} setMenu={setMenu} isMac={isMac} startNewChat={startNewChat}
+        sidebarView={sidebarView} setSidebarView={setSidebarView} chats={chats} saved={saved}
+        chatSearch={chatSearch} setChatSearch={setChatSearch} visibleChats={visibleChats}
+        editingChatId={editingChatId} setEditingChatId={setEditingChatId}
+        chatTitleDraft={chatTitleDraft} setChatTitleDraft={setChatTitleDraft}
+        saveChatTitle={saveChatTitle} openChat={openChat} preview={preview} dayLabel={dayLabel}
+        beginRenameChat={beginRenameChat} exportChat={exportChat} deleteChat={deleteChat}
+        busy={busy} activeId={activeId} openSaved={openSaved} removeSaved={removeSaved}
+        status={status} engineTitle={engineTitle} capability={capability} openSettings={openSettings}
+        theme={theme} setTheme={setTheme} appearanceLabel={appearanceLabel}
+      />
 
       <main className="main">
         <header className="topbar">
@@ -1794,6 +1787,18 @@ function App() {
             <button
               className={"crumb reasoning-btn" + (reasoningOpen ? " open" : "")}
               onClick={() => setReasoningOpen((open) => !open)}
+              onKeyDown={(event) => {
+                if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                if (!reasoningOpen) setReasoningOpen(true);
+                window.requestAnimationFrame(() => {
+                  const options = Array.from(reasoningRef.current?.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)') ?? []);
+                  if (!options.length) return;
+                  const index = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1
+                    : event.key === "ArrowUp" ? options.length - 1 : 0;
+                  options[index].focus();
+                });
+              }}
               aria-haspopup="listbox"
               aria-expanded={reasoningOpen}
               aria-label={workspaceMode === "image"
@@ -1810,7 +1815,22 @@ function App() {
               <ChevronDown size={14} className="chev" />
             </button>
             {reasoningOpen && (
-              <div className="reasoning-menu" role="listbox" aria-label={workspaceMode === "image" ? "Drishti image model" : workspaceMode === "video" ? "Chakshu video model" : "Reasoning mode"}>
+              <div
+                className="reasoning-menu"
+                role="listbox"
+                aria-label={workspaceMode === "image" ? "Drishti image model" : workspaceMode === "video" ? "Chakshu video model" : "Reasoning mode"}
+                onKeyDown={(event) => {
+                  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                  const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)'));
+                  if (!options.length) return;
+                  event.preventDefault();
+                  const currentIndex = options.indexOf(document.activeElement as HTMLButtonElement);
+                  const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1
+                    : event.key === "ArrowDown" ? (currentIndex + 1 + options.length) % options.length
+                    : (currentIndex - 1 + options.length) % options.length;
+                  options[nextIndex].focus();
+                }}
+              >
                 {workspaceMode === "chat" ? (
                   (Object.keys(modes) as Mode[]).map((key) => (
                     <button
@@ -1867,7 +1887,7 @@ function App() {
                     <button key={model.id} role="option" aria-selected={chakshuModelId === model.id}
                       className={"reasoning-option" + (chakshuModelId === model.id ? " chosen" : "")}
                       disabled={chakshuGenerating || drishtiChecking}
-                      onClick={() => { setChakshuModelId(model.id); setChakshuResult(null); setChakshuError(""); setReasoningOpen(false); }}>
+                      onClick={() => { setChakshuModelId(model.id); setChakshuError(""); setReasoningOpen(false); }}>
                       <span className="ro-icon ro-symbol" aria-hidden="true"><VideoIcon size={19} /></span>
                       <span className="ro-text"><span className="ro-primary"><strong>{model.name}</strong>{model.experimental && <small className="drishti-experimental">FLAGSHIP</small>}</span><small>{model.description}</small></span>
                       {chakshuModelId === model.id && <Check size={15} className="ro-check" />}
@@ -1892,6 +1912,7 @@ function App() {
               title={memory.name ? memory.name + " · change picture" : "Change profile picture"}
             >
               {avatar ? <img src={avatar} alt="" /> : initials || <User size={16} />}
+              <span className="avatar-edit-hint" aria-hidden="true"><Pencil size={10} /></span>
             </button>
             <input
               ref={avatarInputRef}
@@ -1922,168 +1943,56 @@ function App() {
           aria-label="Conversation"
         >
           {workspaceMode === "image" && (
-            <div className="drishti-studio" aria-label="Drishti image workspace">
-              <div className="drishti-studio-mark" aria-hidden="true">
-                <ImageIcon size={31} strokeWidth={1.6} />
-              </div>
-              <div className="drishti-studio-copy">
-                <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
-                <h1>Let’s create <em>something.</em></h1>
-                <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Generate privately on a Windows desktop using the local Drishti companion."}</p>
-                {!drishtiWindowsDesktopSupported && (
-                  <div className="drishti-platform-note" role="note">
-                    <strong>Desktop · Windows required</strong>
-                    <span>Image generation currently needs the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate images.</span>
-                  </div>
-                )}
-                <div className="drishti-connect-actions">
-                  <button type="button" className="drishti-connect-primary" onClick={() => void connectDrishtiRuntime()} disabled={!drishtiWindowsDesktopSupported || drishtiChecking || drishtiStarting || drishtiGenerating}>
-                    {drishtiStarting ? "Starting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Start local engine"}
-                  </button>
-                  {!drishtiRuntimeHealth && drishtiWindowsDesktopSupported && (
-                    <a className="drishti-install-link" href={DRISHTI_COMPANION_INSTALL_URL} target="_blank" rel="noreferrer">Install companion once</a>
-                  )}
-                </div>
-              </div>
-
-              <div className="drishti-activity" ref={drishtiActivityRef}>
-                {drishtiResult && (
-                  <div className="drishti-result">
-                    <img src={drishtiResult.image_data_url} alt={"Image generated by Drishti: " + drishtiResult.prompt} />
-                    <div className="drishti-result-prompt">
-                      <strong>Prompt</strong>
-                      <p>{drishtiResult.prompt}</p>
-                    </div>
-                    <div className="drishti-result-footer">
-                      <span>{getDrishtiModel(drishtiResult.model_id).name} · Generated locally · {drishtiResult.elapsed_seconds}s · Seed {drishtiResult.seed}</span>
-                      <div className="drishti-result-actions">
-                        <button type="button" className="drishti-download" onClick={varyDrishti} disabled={drishtiGenerating || drishtiStarting}><Sparkles size={14} /> Vary</button>
-                        <button type="button" className="drishti-download" onClick={regenerateDrishti} disabled={drishtiGenerating || drishtiStarting}><RefreshCw size={14} /> Regenerate</button>
-                        <button type="button" className="drishti-download" onClick={downloadDrishtiImage}><Download size={15} /> Download</button>
-                        <button type="button" className="drishti-download" onClick={() => { setDrishtiResult(null); setDrishtiActiveHistoryId(null); setDrishtiError(""); setQuery(""); }}>New image</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {drishtiError && <div className="drishti-runtime-error" role="alert">{drishtiError}</div>}
-                {(drishtiStarting || drishtiGenerating) && (
-                  <div className="drishti-loading-card" role="status" aria-live="polite">
-                    <div className="drishti-loading-head">
-                      <strong>{drishtiStarting ? "Starting local image engine" : drishtiRuntimeStatus?.phase === "loading_model" ? "Preparing the selected model" : "Creating your image"}</strong>
-                      <span>{drishtiRuntimeStatus?.progress != null ? drishtiRuntimeStatus.progress + "%" : "Working"}</span>
-                    </div>
-                    <div className={"drishti-progress-track" + (drishtiRuntimeStatus?.progress == null ? " indeterminate" : "")}>
-                      <span style={drishtiRuntimeStatus?.progress != null ? { width: drishtiRuntimeStatus.progress + "%" } : undefined} />
-                    </div>
-                    <small>{drishtiStarting ? "Waking the installed companion and checking this computer…" : drishtiRuntimeStatus?.message || "Loading the model if needed, then generating locally…"}</small>
-                    <button type="button" className="drishti-cancel-button" onClick={stopDrishtiGeneration}><Square size={13} /> Stop generation</button>
-                  </div>
-                )}
-                {drishtiHistory.length > 0 && (
-                  <div className="drishti-history">
-                    <div className="drishti-history-heading"><strong>Recent generations</strong><span>Saved in this browser · {drishtiHistory.length}</span></div>
-                    <div className="drishti-history-grid">
-                      {drishtiHistory.map((item) => (
-                        <button key={item.id} type="button" className={"drishti-history-item" + (drishtiActiveHistoryId === item.id ? " active" : "")} onClick={() => selectDrishtiHistory(item)} aria-pressed={drishtiActiveHistoryId === item.id} title={item.prompt}>
-                          <img src={item.image_data_url} alt="" loading="lazy" />
-                          <span>{item.prompt}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {drishtiHistoryWarning && <div className="drishti-history-warning">{drishtiHistoryWarning}</div>}
-                <div className="drishti-studio-note" role="status" aria-live="polite">
-                  {drishtiStarting ? "The desktop companion is starting. Your prompt is sent only after the local health check succeeds." : drishtiChecking ? "Checking the local Drishti runtime…" : drishtiRuntimeHealth ? drishtiModelRuntime?.available ? "Local runtime ready for this tier. Your image prompt is sent only to this device." : drishtiModelRuntime?.reason || "This model is not available on the detected hardware." : drishtiRuntimeError || "Install the companion once on Windows. Later prompts start it automatically."}
-                </div>
-              </div>
-
-              {!drishtiGenerating && !drishtiStarting && !drishtiResult && !drishtiError && (
-                <>
-                  <div className="drishti-ideas-heading">
-                    <div><strong>What are we creating today?</strong><span>Choose a subject to start with, then customise the prompt.</span></div>
-                    <span className="drishti-ideas-sparkle" aria-hidden="true"><Sparkles size={17} /></span>
-                  </div>
-                  <div className="drishti-ideas-grid">
-                    {[
-                      { icon: "✦", title: "Cinematic worlds", description: "A rover on the red planet", prompt: "A cinematic wide shot of a six-wheeled Mars exploration rover crossing rust-red dunes at sunset, a vast canyon and distant Olympus Mons on the horizon, fine dust glowing in the low sunlight, realistic aerospace photography, dramatic scale." },
-                      { icon: "◉", title: "Portraits & people", description: "A fictional scientist in her observatory", prompt: "A natural editorial portrait of a fictional adult Indian astrophysicist standing inside a modern observatory, a telescope and softly glowing star charts behind her, thoughtful expression, warm practical lighting, realistic photography, 85mm portrait lens." },
-                      { icon: "⌂", title: "Architecture & spaces", description: "A glass observatory above the clouds", prompt: "A spectacular glass-domed mountain observatory perched above a sea of clouds at blue hour, warm interior lights, a large research telescope visible through the dome, distant snow peaks, refined architectural photography, crisp material detail." },
-                      { icon: "◇", title: "Product photography", description: "A titanium watch in a studio", prompt: "Premium studio product photograph of a fictional brushed-titanium mechanical wristwatch with a deep navy dial and luminous markers, resting on dark volcanic stone, controlled softbox lighting, subtle reflections, macro detail, no brand logos or readable text." },
-                      { icon: "✺", title: "Fantasy & concept art", description: "A giant luminous whale above a night ocean", prompt: "A colossal bioluminescent whale drifting through the night sky above a moonlit ocean, constellations shimmering through its translucent fins, tiny boats far below for scale, atmospheric fantasy concept art, intricate luminous details, cinematic composition." },
-                      { icon: "▧", title: "Posters & graphic art", description: "A retro-futurist space telescope launch poster", prompt: "A bold retro-futurist illustrated launch poster for a fictional orbital telescope mission titled ECHOES OF THE COSMOS, a golden space telescope unfolding above Earth with sweeping orbital lines, deep cobalt and warm orange palette, strong geometric composition, clean typography layout." },
-                    ].map((idea) => (
-                      <button key={idea.title} type="button" className="drishti-idea-card" onClick={() => pickSuggestion(idea.prompt)} disabled={drishtiGenerating || drishtiStarting || !drishtiWindowsDesktopSupported}>
-                        <span className="drishti-idea-icon" aria-hidden="true">{idea.icon}</span>
-                        <span className="drishti-idea-text"><strong>{idea.title}</strong><small>{idea.description}</small></span>
-                        <span className="drishti-idea-arrow" aria-hidden="true">↗</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <DrishtiStudio
+              drishtiChecking={drishtiChecking}
+              drishtiStarting={drishtiStarting}
+              drishtiRuntimeHealth={drishtiRuntimeHealth}
+              connectDrishtiRuntime={connectDrishtiRuntime}
+              drishtiWindowsDesktopSupported={drishtiWindowsDesktopSupported}
+              drishtiGenerating={drishtiGenerating}
+              drishtiActivityRef={drishtiActivityRef}
+              drishtiResult={drishtiResult}
+              varyDrishti={varyDrishti}
+              regenerateDrishti={regenerateDrishti}
+              downloadDrishtiImage={downloadDrishtiImage}
+              onNewImage={() => { setDrishtiResult(null); setDrishtiActiveHistoryId(null); setDrishtiError(""); setQuery(""); }}
+              drishtiError={drishtiError}
+              drishtiRuntimeStatus={drishtiRuntimeStatus}
+              stopDrishtiGeneration={stopDrishtiGeneration}
+              drishtiHistory={drishtiHistory}
+              drishtiActiveHistoryId={drishtiActiveHistoryId}
+              selectDrishtiHistory={selectDrishtiHistory}
+              drishtiHistoryWarning={drishtiHistoryWarning}
+              drishtiModelRuntime={drishtiModelRuntime}
+              drishtiRuntimeError={drishtiRuntimeError}
+              pickSuggestion={pickSuggestion}
+            />
           )}
-
+          
           {workspaceMode === "video" && (
-            <div className="drishti-studio chakshu-studio" aria-label="Chakshu video workspace">
-              <div className="drishti-studio-mark" aria-hidden="true"><VideoIcon size={31} strokeWidth={1.6} /></div>
-              <div className="drishti-studio-copy">
-                <span className="drishti-kicker">SATYAAI · CHAKSHU VIDEO STUDIO</span>
-                <h1>Turn words into <em>motion.</em></h1>
-                <p>{drishtiChecking ? "Checking the local creative engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". Video weights download only when a tier is first used." : "Generate video on this computer. SatyaAI hosts the studio; the companion performs local inference."}</p>
-                <div className="drishti-connect-actions">
-                  <button type="button" className="drishti-connect-primary" onClick={() => void connectChakshuRuntime()} disabled={drishtiChecking || drishtiStarting || chakshuGenerating}>
-                    {drishtiStarting ? "Starting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Start local engine"}
-                  </button>
-                  {!drishtiRuntimeHealth && <a className="drishti-install-link" href={DRISHTI_COMPANION_INSTALL_URL} target="_blank" rel="noreferrer">Install companion once</a>}
-                </div>
-              </div>
-              <div className="chakshu-model-summary">
-                <div>
-                  <span className="drishti-kicker">SELECTED MODEL</span>
-                  <strong>{currentChakshu.name}</strong>
-                  <p>{currentChakshu.description}</p>
-                  <small>{currentChakshu.quality} · {currentChakshu.hardware}</small>
-                  <small>Weights: {currentChakshu.license}</small>
-                </div>
-                <span className="chakshu-model-symbol"><VideoIcon size={20} /></span>
-              </div>
-              {chakshuModelId === "divya" && (
-                <div className="chakshu-license">
-                  <label><input type="checkbox" checked={divyaLicenseAccepted} onChange={(event) => setDivyaLicenseAccepted(event.target.checked)} /><span>I have reviewed and agree to the LTX-2.x Community License for the Divya Chakshu 1 model weights.</span></label>
-                  <a href="https://huggingface.co/Lightricks/LTX-2.5-Diffusers/blob/main/LICENSE" target="_blank" rel="noreferrer">Read the model licence</a>
-                </div>
-              )}
-              {chakshuResult && (
-                <div className="drishti-result chakshu-result">
-                  <video src={chakshuResult.video_url} controls playsInline preload="metadata" aria-label="Video generated locally by Chakshu" />
-                  <div className="drishti-result-footer">
-                    <span>Generated locally · {chakshuResult.elapsed_seconds}s · Seed {chakshuResult.seed}</span>
-                    <a className="drishti-download" href={chakshuResult.video_url} download={"satyaai-chakshu-" + chakshuResult.seed + ".mp4"}><Download size={15} /> Download MP4</a>
-                  </div>
-                </div>
-              )}
-              {chakshuError && <div className="drishti-runtime-error" role="alert">{chakshuError}</div>}
-              {(drishtiStarting || chakshuGenerating) && (
-                <div className="drishti-loading-card" role="status" aria-live="polite">
-                  <div className="drishti-loading-head"><strong>{drishtiStarting ? "Starting the local video engine" : chakshuRuntimeStatus?.phase === "loading_model" ? "Preparing the selected video model" : "Rendering your video"}</strong><span>{chakshuRuntimeStatus?.progress != null ? chakshuRuntimeStatus.progress + "%" : "Working"}</span></div>
-                  <div className={"drishti-progress-track" + (chakshuRuntimeStatus?.progress == null ? " indeterminate" : "")}><span style={chakshuRuntimeStatus?.progress != null ? { width: chakshuRuntimeStatus.progress + "%" } : undefined} /></div>
-                  <small>{drishtiStarting ? "Waking the installed companion and checking this computer…" : chakshuRuntimeStatus?.message || "Downloading the selected weights if needed, then generating locally…"}</small>
-                </div>
-              )}
-              <div className="drishti-studio-note" role="status" aria-live="polite">
-                {drishtiStarting ? "The desktop companion is starting. Your video prompt is sent only after the local health check succeeds."
-                  : drishtiChecking ? "Checking local video model availability…"
-                  : drishtiRuntimeHealth ? chakshuModelRuntime?.available
-                    ? chakshuModelId === "divya" && !divyaLicenseAccepted ? "Review the LTX-2.x Community License and tick the acknowledgement before generating."
-                      : "Local runtime ready for this tier. Your prompt is sent only to this device."
-                    : chakshuModelRuntime?.reason || "This video model is not available on the detected hardware."
-                  : "First install the updated companion once. It prepares its private runtime and caches selected model weights on first use."}
-              </div>
-            </div>
+            <ChakshuStudio
+              drishtiChecking={drishtiChecking}
+              drishtiStarting={drishtiStarting}
+              drishtiRuntimeHealth={drishtiRuntimeHealth}
+              drishtiWindowsDesktopSupported={drishtiWindowsDesktopSupported}
+              connectChakshuRuntime={connectChakshuRuntime}
+              chakshuGenerating={chakshuGenerating}
+              currentChakshu={currentChakshu}
+              chakshuModelId={chakshuModelId}
+              divyaLicenseAccepted={divyaLicenseAccepted}
+              setDivyaLicenseAccepted={setDivyaLicenseAccepted}
+              chakshuResult={chakshuResult}
+              chakshuHistory={chakshuHistory}
+              chakshuActiveHistoryId={chakshuActiveHistoryId}
+              selectChakshuHistory={selectChakshuHistory}
+              chakshuHistoryWarning={chakshuHistoryWarning}
+              chakshuError={chakshuError}
+              chakshuRuntimeStatus={chakshuRuntimeStatus}
+              stopChakshuGeneration={stopChakshuGeneration}
+              chakshuModelRuntime={chakshuModelRuntime}
+            />
           )}
-
+          
           {workspaceMode === "chat" && messages.length === 0 && (
             <div className="hero">
               <div className="orb">
@@ -2321,28 +2230,12 @@ function App() {
                       />
                     </>
                   )}
-                  <button
-                    className="tool-btn soon"
-                    disabled
-                    aria-disabled="true"
-                    title="Web search is coming soon"
-                    aria-label="Search Web (coming soon)"
-                  >
-                    <Search size={16} /> Search Web <em>Soon</em>
-                  </button>
-                  <button
-                    className="tool-btn soon"
-                    disabled
-                    aria-disabled="true"
-                    title="Deep research is coming soon"
-                    aria-label="Research (coming soon)"
-                  >
-                    <Library size={16} /> Research <em>Soon</em>
-                  </button>
+                  
+                  
                   <button
                     className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
                     disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setFile(null); setWorkspaceMode((currentMode) => currentMode === "image" ? "chat" : "image"); setReasoningOpen(false); }}
+                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; switchWorkspaceMode(workspaceMode === "image" ? "chat" : "image"); }}
                     aria-pressed={workspaceMode === "image"}
                     aria-label={workspaceMode === "image" ? "Return to Chat mode" : "Switch to Image mode"}
                     title={workspaceMode === "image" ? "Return to Chat" : "Create an image with Drishti"}
@@ -2350,11 +2243,11 @@ function App() {
                   <button
                     className={"tool-btn drishti-mode-btn chakshu-mode-btn" + (workspaceMode === "video" ? " active" : "")}
                     disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setFile(null); setWorkspaceMode((currentMode) => currentMode === "video" ? "chat" : "video"); setReasoningOpen(false); }}
+                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; switchWorkspaceMode(workspaceMode === "video" ? "chat" : "video"); }}
                     aria-pressed={workspaceMode === "video"}
                     aria-label={workspaceMode === "video" ? "Return to Chat mode" : "Switch to Video mode"}
                     title={workspaceMode === "video" ? "Return to Chat" : "Create a video with Chakshu"}
-                  ><VideoIcon size={16} /> Video</button>
+                  ><VideoIcon size={16} /> Video <small className="drishti-mode-hint">Desktop · Windows</small></button>
                 </div>
                 <button
                   className={"send " + (workspaceMode === "image"
@@ -2365,22 +2258,22 @@ function App() {
                   disabled={workspaceMode === "image"
                     ? (!drishtiGenerating && !drishtiStarting && (!query.trim() || !drishtiWindowsDesktopSupported))
                     : workspaceMode === "video"
-                      ? (!query.trim() || chakshuGenerating || drishtiStarting || (chakshuModelId === "divya" && !divyaLicenseAccepted))
+                      ? (!chakshuGenerating && !drishtiStarting && (!query.trim() || !drishtiWindowsDesktopSupported || (chakshuModelId === "divya" && !divyaLicenseAccepted)))
                       : (!busy && (!query.trim() && !canSpeak))}
                   onClick={() => workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? stopDrishtiGeneration() : void send()
                     : workspaceMode === "video"
-                      ? void send()
+                      ? chakshuGenerating || drishtiStarting ? stopChakshuGeneration() : void send()
                       : busy ? stopGeneration() : (query.trim() ? void send() : toggleMic())}
                   aria-label={workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? "Stop image generation" : !drishtiWindowsDesktopSupported ? "Image generation requires Windows desktop" : drishtiCanGenerate ? "Generate image locally" : "Start local engine and generate image"
                     : workspaceMode === "video"
-                      ? chakshuGenerating ? "Generating video locally" : drishtiStarting ? "Starting local video engine" : chakshuCanGenerate ? "Generate video locally" : "Start local engine and generate video"
+                      ? chakshuGenerating || drishtiStarting ? "Stop video generation" : !drishtiWindowsDesktopSupported ? "Video generation requires Windows desktop" : chakshuCanGenerate ? "Generate video locally" : "Start local engine and generate video"
                       : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn't supported in this browser"}
                   title={workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? "Stop image generation" : !drishtiWindowsDesktopSupported ? "Windows desktop required" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : "Start the local companion and generate"
                     : workspaceMode === "video"
-                      ? chakshuGenerating ? "Generation in progress" : drishtiStarting ? "Starting the local companion" : chakshuCanGenerate ? "Generate locally with " + currentChakshu.name : "Start the local companion and generate"
+                      ? chakshuGenerating || drishtiStarting ? "Stop video generation" : !drishtiWindowsDesktopSupported ? "Windows desktop required" : chakshuCanGenerate ? "Generate locally with " + currentChakshu.name : "Start the local companion and generate"
                       : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
                 >
                   {workspaceMode === "image"
@@ -2425,186 +2318,42 @@ function App() {
         </section>
       </main>
 
-      {settings && (
-        <div className="modal-backdrop" onClick={() => setSettings(false)}>
-          <section
-            className="settings"
-            ref={settingsRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="settings-title"
-            tabIndex={-1}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="settings-head">
-              <div>
-                <div className="section-label">Your workspace</div>
-                <h2 id="settings-title">Settings</h2>
-                <p>Make SatyaAI work the way you think.</p>
-              </div>
-              <button className="icon-btn" onClick={() => setSettings(false)} aria-label="Close settings">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="settings-layout">
-              <nav className="settings-nav" aria-label="Settings sections">
-                {([
-                  ["general", "General", "Tune the interface"],
-                  ["personalization", "Personalization", "Language and response style"],
-                  ["models", "Models & inference", "Choose how AI runs"],
-                  ["privacy", "Privacy & data", "Your local data"],
-                  ["shortcuts", "Keyboard shortcuts", "Work faster"],
-                ] as [SettingsTab, string, string][]).map(([key, label, hint]) => (
-                  <button key={key} className={settingsTab === key ? "active" : ""} onClick={() => setSettingsTab(key)} aria-current={settingsTab === key ? "page" : undefined}>
-                    <strong>{label}</strong><small>{hint}</small>
-                  </button>
-                ))}
-              </nav>
-              <div className="settings-content">
-                {settingsTab === "general" && (
-                  <>
-                    <div className="setting-group">
-                      <h3>Appearance</h3>
-                      <p>Choose a comfortable look for your workspace.</p>
-                      <div className="choice-row" role="group" aria-label="Appearance">
-                        <button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")} aria-pressed={theme === "dark"}><Moon size={15} /> Dark</button>
-                        <button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")} aria-pressed={theme === "light"}><Sun size={15} /> Light</button>
-                      </div>
-                    </div>
-                    <div className="setting-group">
-                      <h3>Interface density</h3>
-                      <label className="setting-toggle"><span><strong>Compact layout</strong><small>Reduce spacing in messages and conversation lists.</small></span><input type="checkbox" checked={preferences.compactMode} onChange={(event) => setPreferences((p) => ({ ...p, compactMode: event.target.checked }))} /></label>
-                      <label className="setting-field">Message text size
-                        <select value={preferences.fontSize} onChange={(event) => setPreferences((p) => ({ ...p, fontSize: event.target.value as AppPreferences["fontSize"] }))}>
-                          <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option>
-                        </select>
-                      </label>
-                    </div>
-                    <div className="setting-group">
-                      <h3>Accessibility & input</h3>
-                      <label className="setting-toggle"><span><strong>Reduce motion</strong><small>Reduce interface animations and transitions.</small></span><input type="checkbox" checked={preferences.reduceMotion} onChange={(event) => setPreferences((p) => ({ ...p, reduceMotion: event.target.checked }))} /></label>
-                      <label className="setting-toggle"><span><strong>Show message timestamps</strong><small>Show the local time beside each message.</small></span><input type="checkbox" checked={preferences.showTimestamps} onChange={(event) => setPreferences((p) => ({ ...p, showTimestamps: event.target.checked }))} /></label>
-                      <label className="setting-toggle"><span><strong>Enter sends a message</strong><small>Use Shift + Enter for a new line.</small></span><input type="checkbox" checked={preferences.enterToSend} onChange={(event) => setPreferences((p) => ({ ...p, enterToSend: event.target.checked }))} /></label>
-                    </div>
-                  </>
-                )}
-                {settingsTab === "personalization" && (
-                  <>
-                    <div className="setting-group">
-                      <h3>Your profile</h3>
-                      <p>Your profile stays in this browser and can be changed or cleared at any time.</p>
-                      <div className="avatar-setting">
-                        <div className="avatar-preview" aria-hidden="true">{avatar ? <img src={avatar} alt="" /> : initials || <User size={22} />}</div>
-                        <div className="avatar-setting-actions">
-                          <button className="ghost-btn" onClick={() => avatarInputRef.current?.click()}>{avatar ? "Change picture" : "Upload picture"}</button>
-                          {avatar && <button className="ghost-btn" onClick={removeAvatar}>Remove</button>}
-                        </div>
-                      </div>
-                      {avatarNote && <div className="memory-footnote" role="status">{avatarNote}</div>}
-                      <label className="setting-field">What should SatyaAI call you?
-                        <input value={memoryNameDraft} onChange={(event) => setMemoryNameDraft(event.target.value)} maxLength={80} placeholder="Your name (optional)" autoComplete="off" />
-                      </label>
-                      <label className="setting-field">About you
-                        <textarea value={memoryNotesDraft} onChange={(event) => setMemoryNotesDraft(event.target.value)} rows={4} maxLength={3000} placeholder="Your interests, goals, or how you like answers explained" />
-                      </label>
-                      <div className="setting-actions">
-                        <button className="save-btn" onClick={saveMemory}>Save profile</button>
-                        <button className="ghost-btn" onClick={clearMemory}>Clear profile</button>
-                      </div>
-                      <div className="memory-footnote" role="status">{memory.name ? "SatyaAI calls you " + memory.name + "." : "No name saved yet."}</div>
-                    </div>
-                    <div className="setting-group">
-                      <h3>Response preferences</h3>
-                      <p>These preferences guide responses across conversations.</p>
-                      <label className="setting-field">Preferred language
-                        <select value={preferences.language} onChange={(event) => setPreferences((p) => ({ ...p, language: event.target.value as AppPreferences["language"] }))}>
-                          <option value="auto">Automatic</option><option value="English">English</option><option value="Hindi">Hindi</option><option value="Odia">Odia</option>
-                        </select>
-                      </label>
-                      <label className="setting-field">Response style
-                        <select value={preferences.responseStyle} onChange={(event) => setPreferences((p) => ({ ...p, responseStyle: event.target.value as AppPreferences["responseStyle"] }))}>
-                          <option value="balanced">Balanced</option><option value="friendly">Friendly and conversational</option><option value="formal">Professional and formal</option><option value="academic">Academic and precise</option>
-                        </select>
-                      </label>
-                      <label className="setting-field">Response length
-                        <select value={preferences.responseLength} onChange={(event) => setPreferences((p) => ({ ...p, responseLength: event.target.value as AppPreferences["responseLength"] }))}>
-                          <option value="short">Concise</option><option value="balanced">Balanced</option><option value="detailed">Detailed</option>
-                        </select>
-                      </label>
-                    </div>
-                  </>
-                )}
-                {settingsTab === "models" && (
-                  <>
-                    <div className="setting-group">
-                      <h3>Model selection</h3>
-                      <p>Pick the default reasoning mode used when a new chat starts. You can still change it from the header at any time.</p>
-                      <label className="setting-field">Default model
-                        <select value={preferences.defaultMode} onChange={(event) => setPreferences((p) => ({ ...p, defaultMode: event.target.value as Mode }))}>
-                          <option value="nano">Anu · Nano</option><option value="fast">Indu · Fast</option><option value="smart">Dhara · Smart</option><option value="deep">Aditya · Deep Think</option>
-                        </select>
-                      </label>
-                      <div className="diag-row"><span>Currently selected</span><strong>{current.name} · {current.modeLabel}</strong></div>
-                      <div className="diag-row"><span>Inference capability</span><strong>{capability}</strong></div>
-                      <div className="diag-row"><span>Route</span><strong>{mode === "nano" ? "Browser-local · Anu" : provider.baseUrl && provider.model ? "Custom-compatible endpoint" : gateway === "online" ? "Configured remote gateway" : "Browser-local · " + current.name}</strong></div>
-                    </div>
-                    <div className="setting-group">
-                      <h3>Compatible inference endpoint</h3>
-                      <p>Optional. Configure a compatible endpoint for non-Nano modes. The endpoint receives prompts and conversation context. Its privacy terms apply.</p>
-                      <label className="setting-field">Endpoint URL
-                        <input value={provider.baseUrl || ""} onChange={(event) => setProvider((p) => ({ ...p, baseUrl: event.target.value.trim() || undefined }))} placeholder="https://your-provider.example/v1" inputMode="url" autoComplete="url" />
-                      </label>
-                      <label className="setting-field">Model identifier
-                        <input value={provider.model || ""} onChange={(event) => setProvider((p) => ({ ...p, model: event.target.value.trim() || undefined }))} placeholder="provider/model-name" autoComplete="off" />
-                      </label>
-                      <label className="setting-field">API key
-                        <input type="password" value={provider.apiKey || ""} onChange={(event) => setProvider((p) => ({ ...p, apiKey: event.target.value || undefined }))} placeholder="Optional bearer token" autoComplete="off" />
-                      </label>
-                      <div className="memory-footnote">The endpoint URL, model name and key are saved in this browser's local storage. Nano always stays on-device.</div>
-                      <div className="setting-actions">
-                        <button className="save-btn" onClick={() => setEndpointFeedback("Endpoint settings saved on this device.")}>Save endpoint</button>
-                        <button className="ghost-btn" onClick={() => { setProvider({}); setEndpointFeedback("Custom endpoint removed."); }}>Clear endpoint</button>
-                      </div>
-                      {endpointFeedback && <div className="memory-footnote" role="status">{endpointFeedback}</div>}
-                    </div>
-                  </>
-                )}
-                {settingsTab === "privacy" && (
-                  <>
-                    <div className="setting-group">
-                      <h3>Local storage</h3>
-                      <p>SatyaAI does not require an account. Conversations, saved answers, profile and preferences are stored in this browser. A remote inference endpoint still receives prompts when selected.</p>
-                      <label className="setting-toggle"><span><strong>Save conversation history</strong><small>Keep chats on this device between visits.</small></span><input type="checkbox" checked={preferences.saveChatHistory} onChange={(event) => setPreferences((p) => ({ ...p, saveChatHistory: event.target.checked }))} /></label>
-                      <div className="diag-row"><span>Conversations saved</span><strong>{chats.length}</strong></div>
-                      <div className="diag-row"><span>Saved answers</span><strong>{saved.length}</strong></div>
-                    </div>
-                    <div className="setting-group">
-                      <h3>Export your data</h3>
-                      <p>Download conversations, saved answers, profile preferences and appearance settings as a JSON file.</p>
-                      <button className="save-btn" onClick={exportAllData}><Download size={15} /> Export all data</button>
-                    </div>
-                    <div className="setting-group danger-group">
-                      <h3>Delete local conversation data</h3>
-                      <p>Remove all conversations and saved answers from this browser. This cannot be undone.</p>
-                      <button className="danger-btn" onClick={clearConversationData}><Trash2 size={15} /> Delete conversations and saved answers</button>
-                    </div>
-                  </>
-                )}
-                {settingsTab === "shortcuts" && (
-                  <div className="setting-group">
-                    <h3>Keyboard shortcuts</h3>
-                    <div className="shortcut-row"><span>New conversation</span><kbd>Ctrl</kbd><kbd>K</kbd></div>
-                    <div className="shortcut-row"><span>Send message</span><kbd>Enter</kbd></div>
-                    <div className="shortcut-row"><span>Insert new line</span><kbd>Shift</kbd><kbd>Enter</kbd></div>
-                    <div className="shortcut-row"><span>Close dialog or menu</span><kbd>Esc</kbd></div>
-                    <p>Keyboard shortcuts use the platform's standard modifier where applicable.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
+      <SettingsPanel
+        open={settings}
+        onClose={() => setSettings(false)}
+        settingsRef={settingsRef}
+        settingsTab={settingsTab}
+        setSettingsTab={setSettingsTab}
+        theme={theme}
+        setTheme={setTheme}
+        preferences={preferences}
+        setPreferences={setPreferences}
+        avatar={avatar}
+        initials={initials}
+        avatarInputRef={avatarInputRef}
+        removeAvatar={removeAvatar}
+        avatarNote={avatarNote}
+        memoryNameDraft={memoryNameDraft}
+        setMemoryNameDraft={setMemoryNameDraft}
+        memoryNotesDraft={memoryNotesDraft}
+        setMemoryNotesDraft={setMemoryNotesDraft}
+        saveMemory={saveMemory}
+        clearMemory={clearMemory}
+        memory={memory}
+        current={current}
+        capability={capability}
+        mode={mode}
+        provider={provider}
+        setProvider={setProvider}
+        gateway={gateway}
+        endpointFeedback={endpointFeedback}
+        saveEndpointSettings={saveEndpointSettings}
+        clearEndpointSettings={clearEndpointSettings}
+        chats={chats}
+        saved={saved}
+        exportAllData={exportAllData}
+        clearConversationData={clearConversationData}
+      />
     </div>
   );
 }

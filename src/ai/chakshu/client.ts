@@ -6,7 +6,7 @@ function loopbackInit(init: RequestInit): RequestInit {
 }
 
 export type ChakshuRuntimeStatus = {
-  phase: "idle" | "checking" | "loading_model" | "generating" | "complete" | "error";
+  phase: "idle" | "checking" | "loading_model" | "generating" | "cancelling" | "cancelled" | "complete" | "error";
   message: string;
   progress: number | null;
   step: number;
@@ -80,7 +80,7 @@ export async function generateChakshuVideo(
       }),
     }));
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
     throw new Error("Could not reach the local video runtime. Confirm the updated companion is running and that this site has Local Network Access permission.");
   }
 

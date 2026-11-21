@@ -341,13 +341,18 @@ export function Starfield({ active, busy }: { active: boolean; busy: boolean }) 
     }
 
     function loop(now: number) {
+      if (busyRef.current) {
+        frame(now, true);
+        raf = 0;
+        return;
+      }
       frame(now);
       raf = reduce.matches || document.hidden ? 0 : requestAnimationFrame(loop);
     }
     function start() {
       cancelAnimationFrame(raf);
       lastNow = performance.now();
-      if (reduce.matches) {
+      if (reduce.matches || busyRef.current) {
         frame(lastNow, true);
         raf = 0;
       } else if (!document.hidden) {
@@ -433,7 +438,7 @@ export function Starfield({ active, busy }: { active: boolean; busy: boolean }) 
       document.removeEventListener("visibilitychange", start);
       reduce.removeEventListener("change", start);
     };
-  }, [active]);
+  }, [active, busy]);
 
   return <canvas ref={canvasRef} className={"starfield" + (active ? "" : " off")} aria-hidden="true" />;
 }

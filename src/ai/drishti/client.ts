@@ -74,7 +74,7 @@ export async function checkDrishtiRuntime(
       signal,
     }));
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
     throw new Error(
       "Could not reach the local Drishti companion. Start it on this device and allow this site’s Local Network Access permission when your browser asks.",
     );
@@ -139,6 +139,7 @@ export async function generateDrishtiImage(
   modelId: DrishtiModelId,
   prompt: string,
   signal?: AbortSignal,
+  seed?: number,
 ): Promise<DrishtiGenerationResult> {
   const cleanPrompt = prompt.trim();
   if (!cleanPrompt) throw new Error("Write an image prompt first.");
@@ -162,6 +163,7 @@ export async function generateDrishtiImage(
         prompt: cleanPrompt,
         width: 512,
         height: 512,
+        ...(seed === undefined ? {} : { seed }),
       }),
     }));
   } catch (error) {
