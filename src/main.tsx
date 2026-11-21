@@ -1561,19 +1561,43 @@ function App() {
               </div>
               <div className="drishti-studio-copy">
                 <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
-                <h1>Create with <em>Drishti.</em></h1>
-                <p>Describe the image you have in mind. Your selected Drishti model is ready to be connected to the local image runtime.</p>
+                <h1>Let’s create <em>something.</em></h1>
+                <p>Start with an idea, choose a direction, and make it yours. Drishti is ready when its local image engine is connected.</p>
               </div>
-              <div className="drishti-selected-model">
-                <div className="drishti-selected-model-heading">
-                  <span>SELECTED MODEL</span>
-                  {currentDrishti.experimental && <em className="drishti-experimental">EXPERIMENTAL</em>}
+              <div className="drishti-ideas-heading">
+                <div>
+                  <strong>What are we creating today?</strong>
+                  <span>Choose a starting point or write your own prompt below.</span>
                 </div>
-                <strong>{currentDrishti.name}</strong>
-                <small>{currentDrishti.description}</small>
+                <span className="drishti-ideas-sparkle" aria-hidden="true"><Sparkles size={17} /></span>
+              </div>
+              <div className="drishti-ideas-grid">
+                {[
+                  { icon: "✦", title: "Cinematic worlds", description: "Movie-like scenes, dramatic light and atmosphere", prompt: "Create a cinematic, film-still scene with dramatic atmospheric lighting, rich environmental detail, a carefully composed frame, and a compelling sense of scale." },
+                  { icon: "◉", title: "Portraits & people", description: "Expressive portraits and character concepts", prompt: "Create a highly detailed, natural-looking editorial portrait with expressive lighting, authentic skin texture, a thoughtful composition, and a softly layered background." },
+                  { icon: "⌂", title: "Architecture & spaces", description: "Dream homes, interiors and future cities", prompt: "Visualise a remarkable piece of contemporary architecture with thoughtful materials, beautiful natural lighting, refined landscaping, and a clean professional architectural-photography composition." },
+                  { icon: "◇", title: "Product photography", description: "Polished campaigns and studio product shots", prompt: "Create a premium commercial product photograph with elegant studio lighting, realistic materials, subtle reflections, a refined background, and a sophisticated advertising-art direction." },
+                  { icon: "✺", title: "Fantasy & concept art", description: "Inventive characters, creatures and new worlds", prompt: "Create an imaginative fantasy concept-art scene with a distinctive visual identity, intricate worldbuilding details, atmospheric depth, and a polished cinematic illustration style." },
+                  { icon: "▧", title: "Posters & graphic art", description: "Campaign visuals, covers and bold compositions", prompt: "Design a striking contemporary visual-poster concept with a clear focal point, bold composition, carefully balanced typography space, a cohesive art direction, and crisp graphic details." },
+                ].map((idea) => (
+                  <button
+                    key={idea.title}
+                    type="button"
+                    className="drishti-idea-card"
+                    onClick={() => pickSuggestion(idea.prompt)}
+                    disabled={busy}
+                  >
+                    <span className="drishti-idea-icon" aria-hidden="true">{idea.icon}</span>
+                    <span className="drishti-idea-text">
+                      <strong>{idea.title}</strong>
+                      <small>{idea.description}</small>
+                    </span>
+                    <span className="drishti-idea-arrow" aria-hidden="true">↗</span>
+                  </button>
+                ))}
               </div>
               <div className="drishti-studio-note" role="status">
-                The image workspace is in development. No image is generated until the local runtime is connected.
+                Your prompt stays in the image workspace. Local image generation will become available when the Drishti runtime is connected.
               </div>
             </div>
           )}
