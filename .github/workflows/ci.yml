@@ -29,3 +29,25 @@ jobs:
         run: pnpm build
       - name: Check Python runtime syntax
         run: python -m py_compile runtime/server.py
+
+  windows-companion:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Publish self-contained companion
+        shell: pwsh
+        run: dotnet publish companion/SatyaAI.Drishti.Companion.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output companion/publish
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/output | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/SatyaAI.Drishti.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
