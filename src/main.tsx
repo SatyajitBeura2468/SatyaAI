@@ -13,6 +13,7 @@ import {
   Cpu,
   Download,
   FileText,
+  Image as ImageIcon,
   Library,
   Menu,
   Mic,
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 import "./cosmos.css";
 import "./reasoning-profile.css";
+import "./drishti.css";
 import { Starfield } from "./Starfield";
 import { freshStarters } from "./starters";
 import { createThinkingPhraseOrder, THINKING_PHRASES } from "./thinking-phrases";
@@ -63,9 +65,11 @@ import {
   type UserMemory,
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
+import { DEFAULT_DRISHTI_MODEL_ID, DRISHTI_MODELS, getDrishtiModel, isDrishtiModelId, type DrishtiModelId } from "./ai/drishti/registry";
 import { Markdown } from "./markdown";
 
 type Mode = SatyaTierMode;
+type WorkspaceMode = "chat" | "image";
 type Theme = "light" | "dark";
 type Message = {
   role: "user" | "ai";
@@ -118,6 +122,7 @@ const modes: Record<Mode, { desc: string }> = {
 const CHATS_KEY = "satya-chats-v1";
 const SAVED_KEY = "satya-saved-v1";
 const PREFERENCES_KEY = "satya-preferences-v1";
+const DRISHTI_MODEL_KEY = "satya-drishti-model-v1";
 const DEFAULT_PREFERENCES: AppPreferences = {
   defaultMode: "smart",
   language: "auto",
@@ -273,6 +278,15 @@ function readSavedTheme(): Theme {
 function App() {
   const [preferences, setPreferences] = useState<AppPreferences>(readPreferences);
   const [mode, setMode] = useState<Mode>(() => preferences.defaultMode);
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("chat");
+  const [drishtiModelId, setDrishtiModelId] = useState<DrishtiModelId>(() => {
+    try {
+      const saved = localStorage.getItem(DRISHTI_MODEL_KEY);
+      return isDrishtiModelId(saved) ? saved : DEFAULT_DRISHTI_MODEL_ID;
+    } catch {
+      return DEFAULT_DRISHTI_MODEL_ID;
+    }
+  });
   const [theme, setTheme] = useState<Theme>(readSavedTheme);
   const [query, setQuery] = useState("");
   const [chats, setChats] = useState<Chat[]>(() =>
@@ -358,6 +372,7 @@ function App() {
   const canSpeak = typeof window !== "undefined" && !!speechCtor();
   activeRef.current = activeId;
   const current = getSatyaTier(mode)!;
+  const currentDrishti = getDrishtiModel(drishtiModelId);
   const initials = getInitials(memory.name);
 
   const capability = useMemo(
@@ -389,6 +404,14 @@ function App() {
   useEffect(() => {
     saveJSON(PREFERENCES_KEY, preferences);
   }, [preferences]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRISHTI_MODEL_KEY, drishtiModelId);
+    } catch {
+      // Model selection remains available for this session if storage is unavailable.
+    }
+  }, [drishtiModelId]);
 
   useEffect(() => {
     try { localStorage.setItem("satya-provider", JSON.stringify(provider)); }
@@ -846,6 +869,7 @@ function App() {
   // chat in "Conversations" if the user actually sends a follow-up.
   function openSaved(item: SavedAnswer) {
     if (busy) return;
+    setWorkspaceMode("chat");
     setMessages([
       { role: "user", text: item.question || "Saved answer" },
       { role: "ai", text: item.answer },
@@ -858,6 +882,7 @@ function App() {
 
   function openChat(chat: Chat) {
     if (busy) return;
+    setWorkspaceMode("chat");
     setMessages(chat.messages);
     setActiveId(chat.id);
     setStatus("Ready");
@@ -919,6 +944,7 @@ function App() {
 
   function startNewChat() {
     if (busy) return;
+    setWorkspaceMode("chat");
     setSidebarView("chats");
     setMenu(false);
     setActiveId(newId());
@@ -1421,37 +1447,66 @@ function App() {
               onClick={() => setReasoningOpen((open) => !open)}
               aria-haspopup="listbox"
               aria-expanded={reasoningOpen}
-              aria-label={"Reasoning mode: " + current.modeLabel + ", engine " + current.name}
+              aria-label={workspaceMode === "image"
+                ? "Image model: " + currentDrishti.name
+                : "Reasoning mode: " + current.modeLabel + ", engine " + current.name}
             >
-              <span className="reasoning-symbol" aria-hidden="true">{current.symbol}</span>
-              <span className="reasoning-full-label">Reasoning</span>
-              <em className="reasoning-current">{current.modeLabel}</em>
+              <span className="reasoning-symbol" aria-hidden="true">
+                {workspaceMode === "image" ? <ImageIcon size={18} /> : current.symbol}
+              </span>
+              <span className="reasoning-full-label">{workspaceMode === "image" ? "Image model" : "Reasoning"}</span>
+              <em className="reasoning-current">{workspaceMode === "image" ? currentDrishti.selectorLabel : current.modeLabel}</em>
               <ChevronDown size={14} className="chev" />
             </button>
             {reasoningOpen && (
-              <div className="reasoning-menu" role="listbox" aria-label="Reasoning mode">
-                {(Object.keys(modes) as Mode[]).map((key) => (
-                  <button
-                    key={key}
-                    role="option"
-                    aria-selected={mode === key}
-                    className={"reasoning-option" + (mode === key ? " chosen" : "")}
-                    onClick={() => {
-                      setMode(key);
-                      setReasoningOpen(false);
-                    }}
-                  >
-                    <span className="ro-icon ro-symbol" aria-hidden="true">{getSatyaTier(key)!.symbol}</span>
-                    <span className="ro-text">
-                      <span className="ro-primary">
-                        <strong>{getSatyaTier(key)!.name}</strong>
-                        <small className="ro-mode">{getSatyaTier(key)!.modeLabel}</small>
+              <div className="reasoning-menu" role="listbox" aria-label={workspaceMode === "image" ? "Drishti image model" : "Reasoning mode"}>
+                {workspaceMode === "chat" ? (
+                  (Object.keys(modes) as Mode[]).map((key) => (
+                    <button
+                      key={key}
+                      role="option"
+                      aria-selected={mode === key}
+                      className={"reasoning-option" + (mode === key ? " chosen" : "")}
+                      onClick={() => {
+                        setMode(key);
+                        setReasoningOpen(false);
+                      }}
+                    >
+                      <span className="ro-icon ro-symbol" aria-hidden="true">{getSatyaTier(key)!.symbol}</span>
+                      <span className="ro-text">
+                        <span className="ro-primary">
+                          <strong>{getSatyaTier(key)!.name}</strong>
+                          <small className="ro-mode">{getSatyaTier(key)!.modeLabel}</small>
+                        </span>
+                        <small>{modes[key].desc}</small>
                       </span>
-                      <small>{modes[key].desc}</small>
-                    </span>
-                    {mode === key && <Check size={15} className="ro-check" />}
-                  </button>
-                ))}
+                      {mode === key && <Check size={15} className="ro-check" />}
+                    </button>
+                  ))
+                ) : (
+                  DRISHTI_MODELS.map((model) => (
+                    <button
+                      key={model.id}
+                      role="option"
+                      aria-selected={drishtiModelId === model.id}
+                      className={"reasoning-option" + (drishtiModelId === model.id ? " chosen" : "")}
+                      onClick={() => {
+                        setDrishtiModelId(model.id);
+                        setReasoningOpen(false);
+                      }}
+                    >
+                      <span className="ro-icon ro-symbol" aria-hidden="true"><ImageIcon size={19} /></span>
+                      <span className="ro-text">
+                        <span className="ro-primary">
+                          <strong>{model.name}</strong>
+                          {model.experimental && <small className="drishti-experimental">EXPERIMENTAL</small>}
+                        </span>
+                        <small>{model.description}</small>
+                      </span>
+                      {drishtiModelId === model.id && <Check size={15} className="ro-check" />}
+                    </button>
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -1499,7 +1554,55 @@ function App() {
           }}
           aria-label="Conversation"
         >
-          {messages.length === 0 && (
+          {workspaceMode === "image" && (
+            <div className="drishti-studio" aria-label="Drishti image workspace">
+              <div className="drishti-studio-mark" aria-hidden="true">
+                <ImageIcon size={31} strokeWidth={1.6} />
+              </div>
+              <div className="drishti-studio-copy">
+                <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
+                <h1>Let’s create <em>something.</em></h1>
+                <p>Start with an idea, choose a direction, and make it yours. Drishti is ready when its local image engine is connected.</p>
+              </div>
+              <div className="drishti-ideas-heading">
+                <div>
+                  <strong>What are we creating today?</strong>
+                  <span>Choose a starting point or write your own prompt below.</span>
+                </div>
+                <span className="drishti-ideas-sparkle" aria-hidden="true"><Sparkles size={17} /></span>
+              </div>
+              <div className="drishti-ideas-grid">
+                {[
+                  { icon: "✦", title: "Cinematic worlds", description: "Movie-like scenes, dramatic light and atmosphere", prompt: "Create a cinematic, film-still scene with dramatic atmospheric lighting, rich environmental detail, a carefully composed frame, and a compelling sense of scale." },
+                  { icon: "◉", title: "Portraits & people", description: "Expressive portraits and character concepts", prompt: "Create a highly detailed, natural-looking editorial portrait with expressive lighting, authentic skin texture, a thoughtful composition, and a softly layered background." },
+                  { icon: "⌂", title: "Architecture & spaces", description: "Dream homes, interiors and future cities", prompt: "Visualise a remarkable piece of contemporary architecture with thoughtful materials, beautiful natural lighting, refined landscaping, and a clean professional architectural-photography composition." },
+                  { icon: "◇", title: "Product photography", description: "Polished campaigns and studio product shots", prompt: "Create a premium commercial product photograph with elegant studio lighting, realistic materials, subtle reflections, a refined background, and a sophisticated advertising-art direction." },
+                  { icon: "✺", title: "Fantasy & concept art", description: "Inventive characters, creatures and new worlds", prompt: "Create an imaginative fantasy concept-art scene with a distinctive visual identity, intricate worldbuilding details, atmospheric depth, and a polished cinematic illustration style." },
+                  { icon: "▧", title: "Posters & graphic art", description: "Campaign visuals, covers and bold compositions", prompt: "Design a striking contemporary visual-poster concept with a clear focal point, bold composition, carefully balanced typography space, a cohesive art direction, and crisp graphic details." },
+                ].map((idea) => (
+                  <button
+                    key={idea.title}
+                    type="button"
+                    className="drishti-idea-card"
+                    onClick={() => pickSuggestion(idea.prompt)}
+                    disabled={busy}
+                  >
+                    <span className="drishti-idea-icon" aria-hidden="true">{idea.icon}</span>
+                    <span className="drishti-idea-text">
+                      <strong>{idea.title}</strong>
+                      <small>{idea.description}</small>
+                    </span>
+                    <span className="drishti-idea-arrow" aria-hidden="true">↗</span>
+                  </button>
+                ))}
+              </div>
+              <div className="drishti-studio-note" role="status">
+                Your prompt stays in the image workspace. Local image generation will become available when the Drishti runtime is connected.
+              </div>
+            </div>
+          )}
+
+          {workspaceMode === "chat" && messages.length === 0 && (
             <div className="hero">
               <div className="orb">
                 <span />
@@ -1529,7 +1632,7 @@ function App() {
             </div>
           )}
 
-          {messages.length > 0 && (
+          {workspaceMode === "chat" && messages.length > 0 && (
             <div className="messages">
               {messages.map((message, index) => (
                 <div
@@ -1684,7 +1787,7 @@ function App() {
           )}
 
           <div className="composer-wrap">
-            {file && (
+            {workspaceMode === "chat" && file && (
               <div className="attachment">
                 <FileText size={16} />
                 <span>{file.name}</span>
@@ -1700,13 +1803,13 @@ function App() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
+                  if (workspaceMode === "chat" && event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
                     event.preventDefault();
                     if (!busy) void send();
                   }
                 }}
-                placeholder={busy ? status : "Ask anything…"}
-                aria-label="Message SatyaAI"
+                placeholder={workspaceMode === "image" ? "Describe the image you want Drishti to create…" : busy ? status : "Ask anything…"}
+                aria-label={workspaceMode === "image" ? "Image prompt for Drishti" : "Message SatyaAI"}
               />
               <div className="composer-bottom">
                 <div className="composer-tools">
@@ -1746,19 +1849,33 @@ function App() {
                   >
                     <Library size={16} /> Research <em>Soon</em>
                   </button>
+                  <button
+                    className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
+                    onClick={() => {
+                      if (busy) return;
+                      setWorkspaceMode((currentMode) => currentMode === "chat" ? "image" : "chat");
+                      setReasoningOpen(false);
+                    }}
+                    disabled={busy}
+                    aria-pressed={workspaceMode === "image"}
+                    aria-label={workspaceMode === "image" ? "Switch to Chat mode" : "Switch to Image mode"}
+                    title={workspaceMode === "image" ? "Return to Chat" : "Create an image with Drishti"}
+                  >
+                    <ImageIcon size={16} /> Image
+                  </button>
                 </div>
                 <button
                   className={"send " + (busy ? "stop " : query.trim() ? "ready " : "mic ") + (listening ? "listening" : "")}
-                  disabled={!busy && (!query.trim() && !canSpeak)}
+                  disabled={workspaceMode === "image" || (!busy && (!query.trim() && !canSpeak))}
                   onClick={() => busy ? stopGeneration() : (query.trim() ? void send() : toggleMic())}
-                  aria-label={busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn't supported in this browser"}
-                  title={busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
+                  aria-label={workspaceMode === "image" ? "Drishti image generation is not connected yet" : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn't supported in this browser"}
+                  title={workspaceMode === "image" ? "Drishti image generation is being integrated" : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
                 >
-                  {busy ? <Square size={17} /> : query.trim() ? <ArrowUp size={18} /> : <Mic size={18} />}
+                  {workspaceMode === "image" ? <ImageIcon size={17} /> : busy ? <Square size={17} /> : query.trim() ? <ArrowUp size={18} /> : <Mic size={18} />}
                 </button>
               </div>
             </div>
-            {showJumpToLatest && messages.length > 0 && (
+            {workspaceMode === "chat" && showJumpToLatest && messages.length > 0 && (
               <button className="jump-latest" onClick={scrollToLatest}>
                 <ArrowDown size={15} /> Jump to latest
               </button>
@@ -1766,9 +1883,11 @@ function App() {
 
             <div className="composer-meta">
               <span>
-                {busy
-                  ? status + " Keep this tab open."
-                  : "SatyaAI can make mistakes. Verify important information."}
+                {workspaceMode === "image"
+                  ? "Drishti image generation is being integrated. Your prompt is not sent to the text model."
+                  : busy
+                    ? status + " Keep this tab open."
+                    : "SatyaAI can make mistakes. Verify important information."}
               </span>
               <button onClick={() => openSettings("privacy")}>Privacy-first · Local memory</button>
             </div>
