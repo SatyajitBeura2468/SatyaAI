@@ -1956,9 +1956,6 @@ function App() {
           </section>
         </div>
       )}
-tion>
-        </div>
-      )}
     </div>
   );
 }
