@@ -43,8 +43,8 @@ MODEL_INFO = {
     "max": {
         "repo": "MiniMaxAI/MiniMax-H3-Image",
         "license": "MiniMax-H3-Image Community License Agreement",
-        "hardware": "High-memory accelerator and at least 140 GB free disk for model and text-encoder files.",
-        "disk_gb": 140,
+        "hardware": "At least about 140 GB of free VRAM and 150 GB of free disk, plus explicit licence and territory acknowledgement.",
+        "disk_gb": 150,
     },
 }
 
@@ -158,16 +158,19 @@ def _model_availability(
             else "Drishti Ultra uses a 20B-parameter BF16 model. The conservative local profile requires about 60 GB free VRAM; this is not a normal laptop model."
         )
     else:
-        license_accepted = os.getenv("SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE") == "1"
+        license_accepted = (
+            os.getenv("SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE") == "1"
+            and os.getenv("SATYAAI_MINIMAX_H3_TERRITORY_ALLOWED") == "1"
+        )
         available = (
             device == "cuda"
-            and (vram_free or 0) >= 80
+            and (vram_free or 0) >= 140
             and license_accepted
         )
         if not license_accepted:
-            reason = "This checkpoint is under the MiniMax-H3-Image Community License Agreement, not Apache-2.0. Review and accept its terms before enabling it; set SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE=1 only after doing so."
+            reason = "This checkpoint is under the MiniMax-H3-Image Community License Agreement, not Apache-2.0. Review the complete licence, confirm your territory is not excluded, then set both SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE=1 and SATYAAI_MINIMAX_H3_TERRITORY_ALLOWED=1."
         elif device != "cuda" or (vram_free or 0) < 80:
-            reason = "Drishti X uses a 33.1B-parameter image transformer and a separate large text encoder. This conservative profile requires a high-memory CUDA accelerator (about 80 GB free VRAM) and substantial disk space."
+            reason = "Drishti X uses a 33.1B-parameter image transformer plus a separate 66.7 GB text encoder. The official model card lists about 133 GB of model assets; this conservative local profile requires about 140 GB free VRAM and 150 GB free disk."
         else:
             reason = "License acknowledgement and high-memory CUDA hardware detected. The model will download only when first selected."
     return {
@@ -271,8 +274,11 @@ def _load_pipeline(model_id: str):
         pipeline = pipeline_type.from_pretrained(repo, **common)
         pipeline.to("cuda")
     else:
-        pipeline = diffusers.DiffusionPipeline.from_pretrained(repo, **common)
-        pipeline.to("cuda")
+        pipeline = diffusers.DiffusionPipeline.from_pretrained(
+            repo,
+            torch_dtype=torch.bfloat16,
+            device_map="cuda",
+        )
 
     _pipeline = pipeline
     _loaded_model = model_id
@@ -301,19 +307,26 @@ def generate(request: GenerateRequest):
             raise HTTPException(status_code=400, detail="CPU generation is limited to 512 × 512 pixels.")
 
         pipeline = _load_pipeline(request.model_id)
-        steps = {"lite": 20, "core": 4, "ultra": 30, "max": 6}[request.model_id]
+        steps = {"lite": 30, "core": 4, "ultra": 50, "max": 6}[request.model_id]
         seed = secrets.randbelow(2**31)
         generator_device = "cuda" if torch.cuda.is_available() else "cpu"
         generator = torch.Generator(device=generator_device).manual_seed(seed)
 
         with torch.inference_mode():
-            output = pipeline(
-                prompt=prompt,
-                width=width,
-                height=height,
-                num_inference_steps=steps,
-                generator=generator,
-            )
+            call_args = {
+                "prompt": prompt,
+                "width": width,
+                "height": height,
+                "num_inference_steps": steps,
+                "generator": generator,
+            }
+            if request.model_id == "lite":
+                call_args["guidance_scale"] = 9.0
+            elif request.model_id == "core":
+                call_args["guidance_scale"] = 1.0
+            elif request.model_id == "ultra":
+                call_args["true_cfg_scale"] = 4.0
+            output = pipeline(**call_args)
 
         image: Image.Image = output.images[0]
         buffer = io.BytesIO()
