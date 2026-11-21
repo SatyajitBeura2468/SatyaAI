@@ -1703,14 +1703,26 @@ function App() {
                 <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
                 <h1>Let’s create <em>something.</em></h1>
                 <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Start the local Drishti companion on this computer to generate images privately."}</p>
-                <button
-                  type="button"
-                  className="drishti-connect-primary"
-                  onClick={() => void refreshDrishtiRuntime()}
-                  disabled={drishtiChecking || drishtiGenerating}
-                >
-                  {drishtiChecking ? "Connecting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Connect local engine"}
-                </button>
+                <div className="drishti-connect-actions">
+                  <button
+                    type="button"
+                    className="drishti-connect-primary"
+                    onClick={() => void connectDrishtiRuntime()}
+                    disabled={drishtiChecking || drishtiStarting || drishtiGenerating}
+                  >
+                    {drishtiStarting ? "Starting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Start local engine"}
+                  </button>
+                  {!drishtiRuntimeHealth && (
+                    <a
+                      className="drishti-install-link"
+                      href={DRISHTI_COMPANION_INSTALL_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Install companion once
+                    </a>
+                  )}
+                </div>
               </div>
               <div className="drishti-ideas-heading">
                 <div>
@@ -1756,14 +1768,38 @@ function App() {
                 </div>
               )}
               {drishtiError && <div className="drishti-runtime-error" role="alert">{drishtiError}</div>}
+              {(drishtiStarting || drishtiGenerating) && (
+                <div className="drishti-loading-card" role="status" aria-live="polite">
+                  <div className="drishti-loading-head">
+                    <strong>
+                      {drishtiStarting
+                        ? "Starting local image engine"
+                        : drishtiRuntimeStatus?.phase === "loading_model"
+                          ? "Preparing the selected model"
+                          : "Creating your image"}
+                    </strong>
+                    <span>{drishtiRuntimeStatus?.progress != null ? drishtiRuntimeStatus.progress + "%" : "Working"}</span>
+                  </div>
+                  <div className={"drishti-progress-track" + (drishtiRuntimeStatus?.progress == null ? " indeterminate" : "")}>
+                    <span style={drishtiRuntimeStatus?.progress != null ? { width: drishtiRuntimeStatus.progress + "%" } : undefined} />
+                  </div>
+                  <small>
+                    {drishtiStarting
+                      ? "Waking the installed companion and checking this computer…"
+                      : drishtiRuntimeStatus?.message || "Loading the model if needed, then generating locally…"}
+                  </small>
+                </div>
+              )}
               <div className="drishti-studio-note" role="status" aria-live="polite">
-                {drishtiChecking
-                  ? "Checking the local Drishti runtime…"
-                  : drishtiRuntimeHealth
-                    ? drishtiModelRuntime?.available
-                      ? "Local runtime ready for this tier. Your image prompt is sent only to this device."
-                      : drishtiModelRuntime?.reason || "This model is not available on the detected hardware."
-                    : drishtiRuntimeError || "Local runtime disconnected. Start the companion and use Connect local engine above."}
+                {drishtiStarting
+                  ? "The desktop companion is starting. Your prompt is sent only after the local health check succeeds."
+                  : drishtiChecking
+                    ? "Checking the local Drishti runtime…"
+                    : drishtiRuntimeHealth
+                      ? drishtiModelRuntime?.available
+                        ? "Local runtime ready for this tier. Your image prompt is sent only to this device."
+                        : drishtiModelRuntime?.reason || "This model is not available on the detected hardware."
+                      : drishtiRuntimeError || "Install the companion once. Subsequent image prompts can wake it automatically."}
               </div>
             </div>
           )}
@@ -1972,7 +2008,7 @@ function App() {
                   if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
                     event.preventDefault();
                     if (workspaceMode === "image") {
-                      if (drishtiCanGenerate && !drishtiGenerating) void send();
+                      if (!drishtiGenerating && !drishtiStarting) void send();
                     } else if (!busy) void send();
                   }
                 }}
@@ -2035,7 +2071,7 @@ function App() {
                 <button
                   className={"send " + (workspaceMode === "image" ? (drishtiGenerating ? "stop " : query.trim() ? "ready " : "mic ") : busy ? "stop " : query.trim() ? "ready " : "mic ") + (listening ? "listening" : "")}
                   disabled={workspaceMode === "image"
-                    ? (drishtiGenerating || !query.trim() || !drishtiCanGenerate)
+                    ? (!query.trim() || drishtiGenerating || drishtiStarting)
                     : (!busy && (!query.trim() && !canSpeak))}
                   onClick={() => workspaceMode === "image"
                     ? void send()
@@ -2043,13 +2079,13 @@ function App() {
                       ? stopGeneration()
                       : (query.trim() ? void send() : toggleMic())}
                   aria-label={workspaceMode === "image"
-                    ? drishtiGenerating ? "Generating image locally" : drishtiCanGenerate ? "Generate image locally" : drishtiModelRuntime?.reason || "Local Drishti runtime is unavailable"
+                    ? drishtiGenerating ? "Generating image locally" : drishtiStarting ? "Starting local image engine" : drishtiCanGenerate ? "Generate image locally" : "Start local engine and generate image"
                     : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn\'t supported in this browser"}
                   title={workspaceMode === "image"
-                    ? drishtiGenerating ? "Generation in progress" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : drishtiModelRuntime?.reason || drishtiRuntimeError || "Start the local Drishti companion"
+                    ? drishtiGenerating ? "Generation in progress" : drishtiStarting ? "Starting the local companion" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : "Start the local companion and generate"
                     : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
                 >
-                  {workspaceMode === "image" ? drishtiGenerating ? <Square size={17} /> : <ImageIcon size={17} /> : busy ? <Square size={17} /> : query.trim() ? <ArrowUp size={18} /> : <Mic size={18} />}
+                  {workspaceMode === "image" ? drishtiGenerating || drishtiStarting ? <Square size={17} /> : <ImageIcon size={17} /> : busy ? <Square size={17} /> : query.trim() ? <ArrowUp size={18} /> : <Mic size={18} />}
                 </button>
               </div>
             </div>
@@ -2062,11 +2098,13 @@ function App() {
             <div className="composer-meta">
               <span>
                 {workspaceMode === "image"
-                  ? drishtiGenerating
-                    ? "Generating locally on this device…"
-                    : drishtiCanGenerate
-                      ? "Local runtime connected. Image prompts stay on this device."
-                      : drishtiRuntimeError || drishtiModelRuntime?.reason || "Start the local Drishti companion to enable image generation."
+                  ? drishtiStarting
+                    ? "Starting the desktop companion…"
+                    : drishtiGenerating
+                      ? drishtiRuntimeStatus?.message || "Generating locally on this device…"
+                      : drishtiCanGenerate
+                        ? "Local runtime connected. Image prompts stay on this device."
+                        : "Submitting a prompt can start the installed local companion automatically."
                   : busy
                     ? status + " Keep this tab open."
                     : "SatyaAI can make mistakes. Verify important information."}
