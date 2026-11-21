@@ -595,11 +595,6 @@ internal sealed class CompanionForm : Form
         catch { }
     }
 
-    private static bool IsStartArgument(string value) =>
-        string.Equals(value, "--install", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(value, "--background", StringComparison.OrdinalIgnoreCase) ||
-        value.StartsWith("satyaai-drishti:", StringComparison.OrdinalIgnoreCase);
-
     private static void OpenUrl(string url)
     {
         try
