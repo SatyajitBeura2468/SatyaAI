@@ -52,7 +52,7 @@ describe("Drishti local runtime client", () => {
     expect(result.service).toBe("satyaai-drishti-runtime");
     expect(fetch).toHaveBeenCalledWith(
       "http://127.0.0.1:7860/health",
-      expect.objectContaining({ credentials: "omit", cache: "no-store" }),
+      expect.objectContaining({ credentials: "omit", cache: "no-store", targetAddressSpace: "loopback" }),
     );
   });
 
@@ -90,6 +90,7 @@ describe("Drishti local runtime client", () => {
       expect.objectContaining({
         method: "POST",
         credentials: "omit",
+        targetAddressSpace: "loopback",
         body: JSON.stringify({
           model_id: "lite",
           prompt: "a dog on a boat",
