@@ -250,7 +250,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                   </div>
                 </section>
               </div>
-            )
+            )}
     </>
   );
 }
