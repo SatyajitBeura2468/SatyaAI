@@ -6,7 +6,7 @@ function loopbackInit(init: RequestInit): RequestInit {
 }
 
 export type ChakshuRuntimeStatus = {
-  phase: "idle" | "checking" | "loading_model" | "generating" | "complete" | "error";
+  phase: "idle" | "checking" | "loading_model" | "generating" | "cancelling" | "cancelled" | "complete" | "error";
   message: string;
   progress: number | null;
   step: number;
