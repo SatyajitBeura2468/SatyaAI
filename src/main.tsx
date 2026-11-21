@@ -66,7 +66,7 @@ import {
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
 import { DEFAULT_DRISHTI_MODEL_ID, DRISHTI_MODELS, getDrishtiModel, isDrishtiModelId, type DrishtiModelId } from "./ai/drishti/registry";
-import { checkDrishtiRuntime, generateDrishtiImage, type DrishtiGenerationResult, type DrishtiRuntimeHealth } from "./ai/drishti/client";
+import { checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, DRISHTI_COMPANION_INSTALL_URL, type DrishtiGenerationResult, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
 import { Markdown } from "./markdown";
 
 type Mode = SatyaTierMode;
@@ -290,6 +290,8 @@ function App() {
   });
   const [drishtiRuntimeHealth, setDrishtiRuntimeHealth] = useState<DrishtiRuntimeHealth | null>(null);
   const [drishtiChecking, setDrishtiChecking] = useState(false);
+  const [drishtiStarting, setDrishtiStarting] = useState(false);
+  const [drishtiRuntimeStatus, setDrishtiRuntimeStatus] = useState<DrishtiRuntimeStatus | null>(null);
   const [drishtiRuntimeError, setDrishtiRuntimeError] = useState("");
   const [drishtiGenerating, setDrishtiGenerating] = useState(false);
   const [drishtiError, setDrishtiError] = useState("");
@@ -381,7 +383,7 @@ function App() {
   const current = getSatyaTier(mode)!;
   const currentDrishti = getDrishtiModel(drishtiModelId);
   const drishtiModelRuntime = drishtiRuntimeHealth?.models?.[drishtiModelId];
-  const drishtiCanGenerate = Boolean(!drishtiChecking && !drishtiGenerating && drishtiRuntimeHealth?.ok && drishtiModelRuntime?.available);
+  const drishtiCanGenerate = Boolean(!drishtiChecking && !drishtiStarting && !drishtiGenerating && drishtiRuntimeHealth?.ok && drishtiModelRuntime?.available);
   const initials = getInitials(memory.name);
 
   const capability = useMemo(
@@ -986,19 +988,93 @@ function App() {
     }
   }
 
+  async function ensureDrishtiRuntimeReady(): Promise<DrishtiRuntimeHealth> {
+    setDrishtiStarting(true);
+    setDrishtiRuntimeError("");
+    setStatus("Starting the local Drishti companion…");
+
+    // Start the loopback check and native companion launch directly from the
+    // user's click, so the browser can display its local-access permission.
+    const firstHealthCheck = checkDrishtiRuntime();
+    requestDrishtiCompanionStart();
+
+    try {
+      try {
+        const health = await firstHealthCheck;
+        setDrishtiRuntimeHealth(health);
+        return health;
+      } catch {
+        // The companion may still be starting. Retry below.
+      }
+
+      for (let attempt = 0; attempt < 45; attempt++) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        try {
+          const health = await checkDrishtiRuntime();
+          setDrishtiRuntimeHealth(health);
+          setDrishtiRuntimeError("");
+          return health;
+        } catch {
+          // Continue waiting while the one-time-installed companion boots.
+        }
+      }
+
+      throw new Error(
+        "The SatyaAI desktop companion did not respond. Install it once using the Windows companion installer below; after installation, SatyaAI can start it automatically.",
+      );
+    } finally {
+      setDrishtiStarting(false);
+    }
+  }
+
+  async function connectDrishtiRuntime() {
+    setDrishtiChecking(true);
+    try {
+      const health = await ensureDrishtiRuntimeReady();
+      const availability = health.models?.[drishtiModelId];
+      if (!availability?.available) {
+        setDrishtiRuntimeError(availability?.reason || "This Drishti tier is not available on the detected hardware.");
+      }
+    } catch (error) {
+      setDrishtiRuntimeHealth(null);
+      setDrishtiRuntimeError(error instanceof Error ? error.message : "Could not start the local Drishti companion.");
+    } finally {
+      setDrishtiChecking(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!drishtiGenerating) return;
+    let active = true;
+    const poll = async () => {
+      const snapshot = await getDrishtiRuntimeStatus();
+      if (active && snapshot) setDrishtiRuntimeStatus(snapshot);
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 900);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [drishtiGenerating]);
+
   async function generateDrishti() {
     const prompt = query.trim();
-    if (!prompt || drishtiGenerating) return;
-    if (!drishtiCanGenerate) {
-      setDrishtiError(drishtiModelRuntime?.reason || drishtiRuntimeError || "The selected Drishti model is not ready on this device.");
-      return;
-    }
+    if (!prompt || drishtiGenerating || drishtiStarting) return;
 
     setDrishtiGenerating(true);
+    setDrishtiRuntimeStatus(null);
     setDrishtiError("");
     setDrishtiResult(null);
-    setStatus("Generating locally with " + currentDrishti.name + "…");
+    setStatus("Preparing local Drishti generation…");
     try {
+      const health = await ensureDrishtiRuntimeReady();
+      const availability = health.models?.[drishtiModelId];
+      if (!availability?.available) {
+        throw new Error(availability?.reason || "The selected Drishti model is not available on this computer.");
+      }
+
+      setStatus("Generating locally with " + currentDrishti.name + "…");
       const result = await generateDrishtiImage(drishtiModelId, prompt);
       setDrishtiResult(result);
       setQuery("");
