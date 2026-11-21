@@ -387,6 +387,7 @@ class GenerateRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
     width: int = Field(default=512, ge=256, le=1024)
     height: int = Field(default=512, ge=256, le=1024)
+    seed: int | None = Field(default=None, ge=0, le=2**31 - 1)
 
 
 def _release_video_pipeline() -> None:
@@ -514,7 +515,7 @@ def generate(request: GenerateRequest):
             request.model_id,
         )
 
-        seed = secrets.randbelow(2**31)
+        seed = request.seed if request.seed is not None else secrets.randbelow(2**31)
         generator_device = "cuda" if torch.cuda.is_available() else "cpu"
         generator = torch.Generator(device=generator_device).manual_seed(seed)
 
