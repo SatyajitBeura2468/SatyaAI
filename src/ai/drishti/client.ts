@@ -33,7 +33,7 @@ function loopbackInit(init: RequestInit): RequestInit {
 }
 
 export type DrishtiRuntimeStatus = {
-  phase: "idle" | "checking" | "loading_model" | "generating" | "complete" | "error";
+  phase: "idle" | "checking" | "loading_model" | "generating" | "cancelling" | "cancelled" | "complete" | "error";
   message: string;
   progress: number | null;
   step: number;
@@ -95,6 +95,26 @@ export function requestDrishtiCompanionStart(): void {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+export async function cancelDrishtiGeneration(): Promise<boolean> {
+  try {
+    const response = await fetch(
+      DRISHTI_RUNTIME_URL + "/v1/cancel",
+      loopbackInit({
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "omit",
+        cache: "no-store",
+        body: JSON.stringify({}),
+      }),
+    );
+    if (!response.ok) return false;
+    const result = (await response.json()) as { accepted?: boolean };
+    return result.accepted === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getDrishtiRuntimeStatus(): Promise<DrishtiRuntimeStatus | null> {
