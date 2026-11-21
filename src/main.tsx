@@ -7,7 +7,9 @@ import {
   BookmarkCheck,
   Bot,
   ArrowDown,
+  Aperture,
   Check,
+  Crown,
   ChevronDown,
   Copy,
   Cpu,
@@ -15,11 +17,13 @@ import {
   FileText,
   Image as ImageIcon,
   Video as VideoIcon,
+  Layers,
   Library,
   Menu,
   Mic,
   Moon,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   Sparkles,
@@ -67,10 +71,11 @@ import {
 } from "./ai/identity";
 import { loadJSON, saveJSON } from "./storage";
 import { DEFAULT_DRISHTI_MODEL_ID, DRISHTI_MODELS, getDrishtiModel, isDrishtiModelId, type DrishtiModelId } from "./ai/drishti/registry";
-import { checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, DRISHTI_COMPANION_INSTALL_URL, type DrishtiGenerationResult, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
+import { cancelDrishtiGeneration, checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, DRISHTI_COMPANION_INSTALL_URL, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
 import { CHAKSHU_MODELS, DEFAULT_CHAKSHU_MODEL_ID, getChakshuModel, isChakshuModelId, type ChakshuModelId } from "./ai/chakshu/registry";
 import { generateChakshuVideo, getChakshuRuntimeStatus, type ChakshuGenerationResult, type ChakshuRuntimeStatus } from "./ai/chakshu/client";
 import { Markdown } from "./markdown";
+import { loadDrishtiHistory, saveDrishtiHistoryItem, type DrishtiHistoryItem } from "./ai/drishti/history";
 
 type Mode = SatyaTierMode;
 type WorkspaceMode = "chat" | "image" | "video";
@@ -211,6 +216,15 @@ const preview = (text: string) =>
   text.replace(/[*`#>_]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
 const isMac =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const drishtiWindowsDesktopSupported =
+  typeof navigator !== "undefined" &&
+  /Windows|Win32|Win64|WinCE/i.test(navigator.userAgent + " " + navigator.platform);
+const DRISHTI_MODEL_ICONS = {
+  lite: Sparkles,
+  core: Layers,
+  ultra: Aperture,
+  max: Crown,
+} as const;
 
 function trackPointer(event: React.PointerEvent<HTMLElement>) {
   const box = event.currentTarget.getBoundingClientRect();
@@ -300,7 +314,12 @@ function App() {
   const [drishtiRuntimeError, setDrishtiRuntimeError] = useState("");
   const [drishtiGenerating, setDrishtiGenerating] = useState(false);
   const [drishtiError, setDrishtiError] = useState("");
-  const [drishtiResult, setDrishtiResult] = useState<DrishtiGenerationResult | null>(null);
+  const [drishtiResult, setDrishtiResult] = useState<DrishtiHistoryItem | null>(null);
+  const [drishtiHistory, setDrishtiHistory] = useState<DrishtiHistoryItem[]>([]);
+  const [drishtiActiveHistoryId, setDrishtiActiveHistoryId] = useState<string | null>(null);
+  const [drishtiHistoryWarning, setDrishtiHistoryWarning] = useState("");
+  const drishtiAbortRef = useRef<AbortController | null>(null);
+  const drishtiActivityRef = useRef<HTMLDivElement>(null);
   const [chakshuModelId, setChakshuModelId] = useState<ChakshuModelId>(() => {
     try { const saved = localStorage.getItem(CHAKSHU_MODEL_KEY); return isChakshuModelId(saved) ? saved : DEFAULT_CHAKSHU_MODEL_ID; }
     catch { return DEFAULT_CHAKSHU_MODEL_ID; }
@@ -434,6 +453,24 @@ function App() {
   useEffect(() => {
     saveJSON(PREFERENCES_KEY, preferences);
   }, [preferences]);
+
+  useEffect(() => {
+    let active = true;
+    void loadDrishtiHistory()
+      .then((items) => {
+        if (!active) return;
+        setDrishtiHistory(items);
+        if (items.length) {
+          setDrishtiResult(items[0]);
+          setDrishtiActiveHistoryId(items[0].id);
+          setQuery((currentQuery) => currentQuery || items[0].prompt);
+        }
+      })
+      .catch(() => {
+        if (active) setDrishtiHistoryWarning("Image history storage is unavailable in this browser. Results remain visible until the page is closed.");
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     try {
@@ -1005,14 +1042,36 @@ function App() {
     textareaRef.current?.focus();
   }
 
-  async function ensureDrishtiRuntimeReady(): Promise<DrishtiRuntimeHealth> {
+  function waitForDrishtiDelay(milliseconds: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException("Image generation cancelled.", "AbortError"));
+        return;
+      }
+      const abort = () => {
+        window.clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+        reject(new DOMException("Image generation cancelled.", "AbortError"));
+      };
+      const timer = window.setTimeout(() => {
+        signal?.removeEventListener("abort", abort);
+        resolve();
+      }, milliseconds);
+      signal?.addEventListener("abort", abort, { once: true });
+    });
+  }
+
+  async function ensureDrishtiRuntimeReady(signal?: AbortSignal): Promise<DrishtiRuntimeHealth> {
+    if (!drishtiWindowsDesktopSupported) {
+      throw new Error("Drishti image generation currently requires a Windows desktop and the SatyaAI companion.");
+    }
     setDrishtiStarting(true);
     setDrishtiRuntimeError("");
     setStatus("Starting the local Drishti companion…");
 
     // Start the loopback check and native companion launch directly from the
     // user's click, so the browser can display its local-access permission.
-    const firstHealthCheck = checkDrishtiRuntime();
+    const firstHealthCheck = checkDrishtiRuntime(signal);
     requestDrishtiCompanionStart();
 
     try {
@@ -1020,18 +1079,21 @@ function App() {
         const health = await firstHealthCheck;
         setDrishtiRuntimeHealth(health);
         return health;
-      } catch {
+      } catch (error) {
+        if (signal?.aborted) throw error;
         // The companion may still be starting. Retry below.
       }
 
-      for (let attempt = 0; attempt < 480; attempt++) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      // The old eight-minute wait is now abortable and capped at two minutes.
+      for (let attempt = 0; attempt < 120; attempt++) {
+        await waitForDrishtiDelay(1000, signal);
         try {
-          const health = await checkDrishtiRuntime();
+          const health = await checkDrishtiRuntime(signal);
           setDrishtiRuntimeHealth(health);
           setDrishtiRuntimeError("");
           return health;
-        } catch {
+        } catch (error) {
+          if (signal?.aborted) throw error;
           // Continue waiting while the one-time-installed companion boots.
         }
       }
@@ -1087,32 +1149,96 @@ function App() {
     return () => { active = false; window.clearInterval(timer); };
   }, [chakshuGenerating]);
 
-  async function generateDrishti() {
-    const prompt = query.trim();
-    if (!prompt || drishtiGenerating || drishtiStarting) return;
+  useEffect(() => {
+    if (workspaceMode !== "image" || !(drishtiStarting || drishtiGenerating || drishtiResult || drishtiError)) return;
+    const frame = window.requestAnimationFrame(() => {
+      drishtiActivityRef.current?.scrollIntoView({
+        behavior: preferences.reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [workspaceMode, drishtiStarting, drishtiGenerating, drishtiResult, drishtiError, preferences.reduceMotion]);
 
+  async function generateDrishti(promptOverride?: string) {
+    const prompt = (promptOverride ?? query).trim();
+    if (!prompt || drishtiGenerating || drishtiStarting) return;
+    if (!drishtiWindowsDesktopSupported) {
+      setDrishtiError("Drishti currently requires a Windows desktop and the one-time SatyaAI companion installation.");
+      return;
+    }
+
+    const controller = new AbortController();
+    drishtiAbortRef.current = controller;
     setDrishtiGenerating(true);
     setDrishtiRuntimeStatus(null);
     setDrishtiError("");
-    setDrishtiResult(null);
     setStatus("Preparing local Drishti generation…");
     try {
-      const health = await ensureDrishtiRuntimeReady();
+      const health = await ensureDrishtiRuntimeReady(controller.signal);
+      if (controller.signal.aborted) return;
       const availability = health.models?.[drishtiModelId];
       if (!availability?.available) {
         throw new Error(availability?.reason || "The selected Drishti model is not available on this computer.");
       }
 
       setStatus("Generating locally with " + currentDrishti.name + "…");
-      const result = await generateDrishtiImage(drishtiModelId, prompt);
-      setDrishtiResult(result);
-      setQuery("");
+      const result = await generateDrishtiImage(drishtiModelId, prompt, controller.signal);
+      if (controller.signal.aborted) return;
+
+      const historyItem: DrishtiHistoryItem = {
+        ...result,
+        id: newId(),
+        prompt,
+        created_at: Date.now(),
+      };
+      setDrishtiResult(historyItem);
+      setDrishtiActiveHistoryId(historyItem.id);
+      setDrishtiHistory((previous) => [historyItem, ...previous].slice(0, 12));
+      void saveDrishtiHistoryItem(historyItem).catch(() => {
+        setDrishtiHistoryWarning("This image was generated, but the browser could not save it to persistent history.");
+      });
       setStatus("Image generated locally.");
     } catch (error) {
-      setDrishtiError(error instanceof Error ? error.message : "Drishti image generation failed.");
+      if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        setDrishtiError("");
+        setStatus("Image generation stopped.");
+      } else {
+        setDrishtiError(error instanceof Error ? error.message : "Drishti image generation failed.");
+      }
     } finally {
+      if (drishtiAbortRef.current === controller) drishtiAbortRef.current = null;
       setDrishtiGenerating(false);
     }
+  }
+
+  function stopDrishtiGeneration() {
+    const controller = drishtiAbortRef.current;
+    if (!controller) return;
+    setStatus("Stopping image generation…");
+    void cancelDrishtiGeneration();
+    controller.abort();
+  }
+
+  function selectDrishtiHistory(item: DrishtiHistoryItem) {
+    setDrishtiResult(item);
+    setDrishtiActiveHistoryId(item.id);
+    setDrishtiModelId(item.model_id);
+    setQuery(item.prompt);
+    setDrishtiError("");
+  }
+
+  function varyDrishti() {
+    if (!drishtiResult) return;
+    const prompt = "Create a fresh visual variation of this image prompt while preserving its main subject and intent: " + drishtiResult.prompt + " Use a different composition, lighting arrangement, and visual details.";
+    setQuery(prompt);
+    void generateDrishti(prompt);
+  }
+
+  function regenerateDrishti() {
+    if (!drishtiResult) return;
+    setQuery(drishtiResult.prompt);
+    void generateDrishti(drishtiResult.prompt);
   }
 
   function downloadDrishtiImage() {
@@ -1714,7 +1840,9 @@ function App() {
                         setReasoningOpen(false);
                       }}
                     >
-                      <span className="ro-icon ro-symbol" aria-hidden="true"><ImageIcon size={19} /></span>
+                      <span className="ro-icon ro-symbol" aria-hidden="true">
+                        {React.createElement(DRISHTI_MODEL_ICONS[model.id], { size: 19 })}
+                      </span>
                       <span className="ro-text">
                         <span className="ro-primary">
                           <strong>{model.name}</strong>
@@ -1792,105 +1920,99 @@ function App() {
               <div className="drishti-studio-copy">
                 <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
                 <h1>Let’s create <em>something.</em></h1>
-                <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Start the local Drishti companion on this computer to generate images privately."}</p>
+                <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Generate privately on a Windows desktop using the local Drishti companion."}</p>
+                {!drishtiWindowsDesktopSupported && (
+                  <div className="drishti-platform-note" role="note">
+                    <strong>Desktop · Windows required</strong>
+                    <span>Image generation currently needs the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate images.</span>
+                  </div>
+                )}
                 <div className="drishti-connect-actions">
-                  <button
-                    type="button"
-                    className="drishti-connect-primary"
-                    onClick={() => void connectDrishtiRuntime()}
-                    disabled={drishtiChecking || drishtiStarting || drishtiGenerating}
-                  >
+                  <button type="button" className="drishti-connect-primary" onClick={() => void connectDrishtiRuntime()} disabled={!drishtiWindowsDesktopSupported || drishtiChecking || drishtiStarting || drishtiGenerating}>
                     {drishtiStarting ? "Starting…" : drishtiRuntimeHealth ? "Recheck local engine" : "Start local engine"}
                   </button>
-                  {!drishtiRuntimeHealth && (
-                    <a
-                      className="drishti-install-link"
-                      href={DRISHTI_COMPANION_INSTALL_URL}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Install companion once
-                    </a>
+                  {!drishtiRuntimeHealth && drishtiWindowsDesktopSupported && (
+                    <a className="drishti-install-link" href={DRISHTI_COMPANION_INSTALL_URL} target="_blank" rel="noreferrer">Install companion once</a>
                   )}
                 </div>
               </div>
-              <div className="drishti-ideas-heading">
-                <div>
-                  <strong>What are we creating today?</strong>
-                  <span>Choose a starting point or write your own prompt below.</span>
-                </div>
-                <span className="drishti-ideas-sparkle" aria-hidden="true"><Sparkles size={17} /></span>
-              </div>
-              <div className="drishti-ideas-grid">
-                {[
-                  { icon: "✦", title: "Cinematic worlds", description: "Movie-like scenes, dramatic light and atmosphere", prompt: "Create a cinematic, film-still scene with dramatic atmospheric lighting, rich environmental detail, a carefully composed frame, and a compelling sense of scale." },
-                  { icon: "◉", title: "Portraits & people", description: "Expressive portraits and character concepts", prompt: "Create a highly detailed, natural-looking editorial portrait with expressive lighting, authentic skin texture, a thoughtful composition, and a softly layered background." },
-                  { icon: "⌂", title: "Architecture & spaces", description: "Dream homes, interiors and future cities", prompt: "Visualise a remarkable piece of contemporary architecture with thoughtful materials, beautiful natural lighting, refined landscaping, and a clean professional architectural-photography composition." },
-                  { icon: "◇", title: "Product photography", description: "Polished campaigns and studio product shots", prompt: "Create a premium commercial product photograph with elegant studio lighting, realistic materials, subtle reflections, a refined background, and a sophisticated advertising-art direction." },
-                  { icon: "✺", title: "Fantasy & concept art", description: "Inventive characters, creatures and new worlds", prompt: "Create an imaginative fantasy concept-art scene with a distinctive visual identity, intricate worldbuilding details, atmospheric depth, and a polished cinematic illustration style." },
-                  { icon: "▧", title: "Posters & graphic art", description: "Campaign visuals, covers and bold compositions", prompt: "Design a striking contemporary visual-poster concept with a clear focal point, bold composition, carefully balanced typography space, a cohesive art direction, and crisp graphic details." },
-                ].map((idea) => (
-                  <button
-                    key={idea.title}
-                    type="button"
-                    className="drishti-idea-card"
-                    onClick={() => pickSuggestion(idea.prompt)}
-                    disabled={busy}
-                  >
-                    <span className="drishti-idea-icon" aria-hidden="true">{idea.icon}</span>
-                    <span className="drishti-idea-text">
-                      <strong>{idea.title}</strong>
-                      <small>{idea.description}</small>
-                    </span>
-                    <span className="drishti-idea-arrow" aria-hidden="true">↗</span>
-                  </button>
-                ))}
-              </div>
-              {drishtiResult && (
-                <div className="drishti-result">
-                  <img src={drishtiResult.image_data_url} alt="Image generated locally by Drishti" />
-                  <div className="drishti-result-footer">
-                    <span>Generated locally · {drishtiResult.elapsed_seconds}s · Seed {drishtiResult.seed}</span>
-                    <button type="button" className="drishti-download" onClick={downloadDrishtiImage}>
-                      <Download size={15} /> Download PNG
-                    </button>
+
+              <div className="drishti-activity" ref={drishtiActivityRef}>
+                {drishtiResult && (
+                  <div className="drishti-result">
+                    <img src={drishtiResult.image_data_url} alt={"Image generated by Drishti: " + drishtiResult.prompt} />
+                    <div className="drishti-result-prompt">
+                      <strong>Prompt</strong>
+                      <p>{drishtiResult.prompt}</p>
+                    </div>
+                    <div className="drishti-result-footer">
+                      <span>{getDrishtiModel(drishtiResult.model_id).name} · Generated locally · {drishtiResult.elapsed_seconds}s · Seed {drishtiResult.seed}</span>
+                      <div className="drishti-result-actions">
+                        <button type="button" className="drishti-download" onClick={varyDrishti} disabled={drishtiGenerating || drishtiStarting}><Sparkles size={14} /> Vary</button>
+                        <button type="button" className="drishti-download" onClick={regenerateDrishti} disabled={drishtiGenerating || drishtiStarting}><RefreshCw size={14} /> Regenerate</button>
+                        <button type="button" className="drishti-download" onClick={downloadDrishtiImage}><Download size={15} /> Download</button>
+                        <button type="button" className="drishti-download" onClick={() => { setDrishtiResult(null); setDrishtiActiveHistoryId(null); setDrishtiError(""); setQuery(""); }}>New image</button>
+                      </div>
+                    </div>
                   </div>
+                )}
+                {drishtiError && <div className="drishti-runtime-error" role="alert">{drishtiError}</div>}
+                {(drishtiStarting || drishtiGenerating) && (
+                  <div className="drishti-loading-card" role="status" aria-live="polite">
+                    <div className="drishti-loading-head">
+                      <strong>{drishtiStarting ? "Starting local image engine" : drishtiRuntimeStatus?.phase === "loading_model" ? "Preparing the selected model" : "Creating your image"}</strong>
+                      <span>{drishtiRuntimeStatus?.progress != null ? drishtiRuntimeStatus.progress + "%" : "Working"}</span>
+                    </div>
+                    <div className={"drishti-progress-track" + (drishtiRuntimeStatus?.progress == null ? " indeterminate" : "")}>
+                      <span style={drishtiRuntimeStatus?.progress != null ? { width: drishtiRuntimeStatus.progress + "%" } : undefined} />
+                    </div>
+                    <small>{drishtiStarting ? "Waking the installed companion and checking this computer…" : drishtiRuntimeStatus?.message || "Loading the model if needed, then generating locally…"}</small>
+                    <button type="button" className="drishti-cancel-button" onClick={stopDrishtiGeneration}><Square size={13} /> Stop generation</button>
+                  </div>
+                )}
+                {drishtiHistory.length > 0 && (
+                  <div className="drishti-history">
+                    <div className="drishti-history-heading"><strong>Recent generations</strong><span>Saved in this browser · {drishtiHistory.length}</span></div>
+                    <div className="drishti-history-grid">
+                      {drishtiHistory.map((item) => (
+                        <button key={item.id} type="button" className={"drishti-history-item" + (drishtiActiveHistoryId === item.id ? " active" : "")} onClick={() => selectDrishtiHistory(item)} aria-pressed={drishtiActiveHistoryId === item.id} title={item.prompt}>
+                          <img src={item.image_data_url} alt="" loading="lazy" />
+                          <span>{item.prompt}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {drishtiHistoryWarning && <div className="drishti-history-warning">{drishtiHistoryWarning}</div>}
+                <div className="drishti-studio-note" role="status" aria-live="polite">
+                  {drishtiStarting ? "The desktop companion is starting. Your prompt is sent only after the local health check succeeds." : drishtiChecking ? "Checking the local Drishti runtime…" : drishtiRuntimeHealth ? drishtiModelRuntime?.available ? "Local runtime ready for this tier. Your image prompt is sent only to this device." : drishtiModelRuntime?.reason || "This model is not available on the detected hardware." : drishtiRuntimeError || "Install the companion once on Windows. Later prompts start it automatically."}
                 </div>
+              </div>
+
+              {!drishtiGenerating && !drishtiStarting && !drishtiResult && !drishtiError && (
+                <>
+                  <div className="drishti-ideas-heading">
+                    <div><strong>What are we creating today?</strong><span>Choose a subject to start with, then customise the prompt.</span></div>
+                    <span className="drishti-ideas-sparkle" aria-hidden="true"><Sparkles size={17} /></span>
+                  </div>
+                  <div className="drishti-ideas-grid">
+                    {[
+                      { icon: "✦", title: "Cinematic worlds", description: "A rover on the red planet", prompt: "A cinematic wide shot of a six-wheeled Mars exploration rover crossing rust-red dunes at sunset, a vast canyon and distant Olympus Mons on the horizon, fine dust glowing in the low sunlight, realistic aerospace photography, dramatic scale." },
+                      { icon: "◉", title: "Portraits & people", description: "A fictional scientist in her observatory", prompt: "A natural editorial portrait of a fictional adult Indian astrophysicist standing inside a modern observatory, a telescope and softly glowing star charts behind her, thoughtful expression, warm practical lighting, realistic photography, 85mm portrait lens." },
+                      { icon: "⌂", title: "Architecture & spaces", description: "A glass observatory above the clouds", prompt: "A spectacular glass-domed mountain observatory perched above a sea of clouds at blue hour, warm interior lights, a large research telescope visible through the dome, distant snow peaks, refined architectural photography, crisp material detail." },
+                      { icon: "◇", title: "Product photography", description: "A titanium watch in a studio", prompt: "Premium studio product photograph of a fictional brushed-titanium mechanical wristwatch with a deep navy dial and luminous markers, resting on dark volcanic stone, controlled softbox lighting, subtle reflections, macro detail, no brand logos or readable text." },
+                      { icon: "✺", title: "Fantasy & concept art", description: "A giant luminous whale above a night ocean", prompt: "A colossal bioluminescent whale drifting through the night sky above a moonlit ocean, constellations shimmering through its translucent fins, tiny boats far below for scale, atmospheric fantasy concept art, intricate luminous details, cinematic composition." },
+                      { icon: "▧", title: "Posters & graphic art", description: "A retro-futurist space telescope launch poster", prompt: "A bold retro-futurist illustrated launch poster for a fictional orbital telescope mission titled ECHOES OF THE COSMOS, a golden space telescope unfolding above Earth with sweeping orbital lines, deep cobalt and warm orange palette, strong geometric composition, clean typography layout." },
+                    ].map((idea) => (
+                      <button key={idea.title} type="button" className="drishti-idea-card" onClick={() => pickSuggestion(idea.prompt)} disabled={drishtiGenerating || drishtiStarting || !drishtiWindowsDesktopSupported}>
+                        <span className="drishti-idea-icon" aria-hidden="true">{idea.icon}</span>
+                        <span className="drishti-idea-text"><strong>{idea.title}</strong><small>{idea.description}</small></span>
+                        <span className="drishti-idea-arrow" aria-hidden="true">↗</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
-              {drishtiError && <div className="drishti-runtime-error" role="alert">{drishtiError}</div>}
-              {(drishtiStarting || drishtiGenerating) && (
-                <div className="drishti-loading-card" role="status" aria-live="polite">
-                  <div className="drishti-loading-head">
-                    <strong>
-                      {drishtiStarting
-                        ? "Starting local image engine"
-                        : drishtiRuntimeStatus?.phase === "loading_model"
-                          ? "Preparing the selected model"
-                          : "Creating your image"}
-                    </strong>
-                    <span>{drishtiRuntimeStatus?.progress != null ? drishtiRuntimeStatus.progress + "%" : "Working"}</span>
-                  </div>
-                  <div className={"drishti-progress-track" + (drishtiRuntimeStatus?.progress == null ? " indeterminate" : "")}>
-                    <span style={drishtiRuntimeStatus?.progress != null ? { width: drishtiRuntimeStatus.progress + "%" } : undefined} />
-                  </div>
-                  <small>
-                    {drishtiStarting
-                      ? "Waking the installed companion and checking this computer…"
-                      : drishtiRuntimeStatus?.message || "Loading the model if needed, then generating locally…"}
-                  </small>
-                </div>
-              )}
-              <div className="drishti-studio-note" role="status" aria-live="polite">
-                {drishtiStarting
-                  ? "The desktop companion is starting. Your prompt is sent only after the local health check succeeds."
-                  : drishtiChecking
-                    ? "Checking the local Drishti runtime…"
-                    : drishtiRuntimeHealth
-                      ? drishtiModelRuntime?.available
-                        ? "Local runtime ready for this tier. Your image prompt is sent only to this device."
-                        : drishtiModelRuntime?.reason || "This model is not available on the detected hardware."
-                      : drishtiRuntimeError || "First install the companion once. Later prompts start it automatically and wait while it prepares the local engine."}
-              </div>
             </div>
           )}
 
@@ -2168,24 +2290,28 @@ function App() {
               />
               <div className="composer-bottom">
                 <div className="composer-tools">
-                  <button
-                    className="tool-btn"
-                    onClick={() => inputRef.current?.click()}
-                    disabled={busy}
-                    aria-label="Attach a text file"
-                  >
-                    <Plus size={17} /> Attach
-                  </button>
-                  <input
-                    ref={inputRef}
-                    hidden
-                    type="file"
-                    accept=".txt,.md,.csv,.json,text/plain"
-                    onChange={(event) => {
-                      void pickFile(event.target.files?.[0]);
-                      event.target.value = "";
-                    }}
-                  />
+                  {workspaceMode === "chat" && (
+                    <>
+                      <button
+                        className="tool-btn"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={busy}
+                        aria-label="Attach a text file"
+                      >
+                        <Plus size={17} /> Attach
+                      </button>
+                      <input
+                        ref={inputRef}
+                        hidden
+                        type="file"
+                        accept=".txt,.md,.csv,.json,text/plain"
+                        onChange={(event) => {
+                          void pickFile(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </>
+                  )}
                   <button
                     className="tool-btn soon"
                     disabled
@@ -2207,15 +2333,15 @@ function App() {
                   <button
                     className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
                     disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setWorkspaceMode((currentMode) => currentMode === "image" ? "chat" : "image"); setReasoningOpen(false); }}
+                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setFile(null); setWorkspaceMode((currentMode) => currentMode === "image" ? "chat" : "image"); setReasoningOpen(false); }}
                     aria-pressed={workspaceMode === "image"}
                     aria-label={workspaceMode === "image" ? "Return to Chat mode" : "Switch to Image mode"}
                     title={workspaceMode === "image" ? "Return to Chat" : "Create an image with Drishti"}
-                  ><ImageIcon size={16} /> Image</button>
+                  ><ImageIcon size={16} /> Image <small className="drishti-mode-hint">Desktop · Windows</small></button>
                   <button
                     className={"tool-btn drishti-mode-btn chakshu-mode-btn" + (workspaceMode === "video" ? " active" : "")}
                     disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setWorkspaceMode((currentMode) => currentMode === "video" ? "chat" : "video"); setReasoningOpen(false); }}
+                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; setFile(null); setWorkspaceMode((currentMode) => currentMode === "video" ? "chat" : "video"); setReasoningOpen(false); }}
                     aria-pressed={workspaceMode === "video"}
                     aria-label={workspaceMode === "video" ? "Return to Chat mode" : "Switch to Video mode"}
                     title={workspaceMode === "video" ? "Return to Chat" : "Create a video with Chakshu"}
@@ -2228,20 +2354,22 @@ function App() {
                       ? (chakshuGenerating ? "stop " : query.trim() ? "ready " : "mic ")
                       : busy ? "stop " : query.trim() ? "ready " : "mic ") + (listening ? "listening" : "")}
                   disabled={workspaceMode === "image"
-                    ? (!query.trim() || drishtiGenerating || drishtiStarting)
+                    ? (!drishtiGenerating && !drishtiStarting && (!query.trim() || !drishtiWindowsDesktopSupported))
                     : workspaceMode === "video"
                       ? (!query.trim() || chakshuGenerating || drishtiStarting || (chakshuModelId === "divya" && !divyaLicenseAccepted))
                       : (!busy && (!query.trim() && !canSpeak))}
-                  onClick={() => workspaceMode === "image" || workspaceMode === "video"
-                    ? void send()
-                    : busy ? stopGeneration() : (query.trim() ? void send() : toggleMic())}
+                  onClick={() => workspaceMode === "image"
+                    ? drishtiGenerating || drishtiStarting ? stopDrishtiGeneration() : void send()
+                    : workspaceMode === "video"
+                      ? void send()
+                      : busy ? stopGeneration() : (query.trim() ? void send() : toggleMic())}
                   aria-label={workspaceMode === "image"
-                    ? drishtiGenerating ? "Generating image locally" : drishtiStarting ? "Starting local image engine" : drishtiCanGenerate ? "Generate image locally" : "Start local engine and generate image"
+                    ? drishtiGenerating || drishtiStarting ? "Stop image generation" : !drishtiWindowsDesktopSupported ? "Image generation requires Windows desktop" : drishtiCanGenerate ? "Generate image locally" : "Start local engine and generate image"
                     : workspaceMode === "video"
                       ? chakshuGenerating ? "Generating video locally" : drishtiStarting ? "Starting local video engine" : chakshuCanGenerate ? "Generate video locally" : "Start local engine and generate video"
                       : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn't supported in this browser"}
                   title={workspaceMode === "image"
-                    ? drishtiGenerating ? "Generation in progress" : drishtiStarting ? "Starting the local companion" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : "Start the local companion and generate"
+                    ? drishtiGenerating || drishtiStarting ? "Stop image generation" : !drishtiWindowsDesktopSupported ? "Windows desktop required" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : "Start the local companion and generate"
                     : workspaceMode === "video"
                       ? chakshuGenerating ? "Generation in progress" : drishtiStarting ? "Starting the local companion" : chakshuCanGenerate ? "Generate locally with " + currentChakshu.name : "Start the local companion and generate"
                       : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
