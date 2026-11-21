@@ -11,7 +11,7 @@ type DrishtiStudioProps = {
   connectDrishtiRuntime: () => void;
   drishtiWindowsDesktopSupported: boolean;
   drishtiGenerating: boolean;
-  drishtiActivityRef: React.RefObject<HTMLDivElement>;
+  drishtiActivityRef: React.RefObject<HTMLDivElement | null>;
   drishtiResult: DrishtiHistoryItem | null;
   varyDrishti: () => void;
   regenerateDrishti: () => void;
