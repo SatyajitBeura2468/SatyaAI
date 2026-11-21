@@ -382,7 +382,7 @@ function App() {
   const current = getSatyaTier(mode)!;
   const currentDrishti = getDrishtiModel(drishtiModelId);
   const drishtiModelRuntime = drishtiRuntimeHealth?.models?.[drishtiModelId];
-  const drishtiCanGenerate = Boolean(drishtiRuntimeHealth?.ok && drishtiModelRuntime?.available);
+  const drishtiCanGenerate = Boolean(!drishtiChecking && !drishtiGenerating && drishtiRuntimeHealth?.ok && drishtiModelRuntime?.available);
   const initials = getInitials(memory.name);
 
   const capability = useMemo(
@@ -1577,8 +1577,11 @@ function App() {
                       role="option"
                       aria-selected={drishtiModelId === model.id}
                       className={"reasoning-option" + (drishtiModelId === model.id ? " chosen" : "")}
+                      disabled={drishtiGenerating || drishtiChecking}
                       onClick={() => {
                         setDrishtiModelId(model.id);
+                        setDrishtiResult(null);
+                        setDrishtiError("");
                         setReasoningOpen(false);
                       }}
                     >
@@ -1911,9 +1914,11 @@ function App() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
-                  if (workspaceMode === "chat" && event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
+                  if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
                     event.preventDefault();
-                    if (!busy) void send();
+                    if (workspaceMode === "image") {
+                      if (drishtiCanGenerate && !drishtiGenerating) void send();
+                    } else if (!busy) void send();
                   }
                 }}
                 placeholder={workspaceMode === "image" ? "Describe the image you want Drishti to create…" : busy ? status : "Ask anything…"}
@@ -1959,6 +1964,7 @@ function App() {
                   </button>
                   <button
                     className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
+                    disabled={busy || drishtiGenerating}
                     onClick={() => {
                       if (busy) return;
                       setWorkspaceMode((currentMode) => currentMode === "chat" ? "image" : "chat");
@@ -1975,20 +1981,18 @@ function App() {
                 <button
                   className={"send " + (workspaceMode === "image" ? (drishtiGenerating ? "stop " : query.trim() ? "ready " : "mic ") : busy ? "stop " : query.trim() ? "ready " : "mic ") + (listening ? "listening" : "")}
                   disabled={workspaceMode === "image"
-                    ? (!drishtiGenerating && (!query.trim() || !drishtiCanGenerate))
+                    ? (drishtiGenerating || !query.trim() || !drishtiCanGenerate)
                     : (!busy && (!query.trim() && !canSpeak))}
                   onClick={() => workspaceMode === "image"
-                    ? drishtiGenerating
-                      ? drishtiAbortRef.current?.abort()
-                      : void send()
+                    ? void send()
                     : busy
                       ? stopGeneration()
                       : (query.trim() ? void send() : toggleMic())}
                   aria-label={workspaceMode === "image"
-                    ? drishtiGenerating ? "Cancel image generation" : drishtiCanGenerate ? "Generate image locally" : drishtiModelRuntime?.reason || "Local Drishti runtime is unavailable"
+                    ? drishtiGenerating ? "Generating image locally" : drishtiCanGenerate ? "Generate image locally" : drishtiModelRuntime?.reason || "Local Drishti runtime is unavailable"
                     : busy ? "Stop generation" : query.trim() ? "Send message" : listening ? "Stop voice input" : canSpeak ? "Start voice input" : "Voice input isn\'t supported in this browser"}
                   title={workspaceMode === "image"
-                    ? drishtiGenerating ? "Cancel generation" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : drishtiModelRuntime?.reason || drishtiRuntimeError || "Start the local Drishti companion"
+                    ? drishtiGenerating ? "Generation in progress" : drishtiCanGenerate ? "Generate locally with " + currentDrishti.name : drishtiModelRuntime?.reason || drishtiRuntimeError || "Start the local Drishti companion"
                     : busy ? "Stop generation" : query.trim() ? "Send message" : "Voice input"}
                 >
                   {workspaceMode === "image" ? drishtiGenerating ? <Square size={17} /> : <ImageIcon size={17} /> : busy ? <Square size={17} /> : query.trim() ? <ArrowUp size={18} /> : <Mic size={18} />}
