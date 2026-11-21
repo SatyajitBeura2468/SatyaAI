@@ -16,19 +16,20 @@ MiniMax-H3-Image is open-weight, but it is **not** Apache-2.0 and should not be 
 ## Runtime architecture
 
 1. Vercel hosts the UI only. It does not receive prompts for image generation and does not store image model weights.
-2. The user presses **Connect local engine**. Only that user action triggers the browser's first request to `http://127.0.0.1:7860/health`, allowing the browser to show its Loopback/Local Network Access permission prompt.
-3. The Generate control is enabled only when the local companion responds and reports that the selected tier passes its disk, hardware and license checks.
-4. The browser sends the prompt to `http://127.0.0.1:7860/v1/generate`. It does not call the SatyaSom chat route, the text model, or a hosted generation API.
-5. The companion loads only the selected model. Hugging Face's local cache is reused across generations and model restarts; switching models releases the previous pipeline to limit memory use.
-6. Generated PNG output is returned to the browser for preview and download. Inference remains local.
+2. When the user presses **Send** in Image mode, the browser checks the loopback companion and asks the installed Windows companion to start through the `satyaai-drishti://start` protocol. The user does not need to open a terminal or start Python manually.
+3. The Windows companion prepares its private runtime on first use. It downloads a pinned, SHA-256-verified copy of uv, which manages Python 3.12 under the user's SatyaAI application-data folder. No system-wide Python installation, winget, or PATH change is required.
+4. The companion uses uv's automatic PyTorch backend selection to choose the best supported CPU, NVIDIA CUDA, or Intel accelerator package available for the computer. This setup is cached; later launches reuse it.
+5. The browser sends the prompt only to `http://127.0.0.1:7860/v1/generate`. It does not call the SatyaSom chat route, the text model, or a hosted image-generation API.
+6. The companion loads only the selected image checkpoint. Hugging Face's local cache is reused; switching models releases the previous pipeline to limit memory use.
+7. Generated PNG output is returned to the browser for preview and download. Inference remains local.
 
 ## Local companion setup
 
-See [`runtime/README.md`](../runtime/README.md) for Windows setup and troubleshooting. Python, PyTorch and the current Diffusers source package are required. The companion binds to loopback only, uses a strict CORS allowlist, and exposes no LAN listener.
+Install the Windows companion once from the release linked in the Image workspace. The first launch downloads and prepares the private Python and PyTorch runtime automatically; the user does not install Python or enter commands. The selected image checkpoint downloads separately on its first generation request. See [the runtime guide](../runtime/README.md) for details and troubleshooting.
 
 ### First connection in Edge or Chrome
 
-On the first **Connect local engine** click, a recent Chromium browser may ask whether SatyaAI can access your local device/network. Choose **Allow**. Edge 143+ enables Local Network Access restrictions by default; if permission was denied, open Edge Settings → Privacy, search, and services → Site permissions → All permissions → Local network access, and change SatyaAI's permission. Reopen Image mode and click Connect local engine again. The app intentionally does not trigger this request automatically on page load.
+On the first **Send** or **Start local engine** action, a recent Chromium browser may ask whether SatyaAI can access the local device/network. Choose **Allow**. Edge 143+ enables Local Network Access restrictions by default; if permission was denied, open Edge Settings → Privacy, search, and services → Site permissions → All permissions → Local network access, and change SatyaAI's permission. Retry the image request after allowing access.
 
 The browser client is intentionally pinned to `http://127.0.0.1:7860`; it does not accept a remote runtime URL. This prevents image prompts from silently leaving the user's device.
 
@@ -51,7 +52,7 @@ These are conservative runtime gates, not guarantees that every GPU of a listed 
 
 ## Current status
 
-The frontend-to-companion request/response pipeline and the local Diffusers service are implemented. The Vercel deployment itself does not bundle the companion process or any checkpoint files. A generation succeeds only after the companion has been installed and started on the same computer and the selected model passes its local eligibility check. This repository does not claim that a model is running merely because its name appears in the selector.
+The frontend-to-companion request/response pipeline, private runtime bootstrap, local Diffusers service, and Windows installer workflow are implemented. The Vercel deployment does not bundle the companion process or model checkpoints. A generation succeeds only after the one-time Windows companion installation, browser local-network permission (where required), and local model eligibility checks. Publishing the web app alone does not install the companion or make an image model available.
 
 ## Sources
 
