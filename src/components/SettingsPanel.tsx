@@ -1,7 +1,7 @@
 import React from "react";
 import { Download, Moon, Sun, Trash2, User, X } from "lucide-react";
-import type { ProviderSettings } from "./ai/providers";
-import type { UserMemory } from "./ai/identity";
+import type { ProviderSettings } from "../ai/providers";
+import type { UserMemory } from "../ai/identity";
 
 type Mode = "nano" | "fast" | "smart" | "deep";
 type SettingsTab = "general" | "personalization" | "models" | "privacy" | "shortcuts";
@@ -21,7 +21,7 @@ type AppPreferences = {
 type SettingsPanelProps = {
   open: boolean;
   onClose: () => void;
-  settingsRef: React.RefObject<HTMLElement>;
+  settingsRef: React.RefObject<HTMLElement | null>;
   settingsTab: SettingsTab;
   setSettingsTab: React.Dispatch<React.SetStateAction<SettingsTab>>;
   theme: "dark" | "light";
@@ -30,7 +30,7 @@ type SettingsPanelProps = {
   setPreferences: React.Dispatch<React.SetStateAction<AppPreferences>>;
   avatar: string | null;
   initials: string;
-  avatarInputRef: React.RefObject<HTMLInputElement>;
+  avatarInputRef: React.RefObject<HTMLInputElement | null>;
   removeAvatar: () => void;
   avatarNote: string;
   memoryNameDraft: string;
@@ -114,7 +114,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                           </div>
                           <div className="setting-group">
                             <h3>Interface density</h3>
-                            <label className="setting-toggle"><span><strong>Compact layout</strong><small>Reduce spacing in messages and conversation lists.</small></span><input type="checkbox" checked={preferences.compactMode} onChange={(event) => setPreferences((p) => ({ ...p, compactMode: event.target.checked }))} /></label>
+                            <label className="setting-toggle"><span><strong>Compact layout</strong><small>Reduce spacing in messages and conversation lists.</small></span><input type="checkbox" checked={preferences.compactMode} onChange={(event) => setPreferences((p: AppPreferences) => ({ ...p, compactMode: event.target.checked }))} /></label>
                             <label className="setting-field">Message text size
                               <select value={preferences.fontSize} onChange={(event) => setPreferences((p) => ({ ...p, fontSize: event.target.value as AppPreferences["fontSize"] }))}>
                                 <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option>
@@ -124,12 +124,12 @@ export function SettingsPanel(props: SettingsPanelProps) {
                           <div className="setting-group">
                             <h3>Accessibility & input</h3>
                             <label className="setting-toggle"><span><strong>Reduce motion</strong><small>Reduce interface animations and transitions.</small></span><input type="checkbox" checked={preferences.reduceMotion} onChange={(event) => setPreferences((p) => ({ ...p, reduceMotion: event.target.checked }))} /></label>
-                            <label className="setting-toggle"><span><strong>Show message timestamps</strong><small>Show the local time beside each message.</small></span><input type="checkbox" checked={preferences.showTimestamps} onChange={(event) => setPreferences((p) => ({ ...p, showTimestamps: event.target.checked }))} /></label>
+                            <label className="setting-toggle"><span><strong>Show message timestamps</strong><small>Show the local time beside each message.</small></span><input type="checkbox" checked={preferences.showTimestamps} onChange={(event) => setPreferences((p: AppPreferences) => ({ ...p, showTimestamps: event.target.checked }))} /></label>
                             <label className="setting-toggle"><span><strong>Enter sends a message</strong><small>Off by default on touch devices. Use Shift + Enter for a new line.</small></span><input type="checkbox" checked={preferences.enterToSend} onChange={(event) => {
                         if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) {
                           try { localStorage.setItem("satya-enter-to-send-touch", String(event.target.checked)); } catch { /* keep the session setting */ }
                         }
-                        setPreferences((p) => ({ ...p, enterToSend: event.target.checked }));
+                        setPreferences((p: AppPreferences) => ({ ...p, enterToSend: event.target.checked }));
                       }} /></label>
                           </div>
                         </>
