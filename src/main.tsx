@@ -448,26 +448,6 @@ function App() {
   }, [provider.baseUrl]);
 
   useEffect(() => {
-    if (workspaceMode !== "image") return;
-    let active = true;
-    setDrishtiChecking(true);
-    setDrishtiRuntimeError("");
-    checkDrishtiRuntime()
-      .then((health) => {
-        if (active) setDrishtiRuntimeHealth(health);
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        setDrishtiRuntimeHealth(null);
-        setDrishtiRuntimeError(error instanceof Error ? error.message : "Could not check the local Drishti runtime.");
-      })
-      .finally(() => {
-        if (active) setDrishtiChecking(false);
-      });
-    return () => { active = false; };
-  }, [workspaceMode, drishtiModelId]);
-
-  useEffect(() => {
     if (!window.matchMedia("(pointer: fine)").matches) return;
     let frame = 0;
     const move = (event: PointerEvent) => {
@@ -1699,9 +1679,9 @@ function App() {
                     ? drishtiModelRuntime?.available
                       ? "Local runtime ready for this tier. Your image prompt is sent only to this device."
                       : drishtiModelRuntime?.reason || "This model is not available on the detected hardware."
-                    : drishtiRuntimeError || "Local runtime not detected. Start the companion on this computer; image prompts are never sent to SatyaSom chat."}
-                <button type="button" onClick={() => void refreshDrishtiRuntime()} disabled={drishtiChecking}>
-                  {drishtiChecking ? "Checking…" : "Recheck"}
+                    : drishtiRuntimeError || "Connect the local companion on this computer. Your image prompts stay on this device and never go through SatyaSom chat."}
+                <button type="button" onClick={() => void refreshDrishtiRuntime()} disabled={drishtiChecking || drishtiGenerating}>
+                  {drishtiChecking ? "Connecting…" : drishtiRuntimeHealth ? "Recheck" : "Connect local engine"}
                 </button>
               </div>
             </div>
