@@ -1,8 +1,6 @@
 import type { DrishtiModelId } from "./registry";
 
-export const DRISHTI_RUNTIME_URL = (
-  import.meta.env.VITE_DRISHTI_RUNTIME_URL || "http://127.0.0.1:7860"
-).replace(/\/+$/, "");
+export const DRISHTI_RUNTIME_URL = "http://127.0.0.1:7860";
 
 export type DrishtiModelAvailability = {
   available: boolean;
