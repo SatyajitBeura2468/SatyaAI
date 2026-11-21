@@ -22,7 +22,7 @@ flowchart TD
   User --> UI[SatyaAI UI]
   UI --> Orchestrator[Conversation Orchestrator]
   Orchestrator --> Modes[Nano / Fast / Smart / Deep Think]
-  Orchestrator --> Perception[Text / Image / Audio / Video / Documents]
+  Orchestrator --> Perception[Text / Drishti images / Audio / Video / Documents]
   Orchestrator --> Tools[Search / Research / Retrieval]
   Orchestrator --> Providers[Provider Layer]
   Providers --> Local[Browser WebGPU / WebLLM]
@@ -31,7 +31,7 @@ flowchart TD
 
 ## Honest V0.1 boundaries
 
-Browser-local text inference is implemented when the browser and device support WebGPU. Anu (Nano) is always on-device. Engine identity and reasoning-mode labels are application-owned; low-level implementation identifiers are kept separate from the user-facing product identity. Web search, SearXNG integration, citation-backed research, audio transcription, video keyframe extraction, and general multimodal document understanding remain separate capabilities that require additional implementation and optional infrastructure.
+Browser-local text inference is implemented when the browser and device support WebGPU. Anu (Nano) is always on-device. Engine identity and reasoning-mode labels are application-owned; low-level implementation identifiers are kept separate from the user-facing product identity. The Drishti Image workspace and model registry are being integrated; local image generation is not yet operational. Web search, SearXNG integration, citation-backed research, audio transcription, video keyframe extraction, and general multimodal document understanding remain separate capabilities that require additional implementation.
 
 See [`docs/architecture.md`](docs/architecture.md), [`docs/privacy-model.md`](docs/privacy-model.md), and [`docs/future-training.md`](docs/future-training.md).
 
