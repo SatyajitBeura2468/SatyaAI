@@ -118,6 +118,17 @@ _loaded_model: str | None = None
 _video_pipeline = None
 _loaded_video_model: str | None = None
 _generation_lock = threading.Lock()
+_cancel_generation = threading.Event()
+
+
+class GenerationCancelled(Exception):
+    pass
+
+
+def _raise_if_generation_cancelled() -> None:
+    if _cancel_generation.is_set():
+        raise GenerationCancelled("Generation cancelled by user.")
+
 
 _runtime_state = {
     "phase": "idle",
@@ -181,6 +192,20 @@ def runtime_status():
         "busy": _generation_lock.locked(),
         "loaded_model": _loaded_model,
     }
+
+
+@app.post("/v1/cancel")
+def cancel_generation():
+    if not _generation_lock.locked():
+        return {"accepted": False, "message": "No local generation is running."}
+    _cancel_generation.set()
+    _set_runtime_state(
+        "cancelling",
+        "Stop requested. Drishti will stop at the next safe inference boundary.",
+        None,
+        model_id=_runtime_state.get("model_id"),
+    )
+    return {"accepted": True, "message": "Stop request accepted."}
 
 
 @app.get("/v1/video/status")
@@ -445,6 +470,7 @@ def generate(request: GenerateRequest):
     if not _generation_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="Another Drishti generation is already running on this device.")
 
+    _cancel_generation.clear()
     started = time.perf_counter()
     try:
         _set_runtime_state(
@@ -471,6 +497,7 @@ def generate(request: GenerateRequest):
                 model_id=request.model_id,
             )
         pipeline = _load_pipeline(request.model_id)
+        _raise_if_generation_cancelled()
         steps = {"lite": 30, "core": 4, "ultra": 50}.get(request.model_id)
         _set_runtime_state(
             "generating",
@@ -486,6 +513,7 @@ def generate(request: GenerateRequest):
         generator = torch.Generator(device=generator_device).manual_seed(seed)
 
         def report_step_end(pipe, step: int, timestep: int, callback_kwargs: dict):
+            _raise_if_generation_cancelled()
             total = max(steps or 1, 1)
             current = step + 1
             _set_runtime_state(
@@ -513,6 +541,7 @@ def generate(request: GenerateRequest):
                 call_args["guidance_scale"] = 1.0
 
             if request.model_id == "max":
+                _raise_if_generation_cancelled()
                 output = pipeline(
                     prompt=prompt,
                     width=width,
@@ -521,6 +550,7 @@ def generate(request: GenerateRequest):
                     output="images",
                     min_generation_area=1024,
                 )
+                _raise_if_generation_cancelled()
                 image: Image.Image = output[0]
             else:
                 call_args["callback_on_step_end"] = report_step_end
@@ -545,6 +575,9 @@ def generate(request: GenerateRequest):
             "elapsed_seconds": elapsed,
             "seed": seed,
         }
+    except GenerationCancelled as error:
+        _set_runtime_state("cancelled", str(error), None, model_id=request.model_id)
+        raise HTTPException(status_code=499, detail=str(error)) from error
     except HTTPException as error:
         _set_runtime_state("error", str(error.detail), None, model_id=request.model_id)
         raise
