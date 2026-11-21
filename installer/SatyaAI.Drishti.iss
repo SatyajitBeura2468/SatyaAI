@@ -37,9 +37,9 @@ Source: "..\runtime\requirements.txt"; DestDir: "{app}\runtime"; Flags: ignoreve
 Name: "{autoprograms}\SatyaAI\Drishti Companion"; Filename: "{app}\{#AppExe}"
 
 [Registry]
-Root: HKCU; Subkey: "Software\Classes\satyaai-drishiti"; ValueType: string; ValueName: ""; ValueData: "URL:SatyaAI Drishti Companion"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\satyaai-drishiti"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
-Root: HKCU; Subkey: "Software\Classes\satyaai-drishiti\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\satyaai-drishti"; ValueType: string; ValueName: ""; ValueData: "URL:SatyaAI Drishti Companion"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\satyaai-drishti"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\satyaai-drishti\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SatyaAI Drishti Companion"; ValueData: """{app}\{#AppExe}"" --background"; Tasks: autostart; Flags: uninsdeletevalue
 
 [Run]
