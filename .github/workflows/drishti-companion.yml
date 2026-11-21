@@ -1,0 +1,87 @@
+name: Drishti Windows Companion
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "companion/**"
+      - "runtime/**"
+      - "installer/**"
+      - ".github/workflows/drishti-companion.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "companion/**"
+      - "runtime/**"
+      - "installer/**"
+      - ".github/workflows/drishti-companion.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish self-contained companion
+        shell: pwsh
+        run: dotnet publish companion/SatyaAI.Drishti.Companion.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output companion/publish
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/output | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/SatyaAI.Drishti.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+
+      - name: Create SHA-256 checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash installer/output/SatyaAI-Drishti-Setup.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  SatyaAI-Drishti-Setup.exe" | Out-File -Encoding ascii installer/output/SatyaAI-Drishti-Setup.exe.sha256
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SatyaAI-Drishti-Windows-Installer
+          path: |
+            installer/output/SatyaAI-Drishti-Setup.exe
+            installer/output/SatyaAI-Drishti-Setup.exe.sha256
+          retention-days: 30
+
+      - name: Publish latest companion release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: drishti-companion-latest
+          target_commitish: ${{ github.sha }}
+          name: SatyaAI Drishti Companion (Latest)
+          body: |
+            Windows x64, per-user installer for the SatyaAI Drishti local image companion.
+
+            - Installs the companion for the current Windows account without administrator access.
+            - Prepares Python 3.12, CPU PyTorch and Drishti runtime dependencies on first launch.
+            - Registers automatic startup at Windows sign-in (optional in the installer).
+            - Registers the satyaai-drishti://start protocol so SatyaAI can wake the companion after a user submits a prompt.
+            - Image model weights are downloaded only when the chosen Drishti model is used for the first time.
+
+            The installer is unsigned. Review the repository and release before running it.
+          prerelease: true
+          make_latest: false
+          files: |
+            installer/output/SatyaAI-Drishti-Setup.exe
+            installer/output/SatyaAI-Drishti-Setup.exe.sha256
+          overwrite_files: true
+          fail_on_unmatched_files: true

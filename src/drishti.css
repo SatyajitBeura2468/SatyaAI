@@ -304,3 +304,80 @@
   flex-direction: column;
   align-items: center;
 }
+
+
+.drishti-connect-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.drishti-connect-actions .drishti-connect-primary {
+  margin: 0;
+}
+.drishti-install-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  color: var(--text-2);
+  background: var(--surface);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.drishti-install-link:hover {
+  color: var(--text);
+  border-color: var(--accent-2);
+}
+.drishti-loading-card {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 11px;
+  padding: 15px 17px;
+  border: 1px solid rgba(94, 200, 255, .28);
+  border-radius: 15px;
+  background: linear-gradient(135deg, rgba(104, 91, 190, .12), rgba(51, 145, 190, .08));
+  box-shadow: 0 12px 34px -24px var(--glow);
+  text-align: left;
+}
+.drishti-loading-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+  font-size: 12px;
+}
+.drishti-loading-head span,
+.drishti-loading-card small {
+  color: var(--text-3);
+  font-size: 10px;
+}
+.drishti-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--surface);
+}
+.drishti-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8b7bff, #58c9ff);
+  transition: width .25s ease;
+}
+.drishti-progress-track.indeterminate > span {
+  width: 35%;
+  animation: drishti-progress 1.35s ease-in-out infinite;
+}
+@keyframes drishti-progress {
+  0% { transform: translateX(-110%); }
+  55% { transform: translateX(165%); }
+  100% { transform: translateX(300%); }
+}

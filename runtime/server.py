@@ -85,6 +85,42 @@ _pipeline = None
 _loaded_model: str | None = None
 _generation_lock = threading.Lock()
 
+_runtime_state = {
+    "phase": "idle",
+    "message": "Ready for a local image request.",
+    "progress": 0,
+    "step": 0,
+    "total_steps": 0,
+    "model_id": None,
+}
+
+
+def _set_runtime_state(
+    phase: str,
+    message: str,
+    progress: int | None = None,
+    step: int = 0,
+    total_steps: int = 0,
+    model_id: str | None = None,
+) -> None:
+    _runtime_state.update({
+        "phase": phase,
+        "message": message,
+        "progress": progress,
+        "step": step,
+        "total_steps": total_steps,
+        "model_id": model_id,
+    })
+
+
+@app.get("/v1/status")
+def runtime_status():
+    return {
+        **_runtime_state,
+        "busy": _generation_lock.locked(),
+        "loaded_model": _loaded_model,
+    }
+
 
 def _disk_root() -> Path:
     configured = os.getenv("HF_HOME")
@@ -293,6 +329,12 @@ def generate(request: GenerateRequest):
 
     started = time.perf_counter()
     try:
+        _set_runtime_state(
+            "checking",
+            "Checking local hardware and model eligibility…",
+            0,
+            model_id=request.model_id,
+        )
         health_snapshot = _health_payload()
         availability = health_snapshot["models"][request.model_id]
         if not availability["available"]:
@@ -302,18 +344,48 @@ def generate(request: GenerateRequest):
         if health_snapshot["device"] == "cpu" and (width > 512 or height > 512):
             raise HTTPException(status_code=400, detail="CPU generation is limited to 512 × 512 pixels.")
 
+        already_loaded = _pipeline is not None and _loaded_model == request.model_id
+        if not already_loaded:
+            _set_runtime_state(
+                "loading_model",
+                "Downloading model files if needed, then loading the selected Drishti model. First use can take a while.",
+                None,
+                model_id=request.model_id,
+            )
         pipeline = _load_pipeline(request.model_id)
         steps = {"lite": 30, "core": 4, "ultra": 50}.get(request.model_id)
+        _set_runtime_state(
+            "generating",
+            "Generating your image locally…",
+            0,
+            0,
+            steps or 0,
+            request.model_id,
+        )
+
         seed = secrets.randbelow(2**31)
         generator_device = "cuda" if torch.cuda.is_available() else "cpu"
         generator = torch.Generator(device=generator_device).manual_seed(seed)
+
+        def report_step_end(pipe, step: int, timestep: int, callback_kwargs: dict):
+            total = max(steps or 1, 1)
+            current = step + 1
+            _set_runtime_state(
+                "generating",
+                f"Generating image locally… Step {current} of {total}",
+                min(99, int((current / total) * 100)),
+                current,
+                total,
+                request.model_id,
+            )
+            return callback_kwargs
 
         with torch.inference_mode():
             call_args = {
                 "prompt": prompt,
                 "width": width,
                 "height": height,
-                "num_inference_steps": steps,
+                "num_inference_steps": steps or 6,
                 "generator": generator,
             }
             if request.model_id == "lite":
@@ -321,6 +393,7 @@ def generate(request: GenerateRequest):
                 call_args["negative_prompt"] = "low quality, blurry, distorted, malformed anatomy, artifacts"
             elif request.model_id == "core":
                 call_args["guidance_scale"] = 1.0
+
             if request.model_id == "max":
                 output = pipeline(
                     prompt=prompt,
@@ -332,37 +405,40 @@ def generate(request: GenerateRequest):
                 )
                 image: Image.Image = output[0]
             else:
+                call_args["callback_on_step_end"] = report_step_end
                 output = pipeline(**call_args)
                 image = output.images[0]
+
         buffer = io.BytesIO()
         image.save(buffer, format="PNG", optimize=True)
         encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
         elapsed = round(time.perf_counter() - started, 2)
+        _set_runtime_state(
+            "complete",
+            f"Image generated in {elapsed} seconds.",
+            100,
+            steps or 6,
+            steps or 6,
+            request.model_id,
+        )
         return {
             "image_data_url": "data:image/png;base64," + encoded,
             "model_id": request.model_id,
             "elapsed_seconds": elapsed,
             "seed": seed,
         }
-    except HTTPException:
+    except HTTPException as error:
+        _set_runtime_state("error", str(error.detail), None, model_id=request.model_id)
         raise
     except torch.cuda.OutOfMemoryError as error:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        raise HTTPException(
-            status_code=507,
-            detail="The selected model exceeded available GPU memory. Choose a smaller Drishti tier or use a machine with more VRAM.",
-        ) from error
+        message = "The selected model exceeded available GPU memory. Choose a smaller Drishti tier or use a machine with more VRAM."
+        _set_runtime_state("error", message, None, model_id=request.model_id)
+        raise HTTPException(status_code=507, detail=message) from error
     except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Drishti could not generate this image: {type(error).__name__}: {error}",
-        ) from error
+        message = f"Drishti could not generate this image: {type(error).__name__}: {error}"
+        _set_runtime_state("error", message, None, model_id=request.model_id)
+        raise HTTPException(status_code=500, detail=message) from error
     finally:
         _generation_lock.release()
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=7860, log_level="info")
