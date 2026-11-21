@@ -5,14 +5,12 @@ import {
   ArrowUp,
   Bookmark,
   BookmarkCheck,
-  Bot,
   ArrowDown,
   Aperture,
   Check,
   Crown,
   ChevronDown,
   Copy,
-  Cpu,
   Download,
   FileText,
   Image as ImageIcon,
@@ -74,6 +72,7 @@ import { DEFAULT_DRISHTI_MODEL_ID, DRISHTI_MODELS, getDrishtiModel, isDrishtiMod
 import { cancelDrishtiGeneration, checkDrishtiRuntime, generateDrishtiImage, getDrishtiRuntimeStatus, requestDrishtiCompanionStart, DRISHTI_COMPANION_INSTALL_URL, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "./ai/drishti/client";
 import { CHAKSHU_MODELS, DEFAULT_CHAKSHU_MODEL_ID, getChakshuModel, isChakshuModelId, type ChakshuModelId } from "./ai/chakshu/registry";
 import { generateChakshuVideo, getChakshuRuntimeStatus, type ChakshuGenerationResult, type ChakshuRuntimeStatus } from "./ai/chakshu/client";
+import { loadChakshuHistory, saveChakshuHistoryItem, type ChakshuHistoryItem } from "./ai/chakshu/history";
 import { Markdown } from "./markdown";
 import { loadDrishtiHistory, saveDrishtiHistoryItem, type DrishtiHistoryItem } from "./ai/drishti/history";
 
@@ -139,7 +138,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   language: "auto",
   responseStyle: "balanced",
   responseLength: "balanced",
-  enterToSend: true,
+  enterToSend: typeof window === "undefined" || !window.matchMedia("(pointer: coarse)").matches,
   compactMode: false,
   showTimestamps: false,
   reduceMotion: false,
@@ -219,6 +218,17 @@ const isMac =
 const drishtiWindowsDesktopSupported =
   typeof navigator !== "undefined" &&
   /Windows|Win32|Win64|WinCE/i.test(navigator.userAgent + " " + navigator.platform);
+const isCoarsePointer = () =>
+  typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+const nextDrishtiSeed = (previous?: number) => {
+  const values = new Uint32Array(1);
+  let seed = 0;
+  do {
+    crypto.getRandomValues(values);
+    seed = values[0] % 2_147_483_647;
+  } while (seed === previous);
+  return seed;
+};
 const DRISHTI_MODEL_ICONS = {
   lite: Sparkles,
   core: Layers,
@@ -328,6 +338,11 @@ function App() {
   const [chakshuError, setChakshuError] = useState("");
   const [chakshuResult, setChakshuResult] = useState<(ChakshuGenerationResult & { video_url: string }) | null>(null);
   const [chakshuRuntimeStatus, setChakshuRuntimeStatus] = useState<ChakshuRuntimeStatus | null>(null);
+  const [chakshuHistory, setChakshuHistory] = useState<Array<ChakshuHistoryItem & { video_url: string }>>([]);
+  const [chakshuActiveHistoryId, setChakshuActiveHistoryId] = useState<string | null>(null);
+  const [chakshuHistoryWarning, setChakshuHistoryWarning] = useState("");
+  const chakshuAbortRef = useRef<AbortController | null>(null);
+  const chakshuObjectUrlsRef = useRef<Set<string>>(new Set());
   const [divyaLicenseAccepted, setDivyaLicenseAccepted] = useState(() => {
     try { return localStorage.getItem(DIVYA_LICENSE_KEY) === "true"; } catch { return false; }
   });
@@ -386,16 +401,15 @@ function App() {
   const [provider, setProvider] = useState<ProviderSettings>(() => {
     try {
       const saved = localStorage.getItem("satya-provider");
-      return saved
-        ? JSON.parse(saved)
-        : {
-            baseUrl:
-              import.meta.env.VITE_OPENAI_COMPATIBLE_BASE_URL ||
-              (import.meta.env.DEV ? "http://127.0.0.1:11434/v1" : undefined),
-            model:
-              import.meta.env.VITE_OPENAI_COMPATIBLE_MODEL ||
-              (import.meta.env.DEV ? "qwen2.5:1.5b" : undefined),
-          };
+      const parsed = saved ? JSON.parse(saved) as Partial<ProviderSettings> : {};
+      const baseUrl = parsed.baseUrl || import.meta.env.VITE_OPENAI_COMPATIBLE_BASE_URL ||
+        (import.meta.env.DEV ? "http://127.0.0.1:11434/v1" : undefined);
+      const model = parsed.model || import.meta.env.VITE_OPENAI_COMPATIBLE_MODEL ||
+        (import.meta.env.DEV ? "qwen2.5:1.5b" : undefined);
+      // Older builds persisted the key with the rest of the provider settings.
+      // Remove it from persistent storage on the next load.
+      localStorage.setItem("satya-provider", JSON.stringify({ baseUrl, model }));
+      return { baseUrl, model, apiKey: sessionStorage.getItem("satya-provider-key") || undefined };
     } catch {
       return {};
     }
@@ -463,7 +477,6 @@ function App() {
         if (items.length) {
           setDrishtiResult(items[0]);
           setDrishtiActiveHistoryId(items[0].id);
-          setQuery((currentQuery) => currentQuery || items[0].prompt);
         }
       })
       .catch(() => {
@@ -488,18 +501,69 @@ function App() {
     try { localStorage.setItem(DIVYA_LICENSE_KEY, String(divyaLicenseAccepted)); } catch { /* keep acknowledgement for this session */ }
   }, [divyaLicenseAccepted]);
 
-  useEffect(() => {
-    if (chakshuResult?.video_url) return () => URL.revokeObjectURL(chakshuResult.video_url);
-  }, [chakshuResult]);
+  function saveEndpointSettings() {
+    const baseUrl = provider.baseUrl?.trim();
+    const model = provider.model?.trim();
+    if (baseUrl) {
+      try {
+        const parsed = new URL(baseUrl);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Unsupported protocol");
+      } catch {
+        setEndpointFeedback("Enter a valid HTTP or HTTPS endpoint URL before saving.");
+        return;
+      }
+      if (!model) {
+        setEndpointFeedback("Enter the model name before saving this endpoint.");
+        return;
+      }
+    }
+    try {
+      localStorage.setItem("satya-provider", JSON.stringify({ baseUrl, model }));
+      if (provider.apiKey) sessionStorage.setItem("satya-provider-key", provider.apiKey);
+      else sessionStorage.removeItem("satya-provider-key");
+      setEndpointFeedback("Endpoint settings saved. The API key is kept only for this browser session.");
+    } catch {
+      setEndpointFeedback("Endpoint settings could not be saved in this browser.");
+    }
+  }
 
-  useEffect(() => {
-    try { localStorage.setItem("satya-provider", JSON.stringify(provider)); }
-    catch { setEndpointFeedback("Endpoint settings could not be saved in this browser."); }
-  }, [provider]);
+  function clearEndpointSettings() {
+    setProvider({});
+    try {
+      localStorage.removeItem("satya-provider");
+      sessionStorage.removeItem("satya-provider-key");
+    } catch { /* state is still cleared */ }
+    setEndpointFeedback("Custom endpoint and session key removed.");
+  }
 
   useEffect(() => {
     saveJSON(SAVED_KEY, saved);
   }, [saved]);
+
+  useEffect(() => {
+    let active = true;
+    void loadChakshuHistory().then((items) => {
+      if (!active) return;
+      const hydrated = items.map((item) => {
+        const video_url = URL.createObjectURL(item.blob);
+        chakshuObjectUrlsRef.current.add(video_url);
+        return { ...item, video_url };
+      });
+      setChakshuHistory(hydrated);
+      if (hydrated.length) {
+        setChakshuResult(hydrated[0]);
+        setChakshuActiveHistoryId(hydrated[0].id);
+      }
+    }).catch(() => {
+      if (active) setChakshuHistoryWarning("Video history could not be loaded in this browser.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => () => {
+    for (const url of chakshuObjectUrlsRef.current) URL.revokeObjectURL(url);
+    chakshuObjectUrlsRef.current.clear();
+  }, []);
 
   useEffect(() => {
     if (provider.baseUrl) return;
@@ -918,6 +982,7 @@ function App() {
   }
 
   function clearConversationData() {
+    if (!window.confirm("Delete all local conversations and saved answers from this browser? This action cannot be undone.")) return;
     activeAbortRef.current?.abort();
     setBusy(false);
     setChats([]);
@@ -1169,7 +1234,7 @@ function App() {
     return () => window.cancelAnimationFrame(frame);
   }, [workspaceMode, drishtiStarting, drishtiGenerating, drishtiResult, drishtiError, preferences.reduceMotion]);
 
-  async function generateDrishti(promptOverride?: string) {
+  async function generateDrishti(promptOverride?: string, seedOverride?: number) {
     const prompt = (promptOverride ?? query).trim();
     if (!prompt || drishtiGenerating || drishtiStarting) return;
     if (!drishtiWindowsDesktopSupported) {
@@ -1192,7 +1257,7 @@ function App() {
       }
 
       setStatus("Generating locally with " + currentDrishti.name + "…");
-      const result = await generateDrishtiImage(drishtiModelId, prompt, controller.signal);
+      const result = await generateDrishtiImage(drishtiModelId, prompt, controller.signal, seedOverride);
       if (controller.signal.aborted) return;
 
       const historyItem: DrishtiHistoryItem = {
@@ -1239,9 +1304,9 @@ function App() {
 
   function varyDrishti() {
     if (!drishtiResult) return;
-    const prompt = ("Create a fresh visual variation of this image prompt while preserving its main subject and intent: " + drishtiResult.prompt + " Use a different composition, lighting arrangement, and visual details.").slice(0, 4000);
+    const prompt = drishtiResult.prompt;
     setQuery(prompt);
-    void generateDrishti(prompt);
+    void generateDrishti(prompt, nextDrishtiSeed(drishtiResult.seed));
   }
 
   function regenerateDrishti() {
@@ -1605,6 +1670,7 @@ function App() {
   function submitEditedMessage(index: number) {
     const original = messages[index];
     if (!original || original.role !== "user" || !editDraft.trim() || busy) return;
+    if (index < messages.length - 1 && !window.confirm("Resubmitting this message will remove all later messages and replies from this conversation. Continue?")) return;
     setEditingMessageIndex(null);
     void sendMessage(editDraft, original.file ?? null, messages.slice(0, index), false);
   }
@@ -2285,7 +2351,7 @@ function App() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend) {
+                  if (event.key === "Enter" && !event.shiftKey && preferences.enterToSend && !isCoarsePointer()) {
                     event.preventDefault();
                     if (workspaceMode === "image") {
                       if (!drishtiGenerating && !drishtiStarting) void send();
