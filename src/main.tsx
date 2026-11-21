@@ -2353,7 +2353,7 @@ function App() {
         saved={saved}
         exportAllData={exportAllData}
         clearConversationData={clearConversationData}
-      />}
+      />
     </div>
   );
 }
