@@ -1,7 +1,7 @@
 import type { DrishtiModelId } from "./registry";
 
 export const DRISHTI_RUNTIME_URL = "http://127.0.0.1:7860";
-export const DRISHTI_COMPANION_SCHEME = "satyaai-drishiti://start";
+export const DRISHTI_COMPANION_SCHEME = "satyaai-drishti://start";
 export const DRISHTI_COMPANION_INSTALL_URL =
   "https://github.com/SatyajitBeura2468/SatyaAI/releases/download/drishti-companion-latest/SatyaAI-Drishti-Setup.exe";
 
