@@ -67,12 +67,13 @@ jobs:
         with:
           tag_name: drishti-companion-latest
           target_commitish: ${{ github.sha }}
-          name: SatyaAI Drishti Companion (Latest)
+          name: SatyaAI Drishti Companion (Managed Runtime)
           body: |
             Windows x64, per-user installer for the SatyaAI Drishti local image companion.
 
             - Installs the companion for the current Windows account without administrator access.
-            - Prepares Python 3.12, CPU PyTorch and Drishti runtime dependencies on first launch.
+            - Downloads a pinned, SHA-256-verified uv runtime manager and privately prepares Python 3.12 plus Drishti dependencies on first launch. No system-wide Python or winget installation is required.
+            - Uses automatic PyTorch backend selection for supported CPU, NVIDIA CUDA, and Intel accelerator configurations.
             - Registers automatic startup at Windows sign-in (optional in the installer).
             - Registers the satyaai-drishti://start protocol so SatyaAI can wake the companion after a user submits a prompt.
             - Image model weights are downloaded only when the chosen Drishti model is used for the first time.

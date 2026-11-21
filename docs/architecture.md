@@ -31,7 +31,7 @@ The public interface displays only the Drishti product names and descriptions. C
 
 The intended execution model is local-first: users download a selected model to their own device and perform inference using a compatible local runtime. A native companion runtime may be required for checkpoints that cannot be executed reliably inside the browser. Browser-only execution is enabled only for model/runtime combinations that have been tested on supported devices. SatyaAI must not silently route Drishti prompts to a hosted text or image endpoint.
 
-The first integration milestone adds the Image workspace, persistent model selection, and the model registry. It does not yet perform image generation. The capability remains IN_DEVELOPMENT until a compatible local runtime, model loading, progress reporting, generation, and output handling have been implemented and tested.
+The current integration includes the Image workspace, persistent model selection, local Diffusers service, native Windows companion, private managed-runtime bootstrap, model loading, progress reporting, generation, and output handling. The frontend still requires a one-time companion install on Windows and browser Local Network Access permission where prompted. This implementation is local-first; image generation is not performed by the Vercel server.
 
 ## Inference routes
 

@@ -1006,7 +1006,7 @@ function App() {
       }
 
       throw new Error(
-        "The local companion is still not responding. Install the Windows companion once using the installer link in the workspace. Initial Python and runtime setup can take several minutes; keep the companion running and retry.",
+        "The local companion is not responding. Install the Windows companion once using the installer link in the workspace. It prepares its own private Python and image runtime automatically on first launch; no separate Python installation or terminal commands are required.",
       );
     } finally {
       setDrishtiStarting(false);

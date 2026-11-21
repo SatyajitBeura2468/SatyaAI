@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -11,6 +13,9 @@ namespace SatyaAI.Drishti.Companion;
 internal sealed class CompanionForm : Form
 {
     private const string RuntimeUrl = "http://127.0.0.1:7860";
+    private const string UvVersion = "0.13.9";
+    private const string UvArchiveSha256 = "edd61f7f5728a56cc62455386661860bdfc7bab65872f39b0c25bdcc1d8e1beb";
+    private const string UvArchiveUrl = "https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-pc-windows-msvc.zip";
     private const string AllowedOrigins =
         "https://satyaai-five.vercel.app," +
         "https://satyaai-teamsatyajitbeura.vercel.app," +
@@ -23,6 +28,7 @@ internal sealed class CompanionForm : Form
         "SatyaAI", "Drishti");
     private readonly string _installRoot = AppContext.BaseDirectory;
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(3) };
+    private readonly HttpClient _downloadHttp = new() { Timeout = TimeSpan.FromMinutes(20) };
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Label _status = new();
@@ -222,70 +228,69 @@ internal sealed class CompanionForm : Form
             if (!File.Exists(serverFile) || !File.Exists(requirementsFile))
                 throw new FileNotFoundException("The installed companion is missing its runtime files. Reinstall the desktop companion.");
 
-            SetStatus("Preparing Python", "Checking for Python 3.12. This setup is performed once.");
-            var basePython = await FindPython312Async();
-            if (basePython is null)
-            {
-                SetStatus("Installing Python", "Using Windows Package Manager to install Python 3.12 for this Windows account.");
-                AppendLog("Python 3.12 not found. Starting the per-user Python installation.");
-                var winget = FindOnPath("winget.exe");
-                if (winget is null)
-                {
-                    OpenUrl("https://www.python.org/downloads/windows/");
-                    throw new InvalidOperationException(
-                        "Python 3.12 and Windows Package Manager were not found. Install Python 3.12 from the page that opened, then click Start / reconnect.");
-                }
-
-                var installCode = await RunCommandAsync(
-                    winget,
-                    new[]
-                    {
-                        "install", "--id", "Python.Python.3.12", "--exact",
-                        "--scope", "user", "--silent",
-                        "--accept-package-agreements", "--accept-source-agreements"
-                    },
-                    "Installing Python 3.12");
-                if (installCode != 0)
-                    throw new InvalidOperationException("Windows Package Manager could not install Python 3.12. Retry from the companion window.");
-
-                for (var i = 0; i < 12 && basePython is null; i++)
-                {
-                    await Task.Delay(1500);
-                    basePython = await FindPython312Async();
-                }
-                if (basePython is null)
-                    throw new InvalidOperationException("Python installation completed but the Python launcher was not found. Restart Windows, then start the companion again.");
-            }
+            // uv is a small, checksum-verified runtime manager. It installs Python
+            // privately under LocalAppData, so users do not need system Python,
+            // winget, PATH changes, or a terminal.
+            SetStatus("Preparing the managed runtime", "Downloading and verifying the private runtime manager. This is a one-time setup.");
+            var uv = await EnsureUvAsync();
 
             var venvDirectory = Path.Combine(_dataRoot, ".venv");
             var venvPython = Path.Combine(venvDirectory, "Scripts", "python.exe");
             if (!File.Exists(venvPython))
             {
-                SetStatus("Creating private runtime", "Preparing an isolated Python environment for Drishti.");
-                AppendLog("Creating the local virtual environment.");
-                var code = await RunCommandAsync(basePython, new[] { "-m", "venv", venvDirectory }, "Creating Python environment");
-                if (code != 0 || !File.Exists(venvPython))
-                    throw new InvalidOperationException("Could not create the isolated Drishti Python environment.");
+                SetStatus("Preparing Python 3.12", "Drishti is downloading a private Python runtime for this app only.");
+                AppendLog("Installing managed Python 3.12 with uv.");
+                var pythonCode = await RunCommandAsync(
+                    uv,
+                    new[] { "python", "install", "3.12" },
+                    "Preparing private Python 3.12",
+                    useUvEnvironment: true);
+                if (pythonCode != 0)
+                    throw new InvalidOperationException("The private Python runtime could not be prepared. Check the internet connection and retry.");
+
+                SetStatus("Creating the private environment", "Setting up Drishti in its own isolated folder.");
+                var venvCode = await RunCommandAsync(
+                    uv,
+                    new[] { "venv", "--python", "3.12", "--seed", venvDirectory },
+                    "Creating isolated Drishti environment",
+                    useUvEnvironment: true);
+                if (venvCode != 0 || !File.Exists(venvPython))
+                    throw new InvalidOperationException("Could not create the private Drishti environment.");
             }
 
             var torchCheck = await CaptureCommandAsync(
                 venvPython,
-                new[] { "-c", "import torch; print(torch.__version__)" });
-            if (torchCheck.ExitCode != 0)
+                new[] { "-c", "import torch; print('VERSION=' + torch.__version__); print('CUDA_AVAILABLE=' + str(torch.cuda.is_available()))" });
+            var nvidiaSmi = FindOnPath("nvidia-smi.exe") ?? FindOnPath("nvidia-smi");
+            var torchMissing = torchCheck.ExitCode != 0;
+            var wrongBackend = !torchMissing && nvidiaSmi is not null &&
+                !torchCheck.Output.Contains("CUDA_AVAILABLE=True", StringComparison.OrdinalIgnoreCase);
+
+            if (torchMissing || wrongBackend)
             {
-                SetStatus("Installing image engine", "Installing the CPU PyTorch runtime. This is a one-time download.");
-                AppendLog("Installing the CPU PyTorch build from the official PyTorch package index.");
+                SetStatus("Installing the image engine", "Selecting the best supported PyTorch backend for this computer.");
+                AppendLog("Installing PyTorch with automatic CPU/CUDA/Intel accelerator selection.");
+                var torchArguments = new List<string>
+                {
+                    "pip", "install", "--python", venvPython, "--torch-backend=auto"
+                };
+                if (wrongBackend)
+                {
+                    torchArguments.Add("--reinstall-package");
+                    torchArguments.Add("torch");
+                    torchArguments.Add("--reinstall-package");
+                    torchArguments.Add("torchvision");
+                }
+                torchArguments.Add("torch");
+                torchArguments.Add("torchvision");
+
                 var code = await RunCommandAsync(
-                    venvPython,
-                    new[]
-                    {
-                        "-m", "pip", "install", "--progress-bar", "on",
-                        "torch", "torchvision",
-                        "--index-url", "https://download.pytorch.org/whl/cpu"
-                    },
-                    "Installing PyTorch");
+                    uv,
+                    torchArguments,
+                    "Installing hardware-aware PyTorch",
+                    useUvEnvironment: true);
                 if (code != 0)
-                    throw new InvalidOperationException("PyTorch installation failed. Check your internet connection and retry.");
+                    throw new InvalidOperationException("The image engine could not install a compatible PyTorch backend. Check the companion log and retry.");
             }
 
             var dependenciesCheck = await CaptureCommandAsync(
@@ -293,18 +298,15 @@ internal sealed class CompanionForm : Form
                 new[] { "-c", "import fastapi, uvicorn, diffusers, transformers, psutil, PIL" });
             if (dependenciesCheck.ExitCode != 0)
             {
-                SetStatus("Installing Drishti components", "Downloading the image pipeline libraries. This setup is cached for future launches.");
-                AppendLog("Installing runtime/requirements.txt.");
+                SetStatus("Installing Drishti components", "Downloading the image pipeline libraries. They are cached for future launches.");
+                AppendLog("Installing runtime/requirements.txt into the private environment.");
                 var code = await RunCommandAsync(
-                    venvPython,
-                    new[]
-                    {
-                        "-m", "pip", "install", "--progress-bar", "on",
-                        "-r", requirementsFile
-                    },
-                    "Installing Drishti dependencies");
+                    uv,
+                    new[] { "pip", "install", "--python", venvPython, "-r", requirementsFile },
+                    "Installing Drishti dependencies",
+                    useUvEnvironment: true);
                 if (code != 0)
-                    throw new InvalidOperationException("Drishti dependency installation failed. Retry from this window.");
+                    throw new InvalidOperationException("Drishti dependencies could not be installed. Check the companion log and retry.");
             }
 
             if (await IsRuntimeHealthyAsync())
@@ -344,6 +346,52 @@ internal sealed class CompanionForm : Form
             _startButton.Enabled = true;
             _startGate.Release();
         }
+    }
+
+    private async Task<string> EnsureUvAsync()
+    {
+        var toolsDirectory = Path.Combine(_dataRoot, "tools");
+        var uvPath = Path.Combine(toolsDirectory, "uv.exe");
+        if (File.Exists(uvPath))
+            return uvPath;
+
+        Directory.CreateDirectory(toolsDirectory);
+        var downloadsDirectory = Path.Combine(_dataRoot, "downloads");
+        Directory.CreateDirectory(downloadsDirectory);
+        var archivePath = Path.Combine(downloadsDirectory, "uv-" + UvVersion + "-windows-x64.zip");
+
+        AppendLog("Downloading the pinned uv " + UvVersion + " Windows runtime manager.");
+        using (var response = await _downloadHttp.GetAsync(UvArchiveUrl, HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+            await using var archiveFile = new FileStream(archivePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await response.Content.CopyToAsync(archiveFile);
+        }
+
+        await using (var archiveFile = File.OpenRead(archivePath))
+        {
+            var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(archiveFile)).ToLowerInvariant();
+            if (!string.Equals(actualHash, UvArchiveSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                File.Delete(archivePath);
+                throw new InvalidOperationException("The runtime manager download failed its SHA-256 integrity check. Nothing was installed.");
+            }
+        }
+
+        using (var archive = ZipFile.OpenRead(archivePath))
+        {
+            var entry = archive.Entries.FirstOrDefault(item =>
+                string.Equals(Path.GetFileName(item.FullName), "uv.exe", StringComparison.OrdinalIgnoreCase));
+            if (entry is null)
+                throw new InvalidDataException("The verified runtime archive did not contain uv.exe.");
+
+            using var source = entry.Open();
+            await using var destination = new FileStream(uvPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await source.CopyToAsync(destination);
+        }
+
+        AppendLog("Verified runtime manager installed at " + uvPath);
+        return uvPath;
     }
 
     private async Task<string?> FindPython312Async()
@@ -425,10 +473,19 @@ internal sealed class CompanionForm : Form
         }
     }
 
-    private async Task<int> RunCommandAsync(string executable, IEnumerable<string> arguments, string label)
+    private async Task<int> RunCommandAsync(
+        string executable,
+        IEnumerable<string> arguments,
+        string label,
+        bool useUvEnvironment = false)
     {
         AppendLog("> " + label);
         var startInfo = CreateProcessInfo(executable, arguments);
+        if (useUvEnvironment)
+        {
+            startInfo.Environment["UV_PYTHON_INSTALL_DIR"] = Path.Combine(_dataRoot, "python");
+            startInfo.Environment["UV_CACHE_DIR"] = Path.Combine(_dataRoot, "uv-cache");
+        }
         startInfo.RedirectStandardOutput = true;
         startInfo.RedirectStandardError = true;
 

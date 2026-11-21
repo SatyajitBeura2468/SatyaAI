@@ -1,36 +1,34 @@
 # Drishti local companion runtime
 
-This companion is the image-inference process used by SatyaAI's Image workspace. The Vercel deployment serves the UI only. Model weights are downloaded to this computer's Hugging Face cache, and generation runs on this computer. The service binds to `127.0.0.1` only; it is not a public API.
+The Windows companion is the only required desktop setup for the hosted SatyaAI Image workspace. Vercel serves the interface; image inference runs locally on the user's computer. Prompts go to the loopback service at `127.0.0.1:7860`, never to the text chat provider.
 
-## Requirements
+## Normal Windows setup (recommended)
 
-- Python 3.10 or newer.
-- A supported PyTorch installation.
-- Free disk space for the selected model.
-- A recent Chrome or Edge browser when using the hosted SatyaAI interface.
-- NVIDIA CUDA hardware for Core, Ultra and X. Lite has a best-effort CPU fallback, but CPU generation can be very slow.
+1. Install the **SatyaAI Drishti Companion** once using the installer linked in the Image workspace.
+2. Keep the companion running in the Windows tray. The first Send action in Image mode will attempt to wake it automatically.
+3. On the browser's first local connection, allow SatyaAI's Local Network Access permission if Chrome or Edge asks.
+4. Send the image prompt. The companion prepares its private runtime on first use and downloads the selected image checkpoint only when it is first needed.
 
-## Windows setup
+The user does not need to install Python globally, use winget, change PATH, open PowerShell, or type setup commands. The companion downloads a pinned, SHA-256-verified uv release and uses it to manage Python 3.12, an isolated environment, and the runtime packages under `%LOCALAPPDATA%\\SatyaAI\\Drishti`. That setup is cached for later launches.
 
-1. Download or clone the SatyaAI repository.
-2. Create the runtime virtual environment: `python -m venv .venv`.
-3. Install PyTorch in `runtime\.venv` using the official selector at https://pytorch.org/get-started/locally/. Choose the CPU build for CPU-only systems, or the matching CUDA build for a supported NVIDIA GPU.
-4. Open PowerShell in the repository's `runtime` folder.
-5. Install the companion dependencies and start the server:
+PyTorch's automatic backend selection is used for supported CPU, NVIDIA CUDA, or Intel accelerator setups. Detection depends on installed drivers and supported hardware. Lite provides a best-effort CPU path; Core and Ultra have substantial GPU-memory requirements. The user interface must never imply that a model can run just because its name is listed.
+
+## Developer / manual setup
+
+Manual setup is intended only for maintainers who are developing the Python service independently of the Windows companion. Python 3.12, PyTorch, and the packages in `requirements.txt` are required in a development virtual environment.
+
+From the repository's `runtime` directory:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn server:app --host 127.0.0.1 --port 7860
+python -m venv .venv
+.\\.venv\\Scripts\\python.exe -m pip install --upgrade pip
+# Install the correct PyTorch build for the local hardware using the official selector:
+# https://pytorch.org/get-started/locally/
+.\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt
+.\\.venv\\Scripts\\python.exe -m uvicorn server:app --host 127.0.0.1 --port 7860
 ```
 
-The `start.ps1` launcher can be used after PyTorch is installed in the runtime virtual environment.
-
-6. Keep the runtime window open and return to SatyaAI Image mode. Click **Connect local engine**. On the first connection, recent Edge/Chrome versions may show a Local Network Access permission prompt; choose **Allow**. Generate is enabled only when the selected model passes the local hardware check.
-
-If permission was denied in Edge, open Settings → Privacy, search, and services → Site permissions → All permissions → Local network access, then change the permission for SatyaAI and click **Connect local engine** again.
-
-For a GPU installation, use the exact command produced by the PyTorch selector instead of the CPU example above. Do not install a random CUDA wheel.
+Keep the development service bound to loopback. Do not expose it to the LAN or the public internet.
 
 ## Model tiers and constraints
 
@@ -43,20 +41,23 @@ For a GPU installation, use the exact command produced by the PyTorch selector i
 
 The model files are not downloaded during setup. The companion loads only the selected checkpoint when the first generation request is made, then reuses it while the service stays running. Hugging Face's local cache prevents repeat downloads unless files are removed.
 
-**Important license note:** MiniMax-H3-Image is not under Apache-2.0. Read the current license at https://huggingface.co/MiniMaxAI/MiniMax-H3-Image before enabling that tier. Only after independently reviewing and accepting its terms, and confirming your territory is not excluded by the licence, set both `SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE=1` and `SATYAAI_MINIMAX_H3_TERRITORY_ALLOWED=1` in the local environment before starting the companion. The official Diffusers modular implementation uses automatic component offloading and documents about 65 GB peak VRAM; the runtime gate reserves about 70 GB free VRAM. The default is disabled.
+**Important license note:** MiniMax-H3-Image is not under Apache-2.0. Read the current license at https://huggingface.co/MiniMaxAI/MiniMax-H3-Image before enabling that tier. Only after independently reviewing and accepting its terms, and confirming your territory is not excluded by the licence, set both `SATYAAI_ACCEPT_MINIMAX_H3_COMMUNITY_LICENSE=1` and `SATYAAI_MINIMAX_H3_TERRITORY_ALLOWED=1` in the local environment before starting the companion. The default is disabled.
 
 ## Privacy and network boundary
 
 - Prompts are sent from the browser to `127.0.0.1:7860`, not to SatyaAI's text chat route.
 - Generation runs through the local Diffusers/PyTorch process. The app does not forward image prompts to the configured text endpoint.
-- The only model downloads are from the selected model's upstream repository on first use.
+- The runtime manager and Python packages are downloaded during first-time setup; selected model weights download from their upstream repository on first use.
 - The runtime does not expose a network listener to the LAN; it binds to loopback.
 - CORS is restricted to SatyaAI's production domains and local development. To use a different trusted deployment origin, set `SATYAAI_ALLOWED_ORIGINS` to a comma-separated allowlist.
 
 ## Troubleshooting
 
-- **Runtime offline:** keep the companion process running and press the status recheck in the Image workspace.
+- **Companion not installed:** use the one-time Windows installer linked from the Image workspace.
+- **Runtime offline:** keep the companion process running in the tray, then press the status recheck in the Image workspace or submit the prompt again.
+- **Browser cannot connect:** allow Local Network Access for SatyaAI in Chrome or Edge.
+- **Private runtime setup fails:** check the companion log at `%LOCALAPPDATA%\\SatyaAI\\Drishti\\companion.log`, confirm internet access, and retry from the companion window. Python does not need to be installed separately.
 - **Model not available:** read the hardware, disk-space and license reason shown by the app. The selector does not override the gate.
 - **CUDA out of memory:** use Lite or a machine with more VRAM. The runtime returns an explicit error and does not silently route to a hosted provider.
 - **First generation is slow:** the selected model is being downloaded and loaded into the local cache. Later generations reuse the loaded pipeline.
-- **Diffusers pipeline class missing:** update dependencies with `pip install -r requirements.txt` in the runtime virtual environment.
+- **Diffusers pipeline class missing:** the companion's next setup check will reconcile missing dependencies; for development, rerun the developer setup above.
