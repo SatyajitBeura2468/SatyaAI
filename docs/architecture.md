@@ -16,6 +16,23 @@ There is no single universal foundation model shared by the four variants, and n
 
 **Runtime implementation note:** the current provider configuration still contains legacy WebLLM checkpoint identifiers. Those identifiers are inference-loader references, not the public SatyaAI identity. They must be replaced or mapped to the correct SatyaSom-built artifacts as those runtime artifacts become available, so the deployed weights and the documented architecture stay aligned.
 
+## Drishti image-generation engine
+
+Drishti is SatyaAI's product-facing image-generation family. Its model tiers are independent of the SatyaSom text-reasoning modes and are selected only while Image mode is active.
+
+| Product tier | Internal checkpoint mapping | Product positioning |
+|---|---|---|
+| Drishti Lite 1.0 | segmind/SSD-1B | Entry-level |
+| Drishti Core 1.5 | black-forest-labs/FLUX.2-klein-4B | Balanced |
+| Drishti Ultra 2.0 | Qwen/Qwen-Image-2512 | Advanced |
+| Drishti X 3.0 MAX | MiniMaxAI/MiniMax-H3-Image | Experimental flagship |
+
+The public interface displays only the Drishti product names and descriptions. Checkpoint identifiers remain internal implementation metadata.
+
+The intended execution model is local-first: users download a selected model to their own device and perform inference using a compatible local runtime. A native companion runtime may be required for checkpoints that cannot be executed reliably inside the browser. Browser-only execution is enabled only for model/runtime combinations that have been tested on supported devices. SatyaAI must not silently route Drishti prompts to a hosted text or image endpoint.
+
+The first integration milestone adds the Image workspace, persistent model selection, and the model registry. It does not yet perform image generation. The capability remains IN_DEVELOPMENT until a compatible local runtime, model loading, progress reporting, generation, and output handling have been implemented and tested.
+
 ## Inference routes
 
 - **Anu (Nano):** always browser-local and on-device. It bypasses configured cloud/custom endpoints. Assets are downloaded on first use and cached by the browser. A compatible build of the same engine family may be used when required by the device's GPU feature support.
