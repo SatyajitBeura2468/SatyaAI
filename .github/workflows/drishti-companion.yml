@@ -74,7 +74,7 @@ jobs:
             - Installs the companion for the current Windows account without administrator access.
             - Prepares Python 3.12, CPU PyTorch and Drishti runtime dependencies on first launch.
             - Registers automatic startup at Windows sign-in (optional in the installer).
-            - Registers the satyaai-drishiti://start protocol so SatyaAI can wake the companion after a user submits a prompt.
+            - Registers the satyaai-drishti://start protocol so SatyaAI can wake the companion after a user submits a prompt.
             - Image model weights are downloaded only when the chosen Drishti model is used for the first time.
 
             The installer is unsigned. Review the repository and release before running it.
