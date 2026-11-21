@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  Archive,
   ArrowUp,
   Bookmark,
   BookmarkCheck,
@@ -11,24 +10,17 @@ import {
   Crown,
   ChevronDown,
   Copy,
-  Download,
   FileText,
   Image as ImageIcon,
   Video as VideoIcon,
   Layers,
-  Library,
   Menu,
   Mic,
-  Moon,
   Plus,
-  RefreshCw,
-  Search,
   Settings,
   Sparkles,
   Square,
   Pencil,
-  Trash2,
-  Sun,
   User,
   X,
   Zap,
@@ -229,8 +221,6 @@ const isMac =
 const drishtiWindowsDesktopSupported =
   typeof navigator !== "undefined" &&
   /Windows|Win32|Win64|WinCE/i.test(navigator.userAgent + " " + navigator.platform);
-const isCoarsePointer = () =>
-  typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 const nextDrishtiSeed = (previous?: number) => {
   const values = new Uint32Array(1);
   let seed = 0;
@@ -1334,16 +1324,25 @@ function App() {
   }
 
   async function connectChakshuRuntime() {
+    if (chakshuAbortRef.current) return;
+    const controller = new AbortController();
+    chakshuAbortRef.current = controller;
     setDrishtiChecking(true);
     setChakshuError("");
     try {
-      const health = await ensureDrishtiRuntimeReady();
+      const health = await ensureDrishtiRuntimeReady(controller.signal);
+      if (controller.signal.aborted) return;
       const availability = health.video_models?.[chakshuModelId];
-      if (!availability?.available) setChakshuError(availability?.reason || "This video tier is not available on the detected hardware.");
+      if (!availability?.available) setChakshuError(availability?.reason || "This video tier is not available on this computer.");
     } catch (error) {
-      setDrishtiRuntimeHealth(null);
-      setChakshuError(error instanceof Error ? error.message : "Could not start the local video companion.");
+      if (controller.signal.aborted) {
+        setStatus("Video companion startup stopped.");
+      } else {
+        setDrishtiRuntimeHealth(null);
+        setChakshuError(error instanceof Error ? error.message : "Could not start the local video companion.");
+      }
     } finally {
+      if (chakshuAbortRef.current === controller) chakshuAbortRef.current = null;
       setDrishtiChecking(false);
     }
   }
@@ -2251,7 +2250,7 @@ function App() {
                   onClick={() => workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? stopDrishtiGeneration() : void send()
                     : workspaceMode === "video"
-                      ? chakshuGenerating ? stopChakshuGeneration() : void send()
+                      ? chakshuGenerating || drishtiStarting ? stopChakshuGeneration() : void send()
                       : busy ? stopGeneration() : (query.trim() ? void send() : toggleMic())}
                   aria-label={workspaceMode === "image"
                     ? drishtiGenerating || drishtiStarting ? "Stop image generation" : !drishtiWindowsDesktopSupported ? "Image generation requires Windows desktop" : drishtiCanGenerate ? "Generate image locally" : "Start local engine and generate image"
