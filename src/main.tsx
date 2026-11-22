@@ -101,7 +101,6 @@ type AppPreferences = {
   showTimestamps: boolean;
   reduceMotion: boolean;
   saveChatHistory: boolean;
-  allowLocalModels: boolean;
   fontSize: "small" | "medium" | "large";
 };
 type SettingsTab = "general" | "personalization" | "models" | "privacy" | "shortcuts";
@@ -146,7 +145,6 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   showTimestamps: false,
   reduceMotion: false,
   saveChatHistory: true,
-  allowLocalModels: false,
   fontSize: "medium",
 };
 function readPreferences(): AppPreferences {
@@ -379,7 +377,6 @@ function App() {
   );
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [listening, setListening] = useState(false);
-  const [gateway, setGateway] = useState<"online" | "offline">("offline");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
   const [thinkingActive, setThinkingActive] = useState(false);
@@ -452,21 +449,17 @@ function App() {
   const capability = useMemo(
     () =>
       provider.baseUrl
-        ? "OpenAI-compatible endpoint configured"
-        : gateway === "online"
-          ? "Answers come from the online gateway"
-          : hasWebGPU()
-            ? "WebGPU · browser-local inference"
-            : "This browser has no WebGPU, so the on-device model cannot run",
-    [provider.baseUrl, gateway],
+        ? "Optional compatible endpoint configured"
+        : hasWebGPU()
+          ? "WebGPU · browser-local inference"
+          : "This browser has no WebGPU, so the on-device model cannot run",
+    [provider.baseUrl],
   );
   const engineTitle = provider.baseUrl
     ? "Custom endpoint"
-    : gateway === "online"
-      ? "Hosted model"
-      : hasWebGPU()
-        ? "Browser model"
-        : "No inference available";
+    : hasWebGPU()
+      ? "Browser model"
+      : "No inference available";
 
   useEffect(() => {
     if (preferences.saveChatHistory) saveJSON(CHATS_KEY, chats);
@@ -572,22 +565,6 @@ function App() {
     for (const url of chakshuObjectUrlsRef.current) URL.revokeObjectURL(url);
     chakshuObjectUrlsRef.current.clear();
   }, []);
-
-  useEffect(() => {
-    if (provider.baseUrl) return;
-    let alive = true;
-    fetch("/api/health")
-      .then((response) => response.json())
-      .then((data: { configured?: boolean }) => {
-        if (alive) setGateway(data?.configured ? "online" : "offline");
-      })
-      .catch(() => {
-        if (alive) setGateway("offline");
-      });
-    return () => {
-      alive = false;
-    };
-  }, [provider.baseUrl]);
 
   useEffect(() => {
     if (!window.matchMedia("(pointer: fine)").matches) return;
@@ -1531,11 +1508,9 @@ function App() {
         content: withFile(message),
       }));
 
-    const inferenceRoute = mode === "nano"
-      ? "browser-local"
-      : provider.baseUrl && provider.model
-        ? "custom-compatible"
-        : "remote-gateway";
+    const inferenceRoute = mode !== "nano" && provider.baseUrl && provider.model
+      ? "custom-compatible"
+      : "browser-local";
     const preferenceNotes = [
       preferences.language !== "auto" ? "Preferred response language: " + preferences.language + "." : "",
       preferences.responseStyle !== "balanced" ? "Preferred response style: " + preferences.responseStyle + "." : "",
@@ -1552,7 +1527,7 @@ function App() {
           mode,
           inferenceRoute,
           localInferenceAvailable: inferenceRoute === "browser-local",
-          remoteInferenceAvailable: inferenceRoute !== "browser-local",
+          remoteInferenceAvailable: inferenceRoute === "custom-compatible",
         }) },
       ...history,
       { role: "user", content: attached ? withFile({ text, file: attached }) : text },
@@ -1577,14 +1552,12 @@ function App() {
     lastDownloadPercentRef.current = null;
     progressCommentaryUntilRef.current = 0;
     followLatestRef.current = true;
-    const usesLocalModel = !identityAnswer && mode === "nano";
+    const usesLocalModel = !identityAnswer && !(provider.baseUrl && provider.model && mode !== "nano");
     const initialLoadingMessage = identityAnswer
       ? "Preparing a reply…"
-      : provider.baseUrl && mode !== "nano"
+      : provider.baseUrl && provider.model && mode !== "nano"
         ? "Configured model se jud raha hoon…"
-        : usesLocalModel
-          ? nextLoadingLine("cache-check")
-          : "Connecting to the hosted model…";
+        : nextLoadingLine("cache-check");
     const initialModelProgress = usesLocalModel
       ? {
           percent: null,
@@ -1684,7 +1657,6 @@ function App() {
           updateStreamingAnswer,
           (active) => setThinkingActive(active),
           memoryForTurn,
-          preferences.allowLocalModels,
           controller.signal,
         );
       }
@@ -2491,7 +2463,6 @@ function App() {
         mode={mode}
         provider={provider}
         setProvider={setProvider}
-        gateway={gateway}
         endpointFeedback={endpointFeedback}
         saveEndpointSettings={saveEndpointSettings}
         clearEndpointSettings={clearEndpointSettings}

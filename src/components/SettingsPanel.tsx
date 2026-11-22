@@ -15,7 +15,6 @@ type AppPreferences = {
   showTimestamps: boolean;
   reduceMotion: boolean;
   saveChatHistory: boolean;
-  allowLocalModels: boolean;
   fontSize: "small" | "medium" | "large";
 };
 
@@ -46,7 +45,6 @@ type SettingsPanelProps = {
   mode: Mode;
   provider: ProviderSettings;
   setProvider: React.Dispatch<React.SetStateAction<ProviderSettings>>;
-  gateway: "online" | "offline";
   endpointFeedback: string;
   saveEndpointSettings: () => void;
   clearEndpointSettings: () => void;
@@ -62,7 +60,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
     preferences, setPreferences, avatar, initials, avatarInputRef, removeAvatar,
     avatarNote, memoryNameDraft, setMemoryNameDraft, memoryNotesDraft,
     setMemoryNotesDraft, saveMemory, clearMemory, memory, current, capability,
-    mode, provider, setProvider, gateway, endpointFeedback, saveEndpointSettings,
+    mode, provider, setProvider, endpointFeedback, saveEndpointSettings,
     clearEndpointSettings, chats, saved, exportAllData, clearConversationData,
   } = props;
   return (
@@ -193,8 +191,8 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             </label>
                             <div className="diag-row"><span>Currently selected</span><strong>{current.name} · {current.modeLabel}</strong></div>
                             <div className="diag-row"><span>Inference capability</span><strong>{capability}</strong></div>
-                            <div className="diag-row"><span>Route</span><strong>{mode === "nano" ? "Browser-local · Anu" : provider.baseUrl && provider.model ? "Custom-compatible endpoint" : gateway === "online" ? "Configured remote gateway" : "Browser-local · " + current.name}</strong></div>
-                            <label className="setting-toggle"><span><strong>Allow browser-local models</strong><small>Opt in to downloading a model to this device when the hosted route is unavailable. Requires WebGPU. Nano always stays local.</small></span><input type="checkbox" checked={preferences.allowLocalModels} onChange={(event) => setPreferences((p) => ({ ...p, allowLocalModels: event.target.checked }))} /></label>
+                            <div className="diag-row"><span>Route</span><strong>{mode !== "nano" && provider.baseUrl && provider.model ? "Optional custom endpoint" : "Browser-local · " + current.name}</strong></div>
+<div className="memory-footnote">All four SatyaAI tiers run locally by default. Model files are downloaded once and reused from this device. Requires WebGPU.</div>
                           </div>
                           <div className="setting-group">
                             <h3>Compatible inference endpoint</h3>
@@ -208,7 +206,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             <label className="setting-field">API key
                               <input type="password" value={provider.apiKey || ""} onChange={(event) => setProvider((p) => ({ ...p, apiKey: event.target.value || undefined }))} placeholder="Optional bearer token" autoComplete="off" />
                             </label>
-                            <div className="memory-footnote">Endpoint URL and model are saved on this device. The API key remains in memory only and is never written to browser storage. Nano always stays on-device.</div>
+                            <div className="memory-footnote">Endpoint URL and model are saved on this device. The API key remains in memory only and is never written to browser storage. This endpoint is optional; all SatyaAI tiers run locally by default.</div>
                             <div className="setting-actions">
                               <button className="save-btn" onClick={saveEndpointSettings}>Save endpoint</button>
                               <button className="ghost-btn" onClick={clearEndpointSettings}>Clear endpoint</button>
@@ -221,7 +219,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                         <>
                           <div className="setting-group">
                             <h3>Local storage</h3>
-                            <p>SatyaAI currently has no account or cloud sync. Conversations, saved answers, profile and preferences are stored in this browser. Prompts are sent to a configured hosted model provider or the custom endpoint you select.</p>
+                            <p>SatyaAI currently has no account or cloud sync. Conversations, saved answers, profile and preferences are stored in this browser. Prompts stay on this device for browser-local inference. They are sent to a third-party service only when you explicitly configure and select a compatible endpoint.</p>
                             <p><a href="https://github.com/SatyajitBeura2468/SatyaAI/blob/main/docs/privacy.md" target="_blank" rel="noreferrer">Privacy notice</a> · <a href="https://github.com/SatyajitBeura2468/SatyaAI/blob/main/docs/terms.md" target="_blank" rel="noreferrer">Terms of use</a> · <a href="https://dev.meta.ai/llama/llama3_2/license" target="_blank" rel="noreferrer">Llama 3.2 license</a></p>
                             <label className="setting-toggle"><span><strong>Save conversation history</strong><small>Keep chats on this device between visits.</small></span><input type="checkbox" checked={preferences.saveChatHistory} onChange={(event) => setPreferences((p) => ({ ...p, saveChatHistory: event.target.checked }))} /></label>
                             <div className="diag-row"><span>Conversations saved</span><strong>{chats.length}</strong></div>

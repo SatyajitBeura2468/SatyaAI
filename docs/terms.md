@@ -6,7 +6,7 @@ SatyaAI is an experimental AI interface for learning, research and creative work
 
 Do not use SatyaAI to violate laws, harm others, or submit private information you do not have permission to share. Do not attempt to disrupt the service or bypass its safety and usage controls.
 
-Some inference modes send prompts and recent conversation context to the configured hosted model provider or to an endpoint you configure. Those providers' terms and privacy practices also apply. Browser-local inference runs on your device when enabled. Image and video generation use the separately installed local companion and are not hosted by Vercel.
+All four SatyaAI text tiers run locally in your browser by default. An optional compatible endpoint can be configured for remote inference; when selected, prompts and conversation context are sent to that endpoint and its terms and privacy practices apply. Image and video generation use the separately installed local companion and are not hosted by Vercel.
 
 The service is provided on an experimental, as-available basis. No promise is made of uninterrupted availability, perfect accuracy, or permanent storage. Features and these terms may change as the project develops.
 

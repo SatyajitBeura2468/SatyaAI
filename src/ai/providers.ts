@@ -88,7 +88,6 @@ let activeModelCacheHit = false;
 let activeTierName = "local";
 
 let localOperationQueue: Promise<void> = Promise.resolve();
-let remoteGatewayReadyPromise: Promise<boolean> | null = null;
 let persistentStoragePromise: Promise<void> | null = null;
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -131,20 +130,6 @@ async function requestPersistentStorage(): Promise<void> {
   }
 
   await persistentStoragePromise;
-}
-
-async function hasConfiguredRemoteGateway(): Promise<boolean> {
-  if (!remoteGatewayReadyPromise) {
-    remoteGatewayReadyPromise = fetch("/api/health")
-      .then(async (response) => {
-        if (!response.ok) return false;
-        const health = (await response.json()) as { configured?: boolean };
-        return health.configured === true;
-      })
-      .catch(() => false);
-  }
-
-  return remoteGatewayReadyPromise;
 }
 
 function formatModelProgress(report: {
@@ -456,52 +441,13 @@ export async function localWebLLM(
   onToken?: (partialText: string) => void,
   onThinking?: (active: boolean) => void,
   userMemory: UserMemory = { name: "", notes: "" },
-  allowLocalFallback = false,
   signal?: AbortSignal,
 ): Promise<string> {
+  // Every SatyaAI tier runs in the browser by default. Remote inference is
+  // available only when the user explicitly configures a compatible endpoint.
   throwIfAborted(signal);
-  // Nano is deliberately on-device. Other tiers use hosted inference first;
-  // downloading a browser model is an explicit user choice.
-  if (mode !== "nano" && (await hasConfiguredRemoteGateway())) {
-    try {
-      onThinking?.(true);
-      const online = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal,
-        body: JSON.stringify({
-          messages,
-          mode,
-          user_memory: userMemory,
-          temperature: MODE_CONFIG[mode].temperature,
-          max_tokens: MODE_CONFIG[mode].maxTokens,
-          stream: true,
-        }),
-      });
-      if (!online.ok) {
-        let data: { error?: string } = {};
-        try { data = await online.json() as { error?: string }; } catch { /* Ignore invalid error bodies. */ }
-        throw new Error(data.error || "Hosted model failed (" + online.status + ").");
-      }
-      const answer = await readOpenAIStream(online, onToken);
-      onThinking?.(false);
-      return answer;
-    } catch (error) {
-      onThinking?.(false);
-      if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
-      if (!allowLocalFallback) throw error;
-      onProgress?.("Hosted model unavailable; browser-local inference is enabled, switching to the device model…");
-    }
-  } else if (mode !== "nano" && !allowLocalFallback) {
-    throw new Error("The hosted model gateway is not configured yet. Browser-local models are disabled. Enable browser-local inference in Settings, or configure the hosted model on Vercel.");
-  }
-
-  throwIfAborted(signal);
-  if (mode !== "nano" && !allowLocalFallback) {
-    throw new Error("Browser-local inference is disabled. Enable it in Settings to download a model to this device.");
-  }
   if (!hasWebGPU()) {
-    throw new Error("WebGPU is unavailable in this browser. Hosted inference is the default; browser-local inference needs a recent WebGPU-capable browser.");
+    throw new Error("WebGPU is required for browser-local inference. Use a supported browser and GPU, or configure an optional compatible endpoint in Settings.");
   }
 
   return withLocalEngineLock(async () => {

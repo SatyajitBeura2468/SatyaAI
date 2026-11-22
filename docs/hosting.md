@@ -1,15 +1,20 @@
-# Hosted inference setup
+# Local-first inference
 
-Fast, Smart and Deep use the Vercel chat gateway. Configure these environment variables in the Vercel project:
+SatyaAI does not require hosted model credentials to answer messages.
 
-| Variable | Purpose |
+All four reasoning tiers run locally in the browser through WebLLM/WebGPU:
+
+| SatyaAI tier | Default inference |
 | --- | --- |
-| `REMOTE_MODEL_BASE_URL` | OpenAI-compatible API base URL, ending in `/v1` |
-| `REMOTE_MODEL_API_KEY` | Provider API key, stored only in Vercel |
-| `REMOTE_MODEL_ID` | Exact model identifier accepted by the provider |
+| Anu (Nano) | Browser-local |
+| Indu (Fast) | Browser-local |
+| Dhara (Smart) | Browser-local |
+| Aditya (Deep Think) | Browser-local |
 
-Set the variables for both Production and Preview as appropriate, then redeploy the project. The gateway uses server-side credentials, enforces request validation and per-instance rate limiting, and can stream OpenAI-compatible server-sent events to the browser.
+On first use, the selected model is downloaded to the browser's model cache. Later sessions reuse the cached files. Local inference requires a supported browser, WebGPU, sufficient GPU memory and available storage. A model's size and performance depend on the tier and device.
 
-Do not put provider secrets in `VITE_*` variables, client-side source, or the repository. The browser-local fallback for Fast, Smart and Deep is disabled by default. Users can explicitly enable it under Settings → Models & inference. Anu (Nano) always stays on-device and requires WebGPU.
+## Optional remote endpoint
 
-The Vercel project should be checked after configuration with a request to `/api/health`. A configured response reports `configured: true`; this health response does not expose the provider key.
+A user may deliberately configure an OpenAI-compatible endpoint under Settings → Models & inference. For non-Nano tiers, SatyaAI then sends the prompt and conversation context directly to the configured endpoint. Its operator's privacy policy and usage terms apply.
+
+The default local-first app does not call `/api/chat` or `/api/health`, and does not need `REMOTE_MODEL_BASE_URL`, `REMOTE_MODEL_API_KEY`, or `REMOTE_MODEL_ID` in Vercel. The API gateway source is retained for possible future deployments but is not part of the normal local inference path.
