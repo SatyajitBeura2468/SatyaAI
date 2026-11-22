@@ -554,3 +554,66 @@ button:disabled{cursor:not-allowed}
   .composer-action-pill svg{width:14px;height:14px}
   .composer-plus-menu{left:0;width:min(292px,calc(100vw - 30px))}
 }
+
+
+/* Keep attachment subtitles directly beneath their action titles. */
+.composer-menu-item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+}
+.composer-menu-item > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  align-content: center;
+  min-width: 0;
+  width: 100%;
+  gap: 3px;
+}
+.composer-menu-item > span > strong,
+.composer-menu-item > span > small {
+  display: block;
+  width: 100%;
+  margin: 0;
+  text-align: left;
+}
+.composer-menu-item > span > small { line-height: 1.35; white-space: normal; }
+.composer-menu-item > .composer-coming-soon { align-self: center; }
+.composer-menu-item.composer-menu-soon > svg { justify-self: center; }
+
+.workspace-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+}
+.workspace-mode-tab {
+  min-height: 38px;
+  padding: 0 11px;
+}
+.workspace-mode-tab.active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent-2) 62%, var(--border-strong));
+  background: linear-gradient(130deg, rgba(139,123,255,.2), rgba(94,200,255,.12));
+  box-shadow: 0 0 0 1px rgba(94,200,255,.1) inset, 0 8px 24px -18px var(--glow);
+}
+.workspace-mode-tab.active svg { color: var(--accent-2); }
+.composer-chat-action { background: var(--surface); }
+.composer-chat-action.active { background: linear-gradient(130deg, rgba(139,123,255,.18), rgba(94,200,255,.1)); }
+.composer-image-action.active { background: linear-gradient(130deg, rgba(139,123,255,.24), rgba(94,200,255,.14)); }
+.composer-video-action.active { background: linear-gradient(130deg, rgba(69,190,197,.22), rgba(94,200,255,.12)); border-color: rgba(69,190,197,.48); }
+.workspace-mode-tab:disabled { opacity: .48; cursor: not-allowed; }
+@media (max-width: 860px) {
+  .composer-tools.composer-actions { gap: 6px; flex-wrap: nowrap; }
+  .workspace-mode-tabs { gap: 4px; }
+  .workspace-mode-tab { min-height: 38px; padding: 0 8px; gap: 5px; font-size: 10.5px; }
+}
+@media (max-width: 420px) {
+  .composer-mode-tabs { gap: 3px; }
+  .workspace-mode-tab { padding: 0 7px; font-size: 10px; }
+  .workspace-mode-tab svg { width: 13px; height: 13px; }
+}
