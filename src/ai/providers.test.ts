@@ -5,7 +5,7 @@ import { SATYAAI_TIERS } from "./core/index.js";
 describe("SatyaAI inference modes", () => {
   it("routes Nano to the bundled WebLLM SmolLM2 360M model", () => {
     expect(MODE_CONFIG.nano.model).toBe("SmolLM2-360M-Instruct-q4f16_1-MLC");
-    expect(MODE_CONFIG.nano.maxTokens).toBe(192);
+    expect(MODE_CONFIG.nano.maxTokens).toBe(512);
     expect(MODE_CONFIG.nano.maxTokens).toBeLessThan(MODE_CONFIG.fast.maxTokens);
   });
 
