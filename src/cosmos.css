@@ -613,7 +613,7 @@ button:disabled{cursor:not-allowed}
   .workspace-mode-tab { min-height: 38px; padding: 0 8px; gap: 5px; font-size: 10.5px; }
 }
 @media (max-width: 420px) {
-  .composer-mode-tabs { gap: 3px; }
+  .workspace-mode-tabs { gap: 3px; }
   .workspace-mode-tab { padding: 0 7px; font-size: 10px; }
   .workspace-mode-tab svg { width: 13px; height: 13px; }
 }
