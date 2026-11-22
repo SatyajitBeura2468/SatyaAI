@@ -1,6 +1,6 @@
 # SatyaAI
 
-Truth-first intelligence for reasoning, research, and creation.
+Truth-first intelligence for curious minds, thinking, learning, and creation.
 
 ### [Open SatyaAI →](https://satyaai-five.vercel.app)
 

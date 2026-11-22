@@ -4,6 +4,10 @@ import { DRISHTI_COMPANION_INSTALL_URL, type DrishtiModelAvailability, type Dris
 import type { ChakshuRuntimeStatus } from "../ai/chakshu/client";
 import { getChakshuModel, type ChakshuModel } from "../ai/chakshu/registry";
 import type { ChakshuHistoryItem } from "../ai/chakshu/history";
+import { CHAKSHU_IDEA_COPY, CHAKSHU_STUDIO_HEADLINES, pickOnLoad } from "../ui-copy";
+
+const CHAKSHU_HEADLINE = pickOnLoad(CHAKSHU_STUDIO_HEADLINES);
+const CHAKSHU_IDEAS = pickOnLoad(CHAKSHU_IDEA_COPY);
 
 type ChakshuStudioProps = {
   drishtiChecking: boolean;
@@ -41,12 +45,12 @@ export function ChakshuStudio(props: ChakshuStudioProps) {
                     <div className="drishti-studio-mark" aria-hidden="true"><VideoIcon size={31} strokeWidth={1.6} /></div>
                     <div className="drishti-studio-copy">
                       <span className="drishti-kicker">SATYAAI · CHAKSHU VIDEO STUDIO</span>
-                      <h1>Turn words into <em>motion.</em></h1>
-                      <p>{drishtiChecking ? "Checking the local creative engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". Video weights download only when a tier is first used." : "Generate video locally on a Windows desktop. Phone, Mac and Linux generation are not currently supported."}</p>
+                      <h1>{CHAKSHU_HEADLINE.lead} <em>{CHAKSHU_HEADLINE.accent}</em></h1>
+                      <p>{drishtiChecking ? "Checking the local creative engine…" : drishtiRuntimeHealth ? "Chakshu is connected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". Video weights download only when a tier is first used." : "Create videos locally on a Windows desktop with Chakshu. Phones, macOS and Linux are not supported yet."}</p>
                       {!drishtiWindowsDesktopSupported && (
                         <div className="drishti-platform-note" role="note">
-                          <strong>Desktop · Windows required</strong>
-                          <span>Chakshu needs the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate video.</span>
+                          <strong>Windows desktop required</strong>
+                          <span>Chakshu's local video engine currently runs through the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate video.</span>
                         </div>
                       )}
                       <div className="drishti-connect-actions">
@@ -60,8 +64,8 @@ export function ChakshuStudio(props: ChakshuStudioProps) {
                       <>
                         <div className="drishti-ideas-heading">
                           <div>
-                            <strong>Start with an idea</strong>
-                            <span>Pick a scene to fill the prompt, then make it yours.</span>
+                            <strong>{CHAKSHU_IDEAS.title}</strong>
+                            <span>{CHAKSHU_IDEAS.subtitle}</span>
                           </div>
                           <span className="drishti-ideas-sparkle" aria-hidden="true"><VideoIcon size={17} /></span>
                         </div>

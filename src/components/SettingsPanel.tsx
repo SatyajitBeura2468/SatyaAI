@@ -10,6 +10,13 @@ type AppPreferences = {
   language: "auto" | "English" | "Hindi" | "Odia";
   responseStyle: "balanced" | "friendly" | "formal" | "academic";
   responseLength: "short" | "balanced" | "detailed";
+  personalityStyle: "subtle-wit" | "clever-sarcastic" | "playfully-chaotic" | "dry-intelligence" | "warm-companion";
+  humorIntensity: "minimal" | "occasional" | "frequent";
+  preferConversational: boolean;
+  preferDirect: boolean;
+  includeExamples: boolean;
+  skipLongIntroductions: boolean;
+  expandWhenUseful: boolean;
   enterToSend: boolean;
   compactMode: boolean;
   showTimestamps: boolean;
@@ -80,7 +87,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                     <div>
                       <div className="section-label">Your workspace</div>
                       <h2 id="settings-title">Settings</h2>
-                      <p>Make SatyaAI work the way you think.</p>
+                      <p>Tune the voice, the vibe and the little details.</p>
                     </div>
                     <button className="icon-btn" onClick={() => onClose()} aria-label="Close settings">
                       <X size={18} />
@@ -176,6 +183,35 @@ export function SettingsPanel(props: SettingsPanelProps) {
                                 <option value="short">Concise</option><option value="balanced">Balanced</option><option value="detailed">Detailed</option>
                               </select>
                             </label>
+                          </div>
+                          <div className="setting-group">
+                            <h3>Personality & humour</h3>
+                            <p>Choose the conversational flavour. SatyaAI still adapts to the moment, especially when a topic needs a serious answer.</p>
+                            <label className="setting-field">Personality style
+                              <select value={preferences.personalityStyle} onChange={(event) => setPreferences((p) => ({ ...p, personalityStyle: event.target.value as AppPreferences["personalityStyle"] }))}>
+                                <option value="subtle-wit">Subtle wit</option>
+                                <option value="clever-sarcastic">Clever & sarcastic</option>
+                                <option value="playfully-chaotic">Playfully chaotic</option>
+                                <option value="dry-intelligence">Dry intelligence</option>
+                                <option value="warm-companion">Warm companion</option>
+                              </select>
+                            </label>
+                            <label className="setting-field">Humour intensity
+                              <select value={preferences.humorIntensity} onChange={(event) => setPreferences((p) => ({ ...p, humorIntensity: event.target.value as AppPreferences["humorIntensity"] }))}>
+                                <option value="minimal">Minimal</option>
+                                <option value="occasional">Occasional</option>
+                                <option value="frequent">Frequent, when the moment fits</option>
+                              </select>
+                            </label>
+                          </div>
+                          <div className="setting-group">
+                            <h3>Conversation preferences</h3>
+                            <p>Small preferences that shape how answers are delivered, not what the facts are.</p>
+                            <label className="setting-toggle"><span><strong>More conversational</strong><small>Use natural, everyday language where it fits.</small></span><input type="checkbox" checked={preferences.preferConversational} onChange={(event) => setPreferences((p) => ({ ...p, preferConversational: event.target.checked }))} /></label>
+                            <label className="setting-toggle"><span><strong>Prefer direct answers</strong><small>Lead with the answer instead of a long runway.</small></span><input type="checkbox" checked={preferences.preferDirect} onChange={(event) => setPreferences((p) => ({ ...p, preferDirect: event.target.checked }))} /></label>
+                            <label className="setting-toggle"><span><strong>Use examples when helpful</strong><small>Add practical examples when they make an idea clearer.</small></span><input type="checkbox" checked={preferences.includeExamples} onChange={(event) => setPreferences((p) => ({ ...p, includeExamples: event.target.checked }))} /></label>
+                            <label className="setting-toggle"><span><strong>Skip long introductions</strong><small>Get to the useful part sooner.</small></span><input type="checkbox" checked={preferences.skipLongIntroductions} onChange={(event) => setPreferences((p) => ({ ...p, skipLongIntroductions: event.target.checked }))} /></label>
+                            <label className="setting-toggle"><span><strong>Go deeper when useful</strong><small>Expand explanations when a topic deserves more depth.</small></span><input type="checkbox" checked={preferences.expandWhenUseful} onChange={(event) => setPreferences((p) => ({ ...p, expandWhenUseful: event.target.checked }))} /></label>
                           </div>
                         </>
                       )}

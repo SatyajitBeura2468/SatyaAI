@@ -27,9 +27,23 @@ describe("SATYA CORE canonical registry", () => {
     expect(CAPABILITIES.find((item) => item.id === "deep-research")?.status).toBe("IN_DEVELOPMENT");
     expect(CAPABILITIES.find((item) => item.id === "image-creation")?.status).toBe("IN_DEVELOPMENT");
   });
-  it("includes personality without forcing humour", () => {
+  it("uses a playfully chaotic default while keeping humour context-aware", () => {
+    expect(PERSONALITY.description).toContain("playfully chaotic");
     expect(PERSONALITY.description).toContain("naturally funny");
     expect(PERSONALITY.boundaries).toContain("Do not force jokes into every response.");
+    expect(PERSONALITY.boundaries).toContain("Keep humour out of sensitive, high-stakes, safety, privacy, and error disclosures where it could obscure meaning.");
+  });
+  it("injects the selected communication preferences into the shared core prompt", () => {
+    const prompt = buildSatyaCorePrompt({ userPreferences: {
+      personalityStyle: "dry-intelligence", humorIntensity: "frequent",
+      preferConversational: true, preferDirect: true, includeExamples: false,
+      skipLongIntroductions: true, expandWhenUseful: true,
+    } });
+    expect(prompt).toContain("Personality style: Dry intelligence.");
+    expect(prompt).toContain("Humour intensity: Frequent when the context is suitable.");
+    expect(prompt).toContain("Prefer direct, answer-first responses.");
+    expect(prompt).toContain("Skip lengthy introductions");
+    expect(prompt).not.toContain("Include examples when they genuinely help.");
   });
   it("composes runtime facts and isolated profile data", () => {
     const prompt = buildSatyaCorePrompt({

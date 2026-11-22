@@ -3,6 +3,10 @@ import { Download, Image as ImageIcon, RefreshCw, Sparkles, Square } from "lucid
 import { DRISHTI_COMPANION_INSTALL_URL, type DrishtiModelAvailability, type DrishtiRuntimeHealth, type DrishtiRuntimeStatus } from "../ai/drishti/client";
 import { getDrishtiModel } from "../ai/drishti/registry";
 import type { DrishtiHistoryItem } from "../ai/drishti/history";
+import { DRISHTI_IDEA_COPY, DRISHTI_STUDIO_HEADLINES, pickOnLoad } from "../ui-copy";
+
+const DRISHTI_HEADLINE = pickOnLoad(DRISHTI_STUDIO_HEADLINES);
+const DRISHTI_IDEAS = pickOnLoad(DRISHTI_IDEA_COPY);
 
 type DrishtiStudioProps = {
   drishtiChecking: boolean;
@@ -45,12 +49,12 @@ export function DrishtiStudio(props: DrishtiStudioProps) {
                     </div>
                     <div className="drishti-studio-copy">
                       <span className="drishti-kicker">SATYAAI · IMAGE STUDIO</span>
-                      <h1>Let’s create <em>something.</em></h1>
-                      <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Local companion detected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Generate privately on a Windows desktop using the local Drishti companion."}</p>
+                      <h1>{DRISHTI_HEADLINE.lead} <em>{DRISHTI_HEADLINE.accent}</em></h1>
+                      <p>{drishtiChecking ? "Checking the local Drishti engine…" : drishtiRuntimeHealth ? "Drishti is connected on " + (drishtiRuntimeHealth.device_name || drishtiRuntimeHealth.device) + ". The selected model loads on first use." : "Create images locally on a Windows desktop with Drishti. The selected model downloads to this device the first time you use it."}</p>
                       {!drishtiWindowsDesktopSupported && (
                         <div className="drishti-platform-note" role="note">
-                          <strong>Desktop · Windows required</strong>
-                          <span>Image generation currently needs the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate images.</span>
+                          <strong>Windows desktop required</strong>
+                          <span>Drishti's local image engine currently runs through the SatyaAI Windows companion. Open SatyaAI on a Windows PC to generate images.</span>
                         </div>
                       )}
                       <div className="drishti-connect-actions">
@@ -118,7 +122,7 @@ export function DrishtiStudio(props: DrishtiStudioProps) {
                     {!drishtiGenerating && !drishtiStarting && !drishtiResult && !drishtiError && (
                       <>
                         <div className="drishti-ideas-heading">
-                          <div><strong>What are we creating today?</strong><span>Choose a subject to start with, then customise the prompt.</span></div>
+                          <div><strong>{DRISHTI_IDEAS.title}</strong><span>{DRISHTI_IDEAS.subtitle}</span></div>
                           <span className="drishti-ideas-sparkle" aria-hidden="true"><Sparkles size={17} /></span>
                         </div>
                         <div className="drishti-ideas-grid">

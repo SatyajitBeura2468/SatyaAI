@@ -34,8 +34,8 @@ export function extractNameCorrection(input: string): string | null {
   return name;
 }
 
-export function buildSatyaSystemPrompt(memory: UserMemory, runtimeContext?: RuntimeContext): string {
-  return buildSatyaCorePrompt({ userMemory: memory, runtimeContext });
+export function buildSatyaSystemPrompt(memory: UserMemory, runtimeContext?: RuntimeContext, userPreferences?: Record<string, unknown>): string {
+  return buildSatyaCorePrompt({ userMemory: memory, runtimeContext, userPreferences });
 }
 
 function capabilityReply(id: string): string | null {

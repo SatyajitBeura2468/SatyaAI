@@ -7,19 +7,45 @@ import { PERSONALITY } from "./personality.js";
 import { formatRuntimeContext } from "./runtime-context.js";
 
 const LEGACY_CREATOR_NOTE = /is the creator and owner of SatyaAI/i;
-
+const PERSONALITY_STYLE_LABELS = Object.freeze({
+  "subtle-wit": "Subtle wit",
+  "clever-sarcastic": "Clever and lightly sarcastic",
+  "playfully-chaotic": "Playfully chaotic",
+  "dry-intelligence": "Dry intelligence",
+  "warm-companion": "Warm companion",
+});
+const HUMOUR_INTENSITY_LABELS = Object.freeze({
+  minimal: "Minimal",
+  occasional: "Occasional",
+  frequent: "Frequent when the context is suitable",
+});
+function formatUserCommunicationPreferences(input = {}) {
+  const preferences = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const style = Object.prototype.hasOwnProperty.call(PERSONALITY_STYLE_LABELS, preferences.personalityStyle) ? PERSONALITY_STYLE_LABELS[preferences.personalityStyle] : PERSONALITY_STYLE_LABELS["playfully-chaotic"];
+  const humour = Object.prototype.hasOwnProperty.call(HUMOUR_INTENSITY_LABELS, preferences.humorIntensity) ? HUMOUR_INTENSITY_LABELS[preferences.humorIntensity] : HUMOUR_INTENSITY_LABELS.occasional;
+  const conversation = [];
+  if (preferences.preferConversational === true) conversation.push("Use natural, conversational language.");
+  if (preferences.preferDirect === true) conversation.push("Prefer direct, answer-first responses.");
+  if (preferences.includeExamples === true) conversation.push("Include examples when they genuinely help.");
+  if (preferences.skipLongIntroductions === true) conversation.push("Skip lengthy introductions and get to the useful part.");
+  if (preferences.expandWhenUseful === true) conversation.push("Expand explanations when the topic deserves more depth.");
+  return [
+    "Personality style: " + style + ".",
+    "Humour intensity: " + humour + ".",
+    "Conversation preferences: " + (conversation.length ? conversation.join(" ") : "No additional conversation preferences selected"),
+    "Treat these as user preferences, not rigid rules. Adapt to the topic and user; accuracy, safety, privacy, clarity, and appropriate seriousness always take priority.",
+  ];
+}
 export function sanitizeCoreUserMemory(value) {
   const candidate = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   let name = typeof candidate.name === "string" ? candidate.name.trim().slice(0, 80) : "";
   let notes = typeof candidate.notes === "string" ? candidate.notes.trim().slice(0, 3000) : "";
-
   if (LEGACY_CREATOR_NOTE.test(notes)) {
     notes = "";
     if (name === FOUNDER.fullName) name = "";
   }
   return { name, notes };
 }
-
 export function buildSatyaCorePrompt(options = {}) {
   const userMemory = sanitizeCoreUserMemory(options.userMemory);
   const teamLines = TEAM.map((member) => "- " + member.name + ": " + member.designation);
@@ -27,7 +53,7 @@ export function buildSatyaCorePrompt(options = {}) {
   const principleLines = CORE_PRINCIPLES.map((item) => "- " + item);
   const constitutionLines = BEHAVIOURAL_CONSTITUTION.map((item) => "- " + item);
   const historyLines = DEVELOPMENT_HISTORY.documentedDevelopmentCycle.map((item, index) => (index + 1) + ". " + item);
-
+  const userPreferenceLines = formatUserCommunicationPreferences(options.userPreferences);
   return [
     CORE_METADATA.name + " — permanent application identity and behavioural context",
     "Core version: " + CORE_METADATA.version,
@@ -90,6 +116,9 @@ export function buildSatyaCorePrompt(options = {}) {
     "Core traits: " + PERSONALITY.traits.join("; ") + ".",
     "Adapt the style to the conversation: casual (" + PERSONALITY.contextStyles.casual + "); technical (" + PERSONALITY.contextStyles.technical + "); academic (" + PERSONALITY.contextStyles.academic + "); professional (" + PERSONALITY.contextStyles.professional + "); sensitive (" + PERSONALITY.contextStyles.sensitive + "); troubleshooting (" + PERSONALITY.contextStyles.troubleshooting + "); creative (" + PERSONALITY.contextStyles.creative + ").",
     ...PERSONALITY.boundaries.map((item) => "- " + item),
+    "",
+    "USER-SELECTED COMMUNICATION PREFERENCES",
+    ...userPreferenceLines,
     "",
     "BEHAVIOURAL CONSTITUTION",
     ...constitutionLines,

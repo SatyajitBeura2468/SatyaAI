@@ -7,14 +7,16 @@ import {
   BookmarkCheck,
   ArrowDown,
   Aperture,
+  Clapperboard,
+  Film,
+  Images,
+  WandSparkles,
   Check,
-  Crown,
   ChevronDown,
   Copy,
   FileText,
   Image as ImageIcon,
   Video as VideoIcon,
-  Layers,
   Menu,
   MessageSquare,
   Mic,
@@ -38,6 +40,7 @@ import "./reasoning-profile.css";
 import "./drishti.css";
 import { Starfield } from "./Starfield";
 import { freshStarters } from "./starters";
+import { HOME_HERO_OPTIONS, pickOnLoad } from "./ui-copy";
 import { createThinkingPhraseOrder, THINKING_PHRASES } from "./thinking-phrases";
 import {
   createLoadingPhraseOrder,
@@ -106,6 +109,13 @@ type AppPreferences = {
   language: "auto" | "English" | "Hindi" | "Odia";
   responseStyle: "balanced" | "friendly" | "formal" | "academic";
   responseLength: "short" | "balanced" | "detailed";
+  personalityStyle: "subtle-wit" | "clever-sarcastic" | "playfully-chaotic" | "dry-intelligence" | "warm-companion";
+  humorIntensity: "minimal" | "occasional" | "frequent";
+  preferConversational: boolean;
+  preferDirect: boolean;
+  includeExamples: boolean;
+  skipLongIntroductions: boolean;
+  expandWhenUseful: boolean;
   enterToSend: boolean;
   compactMode: boolean;
   showTimestamps: boolean;
@@ -133,10 +143,10 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 const modes: Record<Mode, { desc: string }> = {
-  nano: { desc: "Lightweight, on-device replies" },
-  fast: { desc: "Quick, efficient answers" },
-  smart: { desc: "Balanced reasoning & quality" },
-  deep: { desc: "Longer, more detailed answers" },
+  nano: { desc: "Small, quick and ready for everyday stuff." },
+  fast: { desc: "Straight to the point. Less waiting, more doing." },
+  smart: { desc: "Thoughtful answers without making things needlessly complicated." },
+  deep: { desc: "For the big questions that deserve a proper deep dive." },
 };
 
 const CHATS_KEY = "satya-chats-v1";
@@ -150,6 +160,13 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   language: "auto",
   responseStyle: "balanced",
   responseLength: "balanced",
+  personalityStyle: "playfully-chaotic",
+  humorIntensity: "occasional",
+  preferConversational: true,
+  preferDirect: false,
+  includeExamples: false,
+  skipLongIntroductions: true,
+  expandWhenUseful: true,
   enterToSend: typeof window === "undefined" || !window.matchMedia("(pointer: coarse)").matches,
   compactMode: false,
   showTimestamps: false,
@@ -162,9 +179,22 @@ function readPreferences(): AppPreferences {
   const touchDevice = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
   let touchOptIn = false;
   try { touchOptIn = localStorage.getItem("satya-enter-to-send-touch") === "true"; } catch { /* default off on touch devices */ }
+  const personalityStyles = ["subtle-wit", "clever-sarcastic", "playfully-chaotic", "dry-intelligence", "warm-companion"] as const;
+  const humourLevels = ["minimal", "occasional", "frequent"] as const;
   return {
     ...DEFAULT_PREFERENCES,
     ...stored,
+    personalityStyle: personalityStyles.includes(stored.personalityStyle as (typeof personalityStyles)[number])
+      ? stored.personalityStyle!
+      : DEFAULT_PREFERENCES.personalityStyle,
+    humorIntensity: humourLevels.includes(stored.humorIntensity as (typeof humourLevels)[number])
+      ? stored.humorIntensity!
+      : DEFAULT_PREFERENCES.humorIntensity,
+    preferConversational: typeof stored.preferConversational === "boolean" ? stored.preferConversational : DEFAULT_PREFERENCES.preferConversational,
+    preferDirect: typeof stored.preferDirect === "boolean" ? stored.preferDirect : DEFAULT_PREFERENCES.preferDirect,
+    includeExamples: typeof stored.includeExamples === "boolean" ? stored.includeExamples : DEFAULT_PREFERENCES.includeExamples,
+    skipLongIntroductions: typeof stored.skipLongIntroductions === "boolean" ? stored.skipLongIntroductions : DEFAULT_PREFERENCES.skipLongIntroductions,
+    expandWhenUseful: typeof stored.expandWhenUseful === "boolean" ? stored.expandWhenUseful : DEFAULT_PREFERENCES.expandWhenUseful,
     enterToSend: touchDevice ? touchOptIn : (stored.enterToSend ?? DEFAULT_PREFERENCES.enterToSend),
   };
 }
@@ -251,6 +281,7 @@ const speechCtor = (): SpeechCtor | undefined => {
 
 // A new set of four every page load (see starters.ts).
 const STARTERS = freshStarters();
+const HOME_HERO_COPY = pickOnLoad(HOME_HERO_OPTIONS);
 const preview = (text: string) =>
   text.replace(/[*`#>_]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
 const isMac =
@@ -268,10 +299,16 @@ const nextDrishtiSeed = (previous?: number) => {
   return seed;
 };
 const DRISHTI_MODEL_ICONS = {
-  lite: Sparkles,
-  core: Layers,
+  lite: ImageIcon,
+  core: Images,
   ultra: Aperture,
-  max: Crown,
+  max: WandSparkles,
+} as const;
+
+const CHAKSHU_MODEL_ICONS = {
+  light: VideoIcon,
+  chakshu: Film,
+  divya: Clapperboard,
 } as const;
 
 function trackPointer(event: React.PointerEvent<HTMLElement>) {
@@ -1701,7 +1738,7 @@ function App() {
           inferenceRoute,
           localInferenceAvailable: inferenceRoute === "browser-local",
           remoteInferenceAvailable: inferenceRoute === "custom-compatible",
-        }) },
+        }, preferences) },
       ...history,
       { role: "user", content: attached ? withFile({ text, file: attached }) : text },
     ];
@@ -2165,7 +2202,7 @@ function App() {
                       className={"reasoning-option" + (chakshuModelId === model.id ? " chosen" : "")}
                       disabled={chakshuGenerating || drishtiChecking}
                       onClick={() => { setChakshuModelId(model.id); setChakshuError(""); setReasoningOpen(false); }}>
-                      <span className="ro-icon ro-symbol" aria-hidden="true"><VideoIcon size={19} /></span>
+                      <span className="ro-icon ro-symbol" aria-hidden="true">{React.createElement(CHAKSHU_MODEL_ICONS[model.id], { size: 19 })}</span>
                       <span className="ro-text"><span className="ro-primary"><strong>{model.name}</strong>{model.experimental && <small className="drishti-experimental">EXPERIMENTAL</small>}</span><small>{model.description}</small></span>
                       {chakshuModelId === model.id && <Check size={15} className="ro-check" />}
                     </button>
@@ -2279,11 +2316,11 @@ function App() {
                 <span />
               </div>
               <h1>
-                What would you like
+                {HOME_HERO_COPY.lead}
                 <br />
-                <em>to understand?</em>
+                <em>{HOME_HERO_COPY.accent}</em>
               </h1>
-              <p>Truth-first intelligence for reasoning, research, and creation.</p>
+              <p>{HOME_HERO_COPY.tagline}</p>
               <div className="suggestions">
                 {STARTERS.map((item, index) => (
                   <button
@@ -2513,7 +2550,7 @@ function App() {
                     } else if (!busy) void send();
                   }
                 }}
-                placeholder={workspaceMode === "image" ? "Describe the image you want Drishti to create…" : workspaceMode === "video" ? "Describe the video you want Chakshu to create…" : busy ? status : "Ask anything…"}
+                placeholder={workspaceMode === "image" ? "Describe the image you have in mind…" : workspaceMode === "video" ? "Describe the scene you want to see in motion…" : busy ? status : "What's on your mind? Weird questions welcome…"}
                 aria-label={workspaceMode === "image" ? "Image prompt for Drishti" : workspaceMode === "video" ? "Video prompt for Chakshu" : "Message SatyaAI"}
               />
               <div className="composer-bottom">

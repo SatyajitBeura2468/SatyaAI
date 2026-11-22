@@ -1,4 +1,9 @@
 import React from "react";
+import { EMPTY_CONVERSATION_COPY, EMPTY_SAVED_COPY, EMPTY_SEARCH_COPY, pickOnLoad } from "../ui-copy";
+
+const EMPTY_CONVERSATION_MESSAGE = pickOnLoad(EMPTY_CONVERSATION_COPY);
+const EMPTY_SAVED_MESSAGE = pickOnLoad(EMPTY_SAVED_COPY);
+const EMPTY_SEARCH_MESSAGE = pickOnLoad(EMPTY_SEARCH_COPY);
 import {
   Archive, Check, Download, Library, Moon, Pencil, Plus, Search,
   Settings, Sun, Trash2, User, X, MoreHorizontal,
@@ -116,7 +121,7 @@ export function Sidebar(props: SidebarProps) {
                       {chatSearch && <button type="button" onClick={() => setChatSearch("")} aria-label="Clear conversation search"><X size={13} /></button>}
                     </label>
                     {visibleChats.length === 0 && (
-                      <div className="empty-history">{chats.length ? "No matching conversations" : "No conversations yet"}</div>
+                      <div className="empty-history">{chats.length ? EMPTY_SEARCH_MESSAGE : EMPTY_CONVERSATION_MESSAGE}</div>
                     )}
                     {visibleChats.map((chat, index) => (
                       <div className="chat-entry" key={chat.id} style={{ "--i": index } as React.CSSProperties}>
@@ -159,7 +164,7 @@ export function Sidebar(props: SidebarProps) {
                     <div className="section-label">Saved</div>
                     {saved.length === 0 && (
                       <div className="empty-history">
-                        Nothing saved yet. Tap “Save answer” under any reply.
+                        {EMPTY_SAVED_MESSAGE}
                       </div>
                     )}
                     {saved.map((item, index) => (
