@@ -16,6 +16,7 @@ import {
   Video as VideoIcon,
   Layers,
   Menu,
+  MessageSquare,
   Mic,
   Plus,
   Settings,
@@ -2165,7 +2166,7 @@ function App() {
                       disabled={chakshuGenerating || drishtiChecking}
                       onClick={() => { setChakshuModelId(model.id); setChakshuError(""); setReasoningOpen(false); }}>
                       <span className="ro-icon ro-symbol" aria-hidden="true"><VideoIcon size={19} /></span>
-                      <span className="ro-text"><span className="ro-primary"><strong>{model.name}</strong>{model.experimental && <small className="drishti-experimental">FLAGSHIP</small>}</span><small>{model.description}</small></span>
+                      <span className="ro-text"><span className="ro-primary"><strong>{model.name}</strong>{model.experimental && <small className="drishti-experimental">EXPERIMENTAL</small>}</span><small>{model.description}</small></span>
                       {chakshuModelId === model.id && <Check size={15} className="ro-check" />}
                     </button>
                   ))
@@ -2266,6 +2267,7 @@ function App() {
               chakshuRuntimeStatus={chakshuRuntimeStatus}
               stopChakshuGeneration={stopChakshuGeneration}
               chakshuModelRuntime={chakshuModelRuntime}
+              pickSuggestion={pickSuggestion}
             />
           )}
           
@@ -2515,69 +2517,87 @@ function App() {
                 aria-label={workspaceMode === "image" ? "Image prompt for Drishti" : workspaceMode === "video" ? "Video prompt for Chakshu" : "Message SatyaAI"}
               />
               <div className="composer-bottom">
-                <div className="composer-tools composer-actions" aria-label="Message tools">
-                  {workspaceMode === "chat" ? (
-                    <>
-                      <div className="composer-plus-wrap" ref={composerMenuRef}>
-                        <button
-                          type="button"
-                          className="composer-action-pill composer-add-action"
-                          onClick={() => setAttachmentMenuOpen((open) => !open)}
-                          disabled={busy}
-                          aria-label="Open add menu"
-                          aria-expanded={attachmentMenuOpen}
-                          aria-haspopup="menu"
-                        >
-                          <Plus size={17} /> <span>Add</span>
-                        </button>
-                        {attachmentMenuOpen && (
-                          <div className="composer-plus-menu" role="menu" aria-label="Add to message">
-                            <div className="composer-menu-section-label">ATTACH FROM DEVICE</div>
-                            <button type="button" role="menuitem" className="composer-menu-item" onClick={openCamera}>
-                              <Camera size={17} />
-                              <span><strong>Camera</strong><small>Take a photo with your device</small></span>
-                            </button>
-                            <button type="button" role="menuitem" className="composer-menu-item" onClick={() => { setAttachmentMenuOpen(false); inputRef.current?.click(); }}>
-                              <FileText size={17} />
-                              <span><strong>Add media &amp; files</strong><small>Photos, videos, audio and documents</small></span>
-                            </button>
-                            <div className="composer-plus-divider" />
-                            <div className="composer-menu-section-label">MORE TOOLS</div>
-                            <button type="button" role="menuitem" className="composer-menu-item composer-menu-soon" disabled title="Photo understanding is coming soon">
-                              <ImageIcon size={17} />
-                              <span><strong>Photo understanding</strong><small>Ask questions about an attached photo</small></span>
-                              <small className="composer-coming-soon">Coming soon</small>
-                            </button>
-                            <button type="button" role="menuitem" className="composer-menu-item composer-menu-soon" disabled title="Web search is coming soon">
-                              <Search size={17} />
-                              <span><strong>Web search</strong><small>Search and cite live sources</small></span>
-                              <small className="composer-coming-soon">Coming soon</small>
-                            </button>
-                          </div>
-                        )}
-                        <input
-                          ref={inputRef}
-                          hidden
-                          type="file"
-                          accept="image/*,video/*,audio/*,.txt,.md,.csv,.json,.log,.pdf,text/plain,application/pdf"
-                          onChange={(event) => {
-                            void pickFile(event.target.files?.[0]);
-                            event.target.value = "";
-                          }}
-                        />
-                      </div>
-                      <button type="button" className="composer-action-pill composer-image-action" onClick={() => switchWorkspaceMode("image")} disabled={busy}>
-                        <ImageIcon size={16} /><span>Create image</span>
+                <div className="composer-tools composer-actions" aria-label="Workspace controls">
+                  {workspaceMode === "chat" && (
+                    <div className="composer-plus-wrap" ref={composerMenuRef}>
+                      <button
+                        type="button"
+                        className="composer-action-pill composer-add-action"
+                        onClick={() => setAttachmentMenuOpen((open) => !open)}
+                        disabled={busy}
+                        aria-label="Open add menu"
+                        aria-expanded={attachmentMenuOpen}
+                        aria-haspopup="menu"
+                      >
+                        <Plus size={17} /> <span>Add</span>
                       </button>
-                      <button type="button" className="composer-action-pill composer-video-action" onClick={() => switchWorkspaceMode("video")} disabled={busy}>
-                        <VideoIcon size={16} /><span>Create video</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button type="button" className="composer-action-pill composer-add-action" onClick={() => switchWorkspaceMode("chat")}>
-                      <Sparkles size={16} /><span>Back to chat</span>
-                    </button>
+                      {attachmentMenuOpen && (
+                        <div className="composer-plus-menu" role="menu" aria-label="Add to message">
+                          <div className="composer-menu-section-label">ATTACH FROM DEVICE</div>
+                          <button type="button" role="menuitem" className="composer-menu-item" onClick={openCamera}>
+                            <Camera size={17} />
+                            <span><strong>Camera</strong><small>Take a photo with your device</small></span>
+                          </button>
+                          <button type="button" role="menuitem" className="composer-menu-item" onClick={() => { setAttachmentMenuOpen(false); inputRef.current?.click(); }}>
+                            <FileText size={17} />
+                            <span><strong>Add media &amp; files</strong><small>Photos, videos, audio and documents</small></span>
+                          </button>
+                          <div className="composer-plus-divider" />
+                          <div className="composer-menu-section-label">MORE TOOLS</div>
+                          <button type="button" role="menuitem" className="composer-menu-item composer-menu-soon" disabled title="Web search is coming soon">
+                            <Search size={17} />
+                            <span><strong>Web search</strong><small>Search and cite live sources</small></span>
+                            <small className="composer-coming-soon">Coming soon</small>
+                          </button>
+                        </div>
+                      )}
+                      <input
+                        ref={inputRef}
+                        hidden
+                        type="file"
+                        accept="image/*,video/*,audio/*,.txt,.md,.csv,.json,.log,.pdf,text/plain,application/pdf"
+                        onChange={(event) => {
+                          void pickFile(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </div>
                   )}
+                  <div className="workspace-mode-tabs" role="tablist" aria-label="SatyaAI workspace">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={workspaceMode === "chat"}
+                      className={"composer-action-pill workspace-mode-tab composer-chat-action" + (workspaceMode === "chat" ? " active" : "")}
+                      onClick={() => switchWorkspaceMode("chat")}
+                      disabled={busy || drishtiStarting || drishtiGenerating || chakshuGenerating}
+                      title="Chat"
+                    >
+                      <MessageSquare size={15} /><span>Chat</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={workspaceMode === "image"}
+                      className={"composer-action-pill workspace-mode-tab composer-image-action" + (workspaceMode === "image" ? " active" : "")}
+                      onClick={() => switchWorkspaceMode("image")}
+                      disabled={busy || drishtiStarting || drishtiGenerating || chakshuGenerating}
+                      title="Create image"
+                    >
+                      <ImageIcon size={15} /><span>Create image</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={workspaceMode === "video"}
+                      className={"composer-action-pill workspace-mode-tab composer-video-action" + (workspaceMode === "video" ? " active" : "")}
+                      onClick={() => switchWorkspaceMode("video")}
+                      disabled={busy || drishtiStarting || drishtiGenerating || chakshuGenerating}
+                      title="Create video"
+                    >
+                      <VideoIcon size={15} /><span>Create video</span>
+                    </button>
+                  </div>
                 </div>
                 <button
                   className={"send " + (workspaceMode === "image"
