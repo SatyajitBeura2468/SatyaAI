@@ -3,8 +3,8 @@ export const DEFAULT_CHAKSHU_MODEL_ID = "light" as const;
 export const CHAKSHU_MODELS = [
   {
     id: "light",
-    name: "Chakshu Light",
-    selectorLabel: "Light",
+    name: "Chakshu Lite",
+    selectorLabel: "Lite",
     description: "The smallest model in the family. 480p text-to-video; still needs a supported GPU.",
     quality: "Wan2.1 · 1.3B · 480p · silent MP4",
     sourceModelId: "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
@@ -14,8 +14,8 @@ export const CHAKSHU_MODELS = [
   },
   {
     id: "chakshu",
-    name: "Chakshu",
-    selectorLabel: "Chakshu",
+    name: "Chakshu 1.0",
+    selectorLabel: "Chakshu 1.0",
     description: "Balanced high-quality text-to-video at 720p-class resolution and 24 fps.",
     quality: "Wan2.2 TI2V · 5B · 720p-class · silent MP4",
     sourceModelId: "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
