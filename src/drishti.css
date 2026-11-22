@@ -458,3 +458,66 @@
 .drishti-mode-hint { margin-left: 2px; color: var(--text-3); font-size: 10.5px; font-weight: 600; white-space: nowrap; }
 .drishti-history-item video { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; object-fit: cover; background: #05070b; }
 .drishti-result-actions .drishti-download { min-height: 38px; font-size: 12.5px; }
+
+
+/* Compact creative studios: keep the ideas visible above the fixed composer. */
+.drishti-studio,
+.chakshu-studio {
+  width: min(820px, calc(100% - 36px));
+  min-height: 0;
+  justify-content: flex-start;
+  gap: clamp(10px, 1.5vh, 15px);
+  padding: 12px 0 26px;
+}
+.drishti-studio-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+}
+.drishti-studio-mark svg { width: 26px; height: 26px; }
+.drishti-studio-copy { max-width: 760px; }
+.drishti-kicker { margin-bottom: 7px; }
+.drishti-studio-copy h1 { font-size: clamp(30px, 3.5vw, 44px); }
+.drishti-studio-copy p { margin-top: 8px; line-height: 1.5; }
+.drishti-connect-actions { margin-top: 12px; gap: 8px; }
+.drishti-ideas-heading { margin-top: 1px; width: min(800px, 100%); }
+.drishti-ideas-grid { width: min(800px, 100%); gap: 8px; }
+.drishti-idea-card { min-height: 68px; padding: 10px 12px; gap: 10px; border-radius: 14px; }
+.drishti-idea-icon { width: 34px; height: 34px; border-radius: 11px; font-size: 17px; }
+.drishti-idea-text { gap: 3px; }
+.drishti-idea-text strong { font-size: 13px; }
+.drishti-idea-text small { font-size: 11.5px; line-height: 1.35; }
+.drishti-studio-note { width: min(800px, 100%); font-size: 11.5px; line-height: 1.45; }
+.drishti-activity { gap: 10px; }
+.chakshu-ideas-grid { margin-top: 0; }
+.chakshu-license { padding: 10px 12px; gap: 7px; }
+
+@media (max-height: 820px) and (min-width: 621px) {
+  .drishti-studio, .chakshu-studio { padding-top: 8px; padding-bottom: 18px; gap: 9px; }
+  .drishti-studio-mark { width: 48px; height: 48px; border-radius: 15px; }
+  .drishti-studio-mark svg { width: 23px; height: 23px; }
+  .drishti-studio-copy h1 { font-size: clamp(29px, 3.1vw, 40px); }
+  .drishti-studio-copy p { margin-top: 6px; font-size: 13px; }
+  .drishti-connect-actions { margin-top: 8px; }
+  .drishti-idea-card { min-height: 62px; padding: 8px 10px; }
+  .drishti-ideas-heading { margin-top: 0; }
+}
+@media (max-width: 620px) {
+  .drishti-studio, .chakshu-studio {
+    width: min(100% - 28px, 520px);
+    padding: 12px 0 24px;
+    gap: 11px;
+  }
+  .drishti-studio-mark { width: 50px; height: 50px; border-radius: 16px; }
+  .drishti-studio-copy h1 { font-size: clamp(27px, 7.2vw, 36px); }
+  .drishti-studio-copy p { margin-top: 7px; font-size: 12.5px; }
+  .drishti-connect-actions { margin-top: 9px; flex-wrap: wrap; justify-content: center; }
+  .drishti-ideas-heading { margin-top: 1px; }
+  .drishti-ideas-grid { grid-template-columns: 1fr; gap: 7px; }
+  .drishti-idea-card { min-height: 62px; padding: 9px 11px; }
+  .drishti-studio-note { font-size: 11px; }
+  .drishti-activity { gap: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drishti-studio, .chakshu-studio { animation: none; }
+}
