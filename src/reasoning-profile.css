@@ -200,3 +200,36 @@ button.avatar:active{transform:scale(.95)}
 @media (max-width:360px){
   .reasoning-current{max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+
+
+/* Keep model menus fully on-screen on phones, including near the right edge. */
+@media (max-width: 620px) {
+  .reasoning-menu {
+    left: 50%;
+    right: auto;
+    width: min(320px, calc(100vw - 28px));
+    max-width: calc(100vw - 28px);
+    max-height: min(64dvh, 460px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    translate: -50% 0;
+    padding: 7px;
+    border-radius: 17px;
+  }
+  .reasoning-option {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 9px;
+    min-height: 54px;
+    padding: 9px 10px;
+  }
+  .ro-icon { width: 34px; height: 34px; }
+  .ro-primary { gap: 9px; flex-wrap: wrap; }
+  .ro-text small { line-height: 1.35; }
+  .reasoning-current {
+    max-width: 104px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
