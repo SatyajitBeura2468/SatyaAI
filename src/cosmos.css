@@ -182,9 +182,9 @@ button:disabled{cursor:not-allowed}
 .stars.s2{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='760' height='760'><circle cx='273' cy='292' r='0.7' fill='%23c8d7ff' fill-opacity='0.85'/><circle cx='628' cy='583' r='0.83' fill='%23ffffff' fill-opacity='0.6'/><circle cx='471' cy='700' r='1.02' fill='%23dcc8ff' fill-opacity='0.85'/><circle cx='412' cy='407' r='0.74' fill='%23dcc8ff' fill-opacity='1'/><circle cx='67' cy='199' r='0.73' fill='%23dcc8ff' fill-opacity='0.6'/><circle cx='170' cy='116' r='0.84' fill='%23ffffff' fill-opacity='0.6'/><circle cx='4' cy='584' r='0.76' fill='%23c8d7ff' fill-opacity='0.6'/><circle cx='632' cy='30' r='0.73' fill='%23dcc8ff' fill-opacity='0.6'/><circle cx='156' cy='653' r='0.8' fill='%23c8d7ff' fill-opacity='0.85'/><circle cx='489' cy='129' r='0.75' fill='%23dcc8ff' fill-opacity='0.85'/><circle cx='495' cy='499' r='0.82' fill='%23ffffff' fill-opacity='0.6'/><circle cx='354' cy='275' r='0.89' fill='%23ffffff' fill-opacity='1'/><circle cx='532' cy='27' r='0.78' fill='%23c8d7ff' fill-opacity='1'/><circle cx='154' cy='710' r='0.92' fill='%23c8d7ff' fill-opacity='0.6'/></svg>");background-size:760px 760px}
 .stars.s3{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1100' height='1100'><circle cx='190' cy='538' r='1.26' fill='%23c8d7ff' fill-opacity='0.8'/><circle cx='460' cy='1094' r='1.27' fill='%23ffffff' fill-opacity='1'/><circle cx='403' cy='494' r='1.41' fill='%23ffffff' fill-opacity='0.8'/><circle cx='1064' cy='1013' r='1.18' fill='%23ffffff' fill-opacity='0.8'/><circle cx='576' cy='971' r='1.13' fill='%23dcc8ff' fill-opacity='1'/><circle cx='719' cy='750' r='1.04' fill='%23ffffff' fill-opacity='0.8'/></svg>");background-size:1100px 1100px}
 /* ---------- composer ---------- */
-.composer-wrap{position:sticky;bottom:0;z-index:5;margin-top:auto;padding:20px 0 8px}
+.composer-wrap{position:sticky;bottom:0;z-index:24;margin-top:auto;padding:20px 0 8px}
 .composer-wrap::before{content:"";position:absolute;left:-100vw;right:-100vw;top:0;bottom:-18px;z-index:-1;pointer-events:none;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 34%,#000 78%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 34%,#000 78%,transparent 100%);background:color-mix(in srgb,var(--bg) 70%,transparent)}
-.composer{position:relative;display:flex;flex-direction:column;gap:6px;padding:14px 14px 12px 18px;border-radius:26px;overflow:hidden;background:var(--glass-strong);-webkit-backdrop-filter:blur(26px) saturate(1.5);backdrop-filter:blur(26px) saturate(1.5);border:1px solid var(--border-strong);box-shadow:var(--shadow),var(--hi);transition:border-color .3s,box-shadow .35s var(--ease)}
+.composer{position:relative;display:flex;flex-direction:column;gap:8px;padding:14px 14px 12px 18px;border-radius:26px;overflow:visible;isolation:isolate;background:var(--glass-strong);-webkit-backdrop-filter:blur(26px) saturate(1.5);backdrop-filter:blur(26px) saturate(1.5);border:1px solid var(--border-strong);box-shadow:var(--shadow),var(--hi);transition:border-color .3s,box-shadow .35s var(--ease)}
 .composer::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(320px circle at var(--px,50%) var(--py,0),rgba(139,123,255,.13),transparent 65%);opacity:0;transition:opacity .35s}
 .composer:hover::before,.composer:focus-within::before{opacity:1}
 .composer:focus-within{border-color:rgba(139,123,255,.6);box-shadow:0 0 0 4px rgba(139,123,255,.13),0 26px 70px -26px var(--glow),var(--hi)}
@@ -485,3 +485,72 @@ button:disabled{cursor:not-allowed}
 .message-version-pager { display: flex; align-items: center; gap: 7px; margin-top: 9px; color: var(--text-3); font: 11px var(--mono); }
 .message-version-pager .msg-action { min-width: 27px; height: 27px; padding: 0 8px; font-size: 17px; line-height: 1; }
 .message-version-pager .msg-action:disabled { opacity: .35; cursor: not-allowed; }
+
+
+/* SatyaSom composer palette: popover is visible above the glass composer. */
+.composer-tools.composer-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}
+.composer-plus-wrap{position:relative;z-index:42}
+.composer-action-pill{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:0 13px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text-2);font:600 12.5px/1 var(--font);white-space:nowrap;transition:transform .22s var(--ease),background .22s,border-color .22s,color .22s,box-shadow .22s}
+.composer-action-pill:hover:not(:disabled){transform:translateY(-1px);color:var(--text);background:var(--surface-hover);border-color:var(--border-strong)}
+.composer-action-pill:active:not(:disabled){transform:scale(.97)}
+.composer-action-pill:disabled{opacity:.48;cursor:not-allowed}
+.composer-add-action{background:color-mix(in srgb,var(--surface) 86%,var(--accent) 14%);border-color:color-mix(in srgb,var(--border-strong) 65%,var(--accent) 35%);color:var(--text)}
+.composer-image-action{background:linear-gradient(120deg,rgba(139,123,255,.13),rgba(139,123,255,.045));border-color:rgba(139,123,255,.27)}
+.composer-image-action svg{color:#a99aff}
+.composer-video-action{background:linear-gradient(120deg,rgba(69,190,197,.12),rgba(69,190,197,.04));border-color:rgba(69,190,197,.27)}
+.composer-video-action svg{color:#62cbd0}
+.composer-engine-note{font-weight:650;letter-spacing:.02em;color:var(--text-2)}
+.composer-plus-menu{left:0;bottom:calc(100% + 12px);z-index:60;width:min(318px,calc(100vw - 36px));max-height:min(68vh,460px);overflow:auto;padding:9px;border-radius:19px;border:1px solid var(--border-strong);background:var(--glass-strong);box-shadow:0 24px 75px -24px rgba(0,0,0,.68),var(--hi);backdrop-filter:blur(28px) saturate(1.45);-webkit-backdrop-filter:blur(28px) saturate(1.45);animation:composerMenuIn .18s var(--ease) both}
+@keyframes composerMenuIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.composer-menu-section-label{padding:8px 10px 5px;color:var(--text-3);font:700 9px/1.2 var(--mono);letter-spacing:.13em}
+.composer-menu-item{display:flex;align-items:center;gap:11px;width:100%;min-height:54px;padding:8px 10px;border-radius:12px;text-align:left;color:var(--text-2);transition:background .2s,color .2s,transform .2s}
+.composer-menu-item>svg{flex:none;color:var(--accent-2)}
+.composer-menu-item>span{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.composer-menu-item strong{font-size:12.5px;font-weight:650;color:var(--text)}
+.composer-menu-item span small{font-size:10.5px;line-height:1.35;color:var(--text-3)}
+.composer-menu-item:hover:not(:disabled){background:var(--surface-hover);color:var(--text);transform:translateX(2px)}
+.composer-menu-item:disabled{opacity:.48;cursor:not-allowed}
+.composer-menu-item.composer-menu-soon>svg{color:var(--text-3)}
+.composer-coming-soon{flex:none;margin-left:auto;padding:4px 7px;border:1px solid var(--border);border-radius:99px;color:var(--text-3)!important;font:600 9px/1 var(--mono);white-space:nowrap}
+.composer-plus-divider{height:1px;margin:6px 4px;background:var(--border)}
+.attachment{max-width:min(100%,520px);border-radius:17px;padding:7px 9px 7px 8px}
+.attachment-preview{width:46px;height:46px;flex:none;object-fit:cover;border-radius:11px;border:1px solid var(--border)}
+.attachment-copy{display:flex;min-width:0;flex-direction:column;gap:3px}
+.attachment-copy span{font-size:12px}
+.attachment-copy small{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:10px}
+.file-note{display:inline-flex;align-items:center;gap:6px}
+.camera-backdrop{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;background:rgba(3,5,13,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);animation:fade .2s both}
+.camera-dialog{width:min(720px,100%);padding:20px;border:1px solid var(--border-strong);border-radius:26px;background:var(--glass-strong);box-shadow:0 35px 110px -30px rgba(0,0,0,.8),var(--hi);animation:pop .28s var(--ease) both}
+.camera-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.camera-dialog-kicker{font:700 9px/1.2 var(--mono);letter-spacing:.16em;color:var(--accent-2)}
+.camera-dialog-header h2{margin:7px 0 4px;color:var(--text);font-size:22px;letter-spacing:-.04em}
+.camera-dialog-header p{margin:0;color:var(--text-3);font-size:12px;line-height:1.5}
+.camera-close{display:grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid var(--border);border-radius:50%;color:var(--text-2);background:var(--surface)}
+.camera-preview-frame{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:16/10;overflow:hidden;border:1px solid var(--border);border-radius:18px;background:#05070d}
+.camera-preview-frame video{display:block;width:100%;height:100%;object-fit:contain}
+.camera-preview-message{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;flex-direction:column;padding:24px;text-align:center;color:#fff}
+.camera-preview-message svg{color:#b9acff}
+.camera-preview-message strong{font-size:14px}
+.camera-preview-message span{max-width:420px;color:rgba(255,255,255,.66);font-size:11px;line-height:1.5}
+.camera-dialog-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:16px}
+.camera-dialog-footer small{max-width:330px;color:var(--text-3);font-size:10.5px;line-height:1.5}
+.camera-capture-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border:0;border-radius:999px;background:var(--grad);color:#fff;font:650 12px var(--font);box-shadow:0 12px 30px -12px var(--glow);transition:transform .2s,opacity .2s}
+.camera-capture-button:hover:not(:disabled){transform:translateY(-1px)}
+.camera-capture-button:disabled{opacity:.42;cursor:not-allowed}
+@media(max-width:860px){
+  .composer-tools.composer-actions{gap:7px}
+  .composer-action-pill{min-height:40px;padding:0 11px;font-size:11.5px}
+  .composer-plus-menu{width:min(318px,calc(100vw - 40px));max-height:62vh}
+  .attachment-copy small{max-width:calc(100vw - 170px)}
+  .camera-dialog{padding:15px;border-radius:21px}
+  .camera-preview-frame{aspect-ratio:4/3}
+  .camera-dialog-footer{align-items:stretch;flex-direction:column}
+  .camera-dialog-footer small{max-width:none}
+  .camera-capture-button{width:100%}
+}
+@media(max-width:420px){
+  .composer-tools.composer-actions{gap:6px}
+  .composer-action-pill{gap:6px;padding:0 9px;font-size:10.5px}
+  .composer-action-pill svg{width:14px;height:14px}
+  .composer-plus-menu{left:0;width:min(292px,calc(100vw - 30px))}
+}
