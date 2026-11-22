@@ -196,7 +196,7 @@ export function Sidebar(props: SidebarProps) {
                     <small>{capability}</small>
                   </div>
                 </div>
-                <button className="account-chip" onClick={() => openSettings("personalization")}>
+                <button className="account-chip" onClick={() => openSettings()}>
                   <span className="account-chip-avatar"><User size={16} /></span>
                   <span><strong>Local profile</strong><small>Account sync · Soon</small></span>
                 </button>
