@@ -48,4 +48,4 @@ export declare function normalizeRuntimeContext(input?: CoreRuntimeContext): Rea
 }>;
 export declare function formatRuntimeContext(input?: CoreRuntimeContext): string;
 export declare function sanitizeCoreUserMemory(value: unknown): CoreUserMemory;
-export declare function buildSatyaCorePrompt(options?: { userMemory?: unknown; runtimeContext?: CoreRuntimeContext }): string;
+export declare function buildSatyaCorePrompt(options?: { userMemory?: unknown; runtimeContext?: CoreRuntimeContext; userPreferences?: Record<string, unknown> }): string;
