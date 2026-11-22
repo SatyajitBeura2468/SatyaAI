@@ -25,6 +25,7 @@ type ChakshuStudioProps = {
   chakshuRuntimeStatus: ChakshuRuntimeStatus | null;
   stopChakshuGeneration: () => void;
   chakshuModelRuntime: DrishtiModelAvailability | undefined;
+  pickSuggestion: (prompt: string) => void;
 };
 
 export function ChakshuStudio(props: ChakshuStudioProps) {
@@ -33,7 +34,7 @@ export function ChakshuStudio(props: ChakshuStudioProps) {
     connectChakshuRuntime, chakshuGenerating, currentChakshu, chakshuModelId,
     divyaLicenseAccepted, setDivyaLicenseAccepted, chakshuResult, chakshuHistory,
     chakshuActiveHistoryId, selectChakshuHistory, chakshuHistoryWarning, chakshuError,
-    chakshuRuntimeStatus, stopChakshuGeneration, chakshuModelRuntime,
+    chakshuRuntimeStatus, stopChakshuGeneration, chakshuModelRuntime, pickSuggestion,
   } = props;
   return (
       <div className="drishti-studio chakshu-studio" aria-label="Chakshu video workspace">
@@ -55,16 +56,31 @@ export function ChakshuStudio(props: ChakshuStudioProps) {
                         {!drishtiRuntimeHealth && drishtiWindowsDesktopSupported && <a className="drishti-install-link" href={DRISHTI_COMPANION_INSTALL_URL} target="_blank" rel="noreferrer">Install companion once</a>}
                       </div>
                     </div>
-                    <div className="chakshu-model-summary">
-                      <div>
-                        <span className="drishti-kicker">SELECTED MODEL</span>
-                        <strong>{currentChakshu.name}</strong>
-                        <p>{currentChakshu.description}</p>
-                        <small>{currentChakshu.quality} · {currentChakshu.hardware}</small>
-                        <small>Weights: {currentChakshu.license}</small>
-                      </div>
-                      <span className="chakshu-model-symbol"><VideoIcon size={20} /></span>
-                    </div>
+                    {!chakshuGenerating && !drishtiStarting && !chakshuResult && !chakshuError && (
+                      <>
+                        <div className="drishti-ideas-heading">
+                          <div>
+                            <strong>Start with an idea</strong>
+                            <span>Pick a scene to fill the prompt, then make it yours.</span>
+                          </div>
+                          <span className="drishti-ideas-sparkle" aria-hidden="true"><VideoIcon size={17} /></span>
+                        </div>
+                        <div className="drishti-ideas-grid chakshu-ideas-grid">
+                          {[
+                            { icon: "✦", title: "Cinematic landscapes", description: "A sweeping sunrise over a mountain range", prompt: "A cinematic aerial establishing shot over a dramatic Himalayan mountain range at sunrise, clouds flowing through deep valleys, golden light slowly illuminating the snow-covered peaks, smooth forward drone movement, realistic natural cinematography." },
+                            { icon: "◉", title: "Nature in motion", description: "A hummingbird hovering beside a flower", prompt: "An ultra-detailed macro nature film of a hummingbird hovering beside a bright tropical flower, delicate wing movement, tiny droplets catching the morning light, soft bokeh background, gentle slow-motion camera movement, photorealistic." },
+                            { icon: "◇", title: "Future city", description: "A quiet flight through a luminous skyline", prompt: "A cinematic continuous camera flight through a futuristic coastal city at blue hour, elegant illuminated towers, elevated transit gliding between buildings, reflections across rain-wet streets, atmospheric depth, smooth forward camera motion." },
+                            { icon: "▧", title: "Product reveal", description: "A premium object turning in studio light", prompt: "A premium cinematic product reveal of a fictional brushed-titanium wristwatch on a dark reflective plinth, slow controlled orbiting camera, precise moving highlights across the metal, deep navy studio background, photorealistic commercial lighting." },
+                          ].map((idea) => (
+                            <button key={idea.title} type="button" className="drishti-idea-card" onClick={() => pickSuggestion(idea.prompt)} disabled={chakshuGenerating || drishtiStarting || !drishtiWindowsDesktopSupported}>
+                              <span className="drishti-idea-icon" aria-hidden="true">{idea.icon}</span>
+                              <span className="drishti-idea-text"><strong>{idea.title}</strong><small>{idea.description}</small></span>
+                              <span className="drishti-idea-arrow" aria-hidden="true">↗</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                     {chakshuModelId === "divya" && (
                       <div className="chakshu-license">
                         <label><input type="checkbox" checked={divyaLicenseAccepted} onChange={(event) => setDivyaLicenseAccepted(event.target.checked)} /><span>I have reviewed and agree to the LTX-2.x Community License for the Divya Chakshu 1 model weights.</span></label>
