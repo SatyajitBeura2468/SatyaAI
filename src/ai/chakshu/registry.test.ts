@@ -9,8 +9,8 @@ import {
 describe("Chakshu video model registry", () => {
   it("exposes the three named family tiers in order", () => {
     expect(CHAKSHU_MODELS.map((model) => model.name)).toEqual([
-      "Chakshu Light",
-      "Chakshu",
+      "Chakshu Lite",
+      "Chakshu 1.0",
       "Divya Chakshu 1",
     ]);
   });
