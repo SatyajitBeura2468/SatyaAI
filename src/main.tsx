@@ -18,6 +18,7 @@ import {
   Mic,
   Plus,
   Settings,
+  Search,
   Sparkles,
   Square,
   Pencil,
@@ -26,6 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
+import { ConfirmDialog, type ConfirmRequest } from "./components/ConfirmDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { DrishtiStudio } from "./components/DrishtiStudio";
 import { ChakshuStudio } from "./components/ChakshuStudio";
@@ -82,6 +84,9 @@ type Message = {
   modelProgress?: ModelProgressSnapshot;
   tierName?: string;
   error?: boolean;
+  interrupted?: boolean;
+  versions?: string[];
+  versionIndex?: number;
   file?: { name: string; text: string };
   createdAt?: number;
 };
@@ -96,11 +101,13 @@ type AppPreferences = {
   showTimestamps: boolean;
   reduceMotion: boolean;
   saveChatHistory: boolean;
+  allowLocalModels: boolean;
   fontSize: "small" | "medium" | "large";
 };
 type SettingsTab = "general" | "personalization" | "models" | "privacy" | "shortcuts";
 type SavedAnswer = { id: string; question: string; answer: string; savedAt: number };
 type SidebarView = "chats" | "saved";
+type ConfirmState = ConfirmRequest;
 type LoadingPhraseDeck = { order: number[]; position: number };
 
 function formatDuration(seconds: number | null): string | null {
@@ -139,6 +146,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   showTimestamps: false,
   reduceMotion: false,
   saveChatHistory: true,
+  allowLocalModels: false,
   fontSize: "medium",
 };
 function readPreferences(): AppPreferences {
@@ -155,7 +163,6 @@ function readPreferences(): AppPreferences {
 const MAX_SAVED = 100;
 const AVATAR_KEY = "satya-avatar";
 const AVATAR_SIZE = 256;
-const MAX_CHATS = 30;
 const ATTACH_MAX_CHARS = 6000;
 const ATTACH_MAX_BYTES = 1_000_000;
 const newId = () =>
@@ -363,11 +370,14 @@ function App() {
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [copiedAction, setCopiedAction] = useState("");
+  const [messageFeedback, setMessageFeedback] = useState<Record<number, "up" | "down" | undefined>>({});
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [endpointFeedback, setEndpointFeedback] = useState("");
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmState | null>(null);
   const [file, setFile] = useState<{ name: string; text: string } | null>(
     null,
   );
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [gateway, setGateway] = useState<"online" | "offline">("offline");
   const [busy, setBusy] = useState(false);
@@ -601,10 +611,17 @@ function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "o") {
         event.preventDefault();
         newChatRef.current();
+      } else if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setMenu(true);
+        setSidebarView("chats");
+        window.setTimeout(() => document.querySelector<HTMLInputElement>(".chat-list-search input")?.focus(), 40);
       } else if (event.key === "Escape") {
+        setConfirmRequest(null);
+        setAttachmentMenuOpen(false);
         setSettings(false);
         setMenu(false);
         setReasoningOpen(false);
@@ -836,18 +853,22 @@ function App() {
         role: message.role,
         text: message.text,
         ...(message.error ? { error: true } : {}),
+        ...(message.interrupted ? { interrupted: true } : {}),
+        ...(message.versions?.length ? { versions: message.versions, versionIndex: message.versionIndex } : {}),
         ...(message.file ? { file: message.file } : {}),
         ...(message.createdAt ? { createdAt: message.createdAt } : {}),
       })) as Message[];
     const first =
       saved.find((message) => message.role === "user")?.text.trim() ||
       "New chat";
+    const cleanTitle = first.replace(/[*_`#>]/g, "").replace(/\s+/g, " ").trim();
+    const autoTitle = cleanTitle.length > 58 ? cleanTitle.slice(0, 55).trimEnd() + "…" : cleanTitle;
     setChats((previous) => {
       const existing = previous.find((chat) => chat.id === id);
       return [
-        { id, title: existing?.title ?? first.slice(0, 40), updatedAt: Date.now(), messages: saved },
+        { id, title: existing?.title ?? (autoTitle || "New chat"), updatedAt: Date.now(), messages: saved },
         ...previous.filter((chat) => chat.id !== id),
-      ].slice(0, MAX_CHATS);
+      ];
     });
   }
 
@@ -930,17 +951,24 @@ function App() {
 
   function deleteChat(chatId: string) {
     const chat = chats.find((item) => item.id === chatId);
-    if (!chat || !window.confirm('Delete "' + chat.title + '"? This cannot be undone.')) return;
-    setChats((previous) => previous.filter((item) => item.id !== chatId));
-    if (chatId === activeRef.current) {
-      activeAbortRef.current?.abort();
-      activeRef.current = newId();
-      setActiveId(activeRef.current);
-      setBusy(false);
-      setMessages([]);
-      setStatus("Ready");
-      followLatestRef.current = true;
-    }
+    if (!chat) return;
+    setConfirmRequest({
+      title: "Delete conversation?",
+      message: 'Delete "' + chat.title + '" from this browser? This cannot be undone.',
+      confirmLabel: "Delete",
+      onConfirm: () => {
+        setChats((previous) => previous.filter((item) => item.id !== chatId));
+        if (chatId === activeRef.current) {
+          activeAbortRef.current?.abort();
+          activeRef.current = newId();
+          setActiveId(activeRef.current);
+          setBusy(false);
+          setMessages([]);
+          setStatus("Ready");
+          followLatestRef.current = true;
+        }
+      },
+    });
   }
 
   async function copyText(text: string, actionId: string) {
@@ -980,20 +1008,26 @@ function App() {
   }
 
   function clearConversationData() {
-    if (!window.confirm("Delete all local conversations and saved answers from this browser? This action cannot be undone.")) return;
-    activeAbortRef.current?.abort();
-    setBusy(false);
-    setChats([]);
-    setSaved([]);
-    setMessages([]);
-    activeRef.current = newId();
-    setActiveId(activeRef.current);
-    setChatSearch("");
-    try {
-      localStorage.removeItem(CHATS_KEY);
-      localStorage.removeItem(SAVED_KEY);
-    } catch { /* state is still cleared for this session */ }
-    setStatus("Conversation data cleared.");
+    setConfirmRequest({
+      title: "Delete all local data?",
+      message: "Delete every saved conversation and answer from this browser? This action cannot be undone.",
+      confirmLabel: "Delete all data",
+      onConfirm: () => {
+        activeAbortRef.current?.abort();
+        setBusy(false);
+        setChats([]);
+        setSaved([]);
+        setMessages([]);
+        activeRef.current = newId();
+        setActiveId(activeRef.current);
+        setChatSearch("");
+        try {
+          localStorage.removeItem(CHATS_KEY);
+          localStorage.removeItem(SAVED_KEY);
+        } catch { /* state is still cleared for this session */ }
+        setStatus("Conversation data cleared.");
+      },
+    });
   }
 
   function exportAllData() {
@@ -1061,7 +1095,7 @@ function App() {
     }
     const recognition = new Ctor();
     const base = query.trim();
-    recognition.lang = navigator.language || "en-IN";
+    recognition.lang = preferences.language === "Hindi" ? "hi-IN" : preferences.language === "Odia" ? "or-IN" : navigator.language || "en-IN";
     recognition.interimResults = true;
     recognition.continuous = false;
     recognition.onresult = (event) => {
@@ -1421,11 +1455,32 @@ function App() {
   }
 
   function switchWorkspaceMode(nextMode: WorkspaceMode) {
-    if (file && nextMode !== "chat" && !window.confirm("Switching workspace will remove the attached text file from the composer. Continue?")) return;
-    if (file && nextMode !== "chat") setFile(null);
+    if (file && nextMode !== "chat") {
+      setConfirmRequest({
+        title: "Remove attached file?",
+        message: "Switching to the media workspace will remove the current text attachment from the composer.",
+        confirmLabel: "Switch workspace",
+        onConfirm: () => {
+          setFile(null);
+          setWorkspaceMode(nextMode);
+          setReasoningOpen(false);
+        },
+      });
+      return;
+    }
     if (nextMode === "chat" && workspaceMode !== "chat") setQuery("");
     setWorkspaceMode(nextMode);
     setReasoningOpen(false);
+  }
+
+  function updateStreamingAnswer(partial: string) {
+    partialAnswerRef.current = partial;
+    setMessages((previous) => {
+      const next = [...previous];
+      const last = next.length - 1;
+      if (last >= 0 && next[last].role === "ai") next[last] = { ...next[last], text: partial };
+      return next;
+    });
   }
 
   function send() {
@@ -1445,6 +1500,7 @@ function App() {
     attached: Message["file"] | null = file,
     historyOverride?: Message[],
     clearComposer = true,
+    previousVersions?: string[],
   ) {
     const text = rawText.trim();
     if (!text || busy) return;
@@ -1475,11 +1531,11 @@ function App() {
         content: withFile(message),
       }));
 
-    const inferenceRoute = mode !== "nano" && provider.baseUrl && provider.model
-      ? "custom-compatible"
-      : mode !== "nano" && gateway === "online"
-        ? "remote-gateway"
-        : "browser-local";
+    const inferenceRoute = mode === "nano"
+      ? "browser-local"
+      : provider.baseUrl && provider.model
+        ? "custom-compatible"
+        : "remote-gateway";
     const preferenceNotes = [
       preferences.language !== "auto" ? "Preferred response language: " + preferences.language + "." : "",
       preferences.responseStyle !== "balanced" ? "Preferred response style: " + preferences.responseStyle + "." : "",
@@ -1521,12 +1577,14 @@ function App() {
     lastDownloadPercentRef.current = null;
     progressCommentaryUntilRef.current = 0;
     followLatestRef.current = true;
-    const usesLocalModel = !identityAnswer && !(provider.baseUrl && provider.model && mode !== "nano");
+    const usesLocalModel = !identityAnswer && mode === "nano";
     const initialLoadingMessage = identityAnswer
       ? "Preparing a reply…"
       : provider.baseUrl && mode !== "nano"
         ? "Configured model se jud raha hoon…"
-        : nextLoadingLine("cache-check");
+        : usesLocalModel
+          ? nextLoadingLine("cache-check")
+          : "Connecting to the hosted model…";
     const initialModelProgress = usesLocalModel
       ? {
           percent: null,
@@ -1578,7 +1636,7 @@ function App() {
         answer = identityAnswer;
       } else if (provider.baseUrl && provider.model && mode !== "nano") {
         setThinkingActive(true);
-        answer = await openAICompatible(provider, modelMessages, mode, controller.signal);
+        answer = await openAICompatible(provider, modelMessages, mode, controller.signal, updateStreamingAnswer);
         setThinkingActive(false);
       } else {
         answer = await localWebLLM(
@@ -1623,19 +1681,10 @@ function App() {
               updatePendingLoadingText(progress || "Model load ho raha hai…", details);
             }
           },
-          (partial) => {
-            partialAnswerRef.current = partial;
-            setMessages((previous) => {
-              const next = [...previous];
-              const last = next.length - 1;
-              if (last >= 0 && next[last].role === "ai") {
-                next[last] = { ...next[last], text: partial };
-              }
-              return next;
-            });
-          },
+          updateStreamingAnswer,
           (active) => setThinkingActive(active),
           memoryForTurn,
+          preferences.allowLocalModels,
           controller.signal,
         );
       }
@@ -1644,7 +1693,8 @@ function App() {
         const next = [...previous];
         const last = next.length - 1;
         if (last >= 0 && next[last].role === "ai") {
-          next[last] = { ...next[last], role: "ai", text: answer, pending: false };
+          const versions = [...(previousVersions ?? []), answer];
+          next[last] = { ...next[last], role: "ai", text: answer, pending: false, versions, versionIndex: versions.length - 1 };
         }
         return next;
       });
@@ -1652,16 +1702,17 @@ function App() {
       upsertChat(chatId, [
         ...priorMessages,
         userMessage,
-        { role: "ai", text: answer, tierName: selectedTier.name, createdAt: Date.now() },
+        { role: "ai", text: answer, tierName: selectedTier.name, createdAt: Date.now(), versions: [...(previousVersions ?? []), answer], versionIndex: (previousVersions?.length ?? 0) },
       ]);
     } catch (error) {
       if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+        const wasInterrupted = Boolean(partialAnswerRef.current.trim());
         const stoppedText = partialAnswerRef.current || "Generation stopped.";
         setMessages((previous) => {
           const next = [...previous];
           const last = next.length - 1;
           if (last >= 0 && next[last].role === "ai") {
-            next[last] = { ...next[last], text: stoppedText, pending: false, modelProgress: undefined };
+            next[last] = { ...next[last], text: stoppedText, pending: false, modelProgress: undefined, ...(wasInterrupted ? { interrupted: true } : {}) };
           }
           return next;
         });
@@ -1669,7 +1720,7 @@ function App() {
           upsertChat(chatId, [
             ...priorMessages,
             userMessage,
-            { role: "ai", text: stoppedText, tierName: selectedTier.name, createdAt: Date.now() },
+            { role: "ai", text: stoppedText, tierName: selectedTier.name, createdAt: Date.now(), ...(wasInterrupted ? { interrupted: true } : {}) },
           ]);
         }
         setStatus("Generation stopped.");
@@ -1716,6 +1767,47 @@ function App() {
     }
   }
 
+  function retryFailedAnswer(index: number) {
+    if (busy || index !== messages.length - 1 || !messages[index]?.error) return;
+    let userIndex = index - 1;
+    while (userIndex >= 0 && messages[userIndex].role !== "user") userIndex -= 1;
+    if (userIndex < 0) return;
+    const question = messages[userIndex];
+    const previousVersions = messages[messages.length - 1].versions?.length
+      ? messages[messages.length - 1].versions
+      : [messages[messages.length - 1].text];
+    void sendMessage(question.text, question.file ?? null, messages.slice(0, userIndex), false, previousVersions);
+  }
+
+  function continueAnswer(index: number) {
+    if (busy || index !== messages.length - 1 || !messages[index]?.interrupted) return;
+    void sendMessage(
+      "Continue the previous answer from the exact point where it stopped. Do not repeat material already provided; complete the unfinished thought and continue.",
+      null,
+      messages,
+      false,
+    );
+  }
+
+  function voteOnAnswer(index: number, vote: "up" | "down") {
+    setMessageFeedback((previous) => ({ ...previous, [index]: previous[index] === vote ? undefined : vote }));
+  }
+
+  function readAloud(text: string) {
+    if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+      setStatus("Read aloud is not supported in this browser.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = preferences.language === "Hindi"
+      ? "hi-IN"
+      : preferences.language === "Odia"
+        ? "or-IN"
+        : navigator.language || "en-IN";
+    window.speechSynthesis.speak(utterance);
+  }
+
   function regenerateLastAnswer() {
     if (busy || messages.length < 2 || messages[messages.length - 1]?.role !== "ai") return;
     let userIndex = messages.length - 2;
@@ -1726,12 +1818,45 @@ function App() {
     void sendMessage(question.text, question.file ?? null, messages.slice(0, userIndex), false);
   }
 
+  function moveMessageVersion(index: number, direction: -1 | 1) {
+    const message = messages[index];
+    if (!message?.versions || message.versions.length < 2) return;
+    const current = message.versionIndex ?? message.versions.length - 1;
+    const nextIndex = Math.max(0, Math.min(message.versions.length - 1, current + direction));
+    if (nextIndex === current) return;
+    const nextMessages = messages.map((item, itemIndex) => itemIndex === index
+      ? { ...item, versionIndex: nextIndex, text: message.versions![nextIndex] }
+      : item);
+    setMessages(nextMessages);
+    upsertChat(activeRef.current, nextMessages);
+  }
+
+  async function shareAnswer(text: string) {
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: "SatyaAI answer", text });
+      } else {
+        await copyText(text, "share");
+      }
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        await copyText(text, "share");
+      }
+    }
+  }
+
   function submitEditedMessage(index: number) {
     const original = messages[index];
     if (!original || original.role !== "user" || !editDraft.trim() || busy) return;
-    if (index < messages.length - 1 && !window.confirm("Resubmitting this message will remove all later messages and replies from this conversation. Continue?")) return;
-    setEditingMessageIndex(null);
-    void sendMessage(editDraft, original.file ?? null, messages.slice(0, index), false);
+    const submit = () => {
+      setEditingMessageIndex(null);
+      void sendMessage(editDraft, original.file ?? null, messages.slice(0, index), false);
+    };
+    if (index < messages.length - 1) {
+      setConfirmRequest({ title: "Resubmit this message?", message: "Later messages and replies in this conversation will be removed from the current thread.", confirmLabel: "Resubmit", onConfirm: submit });
+      return;
+    }
+    submit();
   }
 
   const visibleChats = chats.filter((chat) => {
@@ -2024,7 +2149,7 @@ function App() {
           )}
 
           {workspaceMode === "chat" && messages.length > 0 && (
-            <div className="messages">
+            <div className="messages" role="log" aria-live="polite" aria-relevant="additions text">
               {messages.map((message, index) => (
                 <div
                   className={"message " + message.role + (message.error ? " error" : "")}
@@ -2052,6 +2177,13 @@ function App() {
                         {message.text}
                       </p>
                     )}
+                    {message.role === "ai" && !message.pending && (message.versions?.length ?? 0) > 1 && (
+                      <div className="message-version-pager" aria-label="Answer versions">
+                        <button className="msg-action" onClick={() => moveMessageVersion(index, -1)} disabled={(message.versionIndex ?? message.versions!.length - 1) <= 0} aria-label="Previous answer version">‹</button>
+                        <span>{(message.versionIndex ?? message.versions!.length - 1) + 1} / {message.versions!.length}</span>
+                        <button className="msg-action" onClick={() => moveMessageVersion(index, 1)} disabled={(message.versionIndex ?? message.versions!.length - 1) >= message.versions!.length - 1} aria-label="Next answer version">›</button>
+                      </div>
+                    )}
                     {preferences.showTimestamps && message.createdAt && (
                       <time className="message-timestamp">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
                     )}
@@ -2070,6 +2202,12 @@ function App() {
                           <button className="msg-action" onClick={() => void copyText(message.text, "user-" + index)}><Copy size={13} /> {copiedAction === "user-" + index ? "Copied" : "Copy"}</button>
                         </div>
                       )
+                    )}
+                    {message.role === "ai" && message.error && !message.pending && index === messages.length - 1 && (
+                      <div className="message-actions">
+                        <button className="msg-action primary-action" onClick={() => retryFailedAnswer(index)} disabled={busy}>Retry</button>
+                        <button className="msg-action" onClick={() => void copyText(message.text, "error-" + index)}><Copy size={13} /> Copy error</button>
+                      </div>
                     )}
                     {message.file && (
                       <small className="file-note">
@@ -2092,6 +2230,13 @@ function App() {
                             {isSaved(index) ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
                             {isSaved(index) ? "Saved" : "Save answer"}
                           </button>
+                          <button className={"msg-action" + (messageFeedback[index] === "up" ? " on" : "")} onClick={() => voteOnAnswer(index, "up")} aria-pressed={messageFeedback[index] === "up"} aria-label="Mark answer helpful">👍</button>
+                          <button className={"msg-action" + (messageFeedback[index] === "down" ? " on" : "")} onClick={() => voteOnAnswer(index, "down")} aria-pressed={messageFeedback[index] === "down"} aria-label="Mark answer not helpful">👎</button>
+                          <button className="msg-action" onClick={() => readAloud(message.text)}>Read aloud</button>
+                          <button className="msg-action" onClick={() => void shareAnswer(message.text)}>Share</button>
+                          {message.interrupted && index === messages.length - 1 && (
+                            <button className="msg-action primary-action" onClick={() => continueAnswer(index)} disabled={busy}>Continue</button>
+                          )}
                           {index === messages.length - 1 && (
                             <button className="msg-action" onClick={regenerateLastAnswer} disabled={busy}>
                               <Zap size={13} /> Regenerate
@@ -2209,15 +2354,28 @@ function App() {
               <div className="composer-bottom">
                 <div className="composer-tools">
                   {workspaceMode === "chat" && (
-                    <>
+                    <div className="composer-plus-wrap">
                       <button
-                        className="tool-btn"
-                        onClick={() => inputRef.current?.click()}
+                        className="tool-btn composer-plus"
+                        onClick={() => setAttachmentMenuOpen((open) => !open)}
                         disabled={busy}
-                        aria-label="Attach a text file"
+                        aria-label="Open add menu"
+                        aria-expanded={attachmentMenuOpen}
+                        aria-haspopup="menu"
                       >
-                        <Plus size={17} /> Attach
+                        <Plus size={17} /> Add
                       </button>
+                      {attachmentMenuOpen && (
+                        <div className="composer-plus-menu" role="menu" aria-label="Add to message">
+                          <button role="menuitem" onClick={() => { setAttachmentMenuOpen(false); inputRef.current?.click(); }}><FileText size={15} /> Upload file</button>
+                          <button role="menuitem" disabled title="Photo question support is coming soon"><ImageIcon size={15} /> Photo <small>Soon</small></button>
+                          <button role="menuitem" disabled title="Camera capture is coming soon"><Aperture size={15} /> Camera <small>Soon</small></button>
+                          <button role="menuitem" disabled title="Web search is coming soon"><Search size={15} /> Web search <small>Soon</small></button>
+                          <div className="composer-plus-divider" />
+                          <button role="menuitem" onClick={() => { setAttachmentMenuOpen(false); switchWorkspaceMode("image"); }}><ImageIcon size={15} /> Create image</button>
+                          <button role="menuitem" onClick={() => { setAttachmentMenuOpen(false); switchWorkspaceMode("video"); }}><VideoIcon size={15} /> Create video</button>
+                        </div>
+                      )}
                       <input
                         ref={inputRef}
                         hidden
@@ -2228,26 +2386,8 @@ function App() {
                           event.target.value = "";
                         }}
                       />
-                    </>
+                    </div>
                   )}
-                  
-                  
-                  <button
-                    className={"tool-btn drishti-mode-btn" + (workspaceMode === "image" ? " active" : "")}
-                    disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; switchWorkspaceMode(workspaceMode === "image" ? "chat" : "image"); }}
-                    aria-pressed={workspaceMode === "image"}
-                    aria-label={workspaceMode === "image" ? "Return to Chat mode" : "Switch to Image mode"}
-                    title={workspaceMode === "image" ? "Return to Chat" : "Create an image with Drishti"}
-                  ><ImageIcon size={16} /> Image <small className="drishti-mode-hint">Desktop · Windows</small></button>
-                  <button
-                    className={"tool-btn drishti-mode-btn chakshu-mode-btn" + (workspaceMode === "video" ? " active" : "")}
-                    disabled={busy || drishtiGenerating || chakshuGenerating}
-                    onClick={() => { if (busy || drishtiGenerating || chakshuGenerating) return; switchWorkspaceMode(workspaceMode === "video" ? "chat" : "video"); }}
-                    aria-pressed={workspaceMode === "video"}
-                    aria-label={workspaceMode === "video" ? "Return to Chat mode" : "Switch to Video mode"}
-                    title={workspaceMode === "video" ? "Return to Chat" : "Create a video with Chakshu"}
-                  ><VideoIcon size={16} /> Video <small className="drishti-mode-hint">Desktop · Windows</small></button>
                 </div>
                 <button
                   className={"send " + (workspaceMode === "image"
@@ -2312,12 +2452,18 @@ function App() {
                       ? status + " Keep this tab open."
                       : "SatyaAI can make mistakes. Verify important information."}
               </span>
-              <button onClick={() => openSettings("privacy")}>Privacy-first · Local memory</button>
+              <span><a href="https://dev.meta.ai/llama/llama3_2/license" target="_blank" rel="noreferrer">Built with Llama</a></span>
+              <button onClick={() => openSettings("privacy")}>Privacy & data</button>
             </div>
           </div>
         </section>
       </main>
 
+      <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} onConfirm={() => {
+        const request = confirmRequest;
+        setConfirmRequest(null);
+        request?.onConfirm();
+      }} />
       <SettingsPanel
         open={settings}
         onClose={() => setSettings(false)}

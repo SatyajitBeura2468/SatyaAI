@@ -4,7 +4,9 @@ Truth-first intelligence for reasoning, research, and creation.
 
 ### [Open SatyaAI →](https://satyaai-five.vercel.app)
 
-SatyaAI V0.1 is a privacy-conscious, local-first AI application. Its model family is built on the from-scratch SatyaSom Engine Architecture. It includes four purpose-built variants: Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think), designed for different model scales, parameter configurations, capabilities, and use cases. No one variant is the foundation model for the others. When WebGPU is available, text inference runs locally in the browser and model assets are cached on the device. If local inference is unavailable, SatyaAI reports the limitation instead of fabricating model output, citations, or search results.
+**Built with Llama.** Browser-local model options use Llama 3.2. See the [Llama 3.2 Community License](https://dev.meta.ai/llama/llama3_2/license).
+
+SatyaAI V0.1 is a privacy-conscious, hosted-first AI application with opt-in browser-local inference. Its model family is built on the from-scratch SatyaSom Engine Architecture. It includes four purpose-built variants: Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think), designed for different model scales, parameter configurations, capabilities, and use cases. No one variant is the foundation model for the others. Fast, Smart and Deep prefer a configured hosted inference gateway. Browser-local inference is opt-in in Settings; Anu (Nano) remains on-device and requires WebGPU. Model assets are cached on the device. If hosted inference is not configured, SatyaAI explains the missing setup instead of pretending a model is connected.
 
 ## Run locally
 
@@ -13,7 +15,7 @@ pnpm install
 pnpm dev
 ```
 
-Optional compatible endpoints can be configured with `.env.example`. No paid API is required for the default boot path.
+Fast, Smart and Deep require the Vercel server environment variables `REMOTE_MODEL_BASE_URL`, `REMOTE_MODEL_API_KEY`, and `REMOTE_MODEL_ID`. Add them under Project Settings → Environment Variables for Production and Preview, then redeploy. Keep the API key server-side; never prefix it with `VITE_`. Anu (Nano) can run locally on a supported WebGPU device. Browser-local fallback for the other tiers is opt-in in Settings. See [docs/hosting.md](docs/hosting.md).
 
 ## Architecture
 

@@ -40,22 +40,22 @@ export const MODE_CONFIG: Record<
   nano: {
     model: "SmolLM2-360M-Instruct-q4f16_1-MLC",
     temperature: 0.35,
-    maxTokens: 192,
+    maxTokens: 512,
   },
   fast: {
     model: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
     temperature: 0.3,
-    maxTokens: 256,
+    maxTokens: 1024,
   },
   smart: {
     model: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
     temperature: 0.4,
-    maxTokens: 512,
+    maxTokens: 2048,
   },
   deep: {
     model: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
     temperature: 0.25,
-    maxTokens: 1536,
+    maxTokens: 4096,
   },
 };
 
@@ -325,24 +325,92 @@ async function ensureLocalModel(
   }
 }
 
+export async function readOpenAIStream(
+  response: Response,
+  onToken?: (partialText: string) => void,
+): Promise<string> {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/event-stream") || !response.body) {
+    const data = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string } | string;
+    };
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === "string" && content.length > 0) {
+      onToken?.(content);
+      return content;
+    }
+    const detail = typeof data.error === "string" ? data.error : data.error?.message;
+    throw new Error(detail || "The provider returned no assistant content.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let answer = "";
+  let finished = false;
+
+  const consume = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) return;
+    const payload = trimmed.slice(5).trim();
+    if (!payload) return;
+    if (payload === "[DONE]") { finished = true; return; }
+    let data: {
+      choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>;
+      error?: { message?: string } | string;
+    };
+    try { data = JSON.parse(payload); }
+    catch { return; }
+    if (data.error) {
+      const detail = typeof data.error === "string" ? data.error : data.error.message;
+      throw new Error(detail || "The provider interrupted the response.");
+    }
+    const piece = data.choices?.[0]?.delta?.content ?? data.choices?.[0]?.message?.content;
+    if (typeof piece === "string" && piece) {
+      answer += piece;
+      onToken?.(answer);
+    }
+  };
+
+  try {
+    while (!finished) {
+      const result = await reader.read();
+      buffer += decoder.decode(result.value, { stream: !result.done });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        consume(line);
+        if (finished) break;
+      }
+      if (result.done) {
+        if (buffer) consume(buffer);
+        break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (!answer.trim()) throw new Error("The provider returned no assistant content.");
+  return answer;
+}
+
 export async function openAICompatible(
   settings: ProviderSettings,
   messages: ChatMessage[],
   mode: SatyaMode,
   signal?: AbortSignal,
+  onToken?: (partialText: string) => void,
 ): Promise<string> {
   if (!settings.baseUrl || !settings.model) {
     throw new Error("Configure a compatible endpoint and model in Settings first.");
   }
-
   const base = settings.baseUrl.replace(/\/$/, "");
   const response = await fetch(base + "/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(settings.apiKey
-        ? { Authorization: "Bearer " + settings.apiKey }
-        : {}),
+      ...(settings.apiKey ? { Authorization: "Bearer " + settings.apiKey } : {}),
     },
     signal,
     body: JSON.stringify({
@@ -350,24 +418,18 @@ export async function openAICompatible(
       messages,
       temperature: MODE_CONFIG[mode].temperature,
       max_tokens: MODE_CONFIG[mode].maxTokens,
-      stream: false,
+      stream: true,
     }),
   });
-
   if (!response.ok) {
-    throw new Error(
-      "Provider request failed (" +
-        response.status +
-        "). Check the endpoint, model, and CORS policy.",
-    );
+    let detail = "";
+    try {
+      const data = await response.json() as { error?: { message?: string } | string };
+      detail = typeof data.error === "string" ? data.error : data.error?.message || "";
+    } catch { /* Providers may return HTML or plain-text error pages. */ }
+    throw new Error("Provider request failed (" + response.status + "). " + (detail || "Check the endpoint, model, and CORS policy."));
   }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("The provider returned no assistant content.");
-  return content;
+  return readOpenAIStream(response, onToken);
 }
 
 async function supportsShaderF16(): Promise<boolean> {
@@ -394,10 +456,12 @@ export async function localWebLLM(
   onToken?: (partialText: string) => void,
   onThinking?: (active: boolean) => void,
   userMemory: UserMemory = { name: "", notes: "" },
+  allowLocalFallback = false,
   signal?: AbortSignal,
 ): Promise<string> {
   throwIfAborted(signal);
-  // Nano is deliberately on-device and never silently routes to a cloud provider.
+  // Nano is deliberately on-device. Other tiers use hosted inference first;
+  // downloading a browser model is an explicit user choice.
   if (mode !== "nano" && (await hasConfiguredRemoteGateway())) {
     try {
       onThinking?.(true);
@@ -411,33 +475,33 @@ export async function localWebLLM(
           user_memory: userMemory,
           temperature: MODE_CONFIG[mode].temperature,
           max_tokens: MODE_CONFIG[mode].maxTokens,
+          stream: true,
         }),
       });
-
-      const data = (await online.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-        error?: string;
-      };
-
       if (!online.ok) {
-        throw new Error(data.error || "Remote provider failed (" + online.status + ")");
+        let data: { error?: string } = {};
+        try { data = await online.json() as { error?: string }; } catch { /* Ignore invalid error bodies. */ }
+        throw new Error(data.error || "Hosted model failed (" + online.status + ").");
       }
-
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) throw new Error("Remote provider returned no assistant content.");
-      return content;
+      const answer = await readOpenAIStream(online, onToken);
+      onThinking?.(false);
+      return answer;
     } catch (error) {
       onThinking?.(false);
       if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
-      onProgress?.("Remote model unavailable; ab browser par local inference…");
+      if (!allowLocalFallback) throw error;
+      onProgress?.("Hosted model unavailable; browser-local inference is enabled, switching to the device model…");
     }
+  } else if (mode !== "nano" && !allowLocalFallback) {
+    throw new Error("The hosted model gateway is not configured yet. Browser-local models are disabled. Enable browser-local inference in Settings, or configure the hosted model on Vercel.");
   }
 
   throwIfAborted(signal);
+  if (mode !== "nano" && !allowLocalFallback) {
+    throw new Error("Browser-local inference is disabled. Enable it in Settings to download a model to this device.");
+  }
   if (!hasWebGPU()) {
-    throw new Error(
-      "WebGPU is unavailable in this browser, so the on-device model cannot run. Try a recent version of Chrome or Edge.",
-    );
+    throw new Error("WebGPU is unavailable in this browser. Hosted inference is the default; browser-local inference needs a recent WebGPU-capable browser.");
   }
 
   return withLocalEngineLock(async () => {

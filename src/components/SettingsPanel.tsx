@@ -15,6 +15,7 @@ type AppPreferences = {
   showTimestamps: boolean;
   reduceMotion: boolean;
   saveChatHistory: boolean;
+  allowLocalModels: boolean;
   fontSize: "small" | "medium" | "large";
 };
 
@@ -193,6 +194,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             <div className="diag-row"><span>Currently selected</span><strong>{current.name} · {current.modeLabel}</strong></div>
                             <div className="diag-row"><span>Inference capability</span><strong>{capability}</strong></div>
                             <div className="diag-row"><span>Route</span><strong>{mode === "nano" ? "Browser-local · Anu" : provider.baseUrl && provider.model ? "Custom-compatible endpoint" : gateway === "online" ? "Configured remote gateway" : "Browser-local · " + current.name}</strong></div>
+                            <label className="setting-toggle"><span><strong>Allow browser-local models</strong><small>Opt in to downloading a model to this device when the hosted route is unavailable. Requires WebGPU. Nano always stays local.</small></span><input type="checkbox" checked={preferences.allowLocalModels} onChange={(event) => setPreferences((p) => ({ ...p, allowLocalModels: event.target.checked }))} /></label>
                           </div>
                           <div className="setting-group">
                             <h3>Compatible inference endpoint</h3>
@@ -219,7 +221,8 @@ export function SettingsPanel(props: SettingsPanelProps) {
                         <>
                           <div className="setting-group">
                             <h3>Local storage</h3>
-                            <p>SatyaAI does not require an account. Conversations, saved answers, profile and preferences are stored in this browser. A remote inference endpoint still receives prompts when selected.</p>
+                            <p>SatyaAI currently has no account or cloud sync. Conversations, saved answers, profile and preferences are stored in this browser. Prompts are sent to a configured hosted model provider or the custom endpoint you select.</p>
+                            <p><a href="https://github.com/SatyajitBeura2468/SatyaAI/blob/main/docs/privacy.md" target="_blank" rel="noreferrer">Privacy notice</a> · <a href="https://github.com/SatyajitBeura2468/SatyaAI/blob/main/docs/terms.md" target="_blank" rel="noreferrer">Terms of use</a> · <a href="https://dev.meta.ai/llama/llama3_2/license" target="_blank" rel="noreferrer">Llama 3.2 license</a></p>
                             <label className="setting-toggle"><span><strong>Save conversation history</strong><small>Keep chats on this device between visits.</small></span><input type="checkbox" checked={preferences.saveChatHistory} onChange={(event) => setPreferences((p) => ({ ...p, saveChatHistory: event.target.checked }))} /></label>
                             <div className="diag-row"><span>Conversations saved</span><strong>{chats.length}</strong></div>
                             <div className="diag-row"><span>Saved answers</span><strong>{saved.length}</strong></div>

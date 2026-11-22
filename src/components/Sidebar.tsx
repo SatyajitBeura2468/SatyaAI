@@ -1,7 +1,7 @@
 import React from "react";
 import {
   Archive, Check, Download, Library, Moon, Pencil, Plus, Search,
-  Settings, Sun, Trash2, User, X,
+  Settings, Sun, Trash2, User, X, MoreHorizontal,
 } from "lucide-react";
 
 export type SidebarChat = {
@@ -55,6 +55,7 @@ type SidebarProps = {
 };
 
 export function Sidebar(props: SidebarProps) {
+  const [chatMenuId, setChatMenuId] = React.useState<string | null>(null);
   const {
     menu, setMenu, isMac, startNewChat, sidebarView, setSidebarView, chats, saved,
     chatSearch, setChatSearch, visibleChats, editingChatId, setEditingChatId,
@@ -77,7 +78,7 @@ export function Sidebar(props: SidebarProps) {
               </div>
       
               <button className="new-chat" onClick={startNewChat}>
-                <Plus size={17} /> New chat <span>{isMac ? "⌘K" : "Ctrl K"}</span>
+                <Plus size={17} /> New chat <span>{isMac ? "⌘⇧O" : "Ctrl ⇧ O"}</span>
               </button>
       
               <div className="side-section">
@@ -139,9 +140,14 @@ export function Sidebar(props: SidebarProps) {
                               <time>{dayLabel(chat.updatedAt)}</time>
                             </button>
                             <div className="chat-entry-actions">
-                              <button className="icon-btn" onClick={() => beginRenameChat(chat)} aria-label={"Rename " + chat.title} title="Rename"><Pencil size={13} /></button>
-                              <button className="icon-btn" onClick={() => exportChat(chat)} aria-label={"Export " + chat.title} title="Export"><Download size={13} /></button>
-                              <button className="icon-btn danger" onClick={() => deleteChat(chat.id)} disabled={busy && chat.id === activeId} aria-label={"Delete " + chat.title} title="Delete"><Trash2 size={13} /></button>
+                              <button className="icon-btn" onClick={() => setChatMenuId((current) => current === chat.id ? null : chat.id)} aria-label={"More actions for " + chat.title} aria-expanded={chatMenuId === chat.id} title="More actions"><MoreHorizontal size={15} /></button>
+                              {chatMenuId === chat.id && (
+                                <div className="chat-row-menu" role="menu">
+                                  <button role="menuitem" onClick={() => { setChatMenuId(null); beginRenameChat(chat); }}><Pencil size={13} /> Rename</button>
+                                  <button role="menuitem" onClick={() => { setChatMenuId(null); exportChat(chat); }}><Download size={13} /> Export</button>
+                                  <button role="menuitem" className="danger" onClick={() => { setChatMenuId(null); deleteChat(chat.id); }} disabled={busy && chat.id === activeId}><Trash2 size={13} /> Delete</button>
+                                </div>
+                              )}
                             </div>
                           </>
                         )}
@@ -190,6 +196,10 @@ export function Sidebar(props: SidebarProps) {
                     <small>{capability}</small>
                   </div>
                 </div>
+                <button className="account-chip" onClick={() => openSettings("personalization")}>
+                  <span className="account-chip-avatar"><User size={16} /></span>
+                  <span><strong>Local profile</strong><small>Account sync · Soon</small></span>
+                </button>
                 <button className="side-link" onClick={() => openSettings()}>
                   <Settings size={16} /> Settings
                 </button>

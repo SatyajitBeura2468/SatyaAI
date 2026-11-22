@@ -15,6 +15,11 @@ beforeAll(async () => {
       received.push({ auth: req.headers.authorization, body });
       if (upstreamMode === 'html') { res.writeHead(502, { 'content-type': 'text/html' }); return res.end('<html>Bad gateway</html>'); }
       if (body.model !== 'Qwen/Qwen3-8B') { res.writeHead(404, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: { message: `model '${body.model}' not found` } })); }
+      if (body.stream) {
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        res.write('data: {"choices":[{"delta":{"content":"mock "}}]}\n\n');
+        return res.end('data: {"choices":[{"delta":{"content":"answer"}}]}\n\ndata: [DONE]\n\n');
+      }
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ choices: [{ message: { content: 'mock answer' } }], usage: { secret: 'provider-metadata' } }));
     });
@@ -32,7 +37,15 @@ beforeEach(() => {
 });
 
 const call = async (body, { ip = nextIp(), method = 'POST' } = {}) => {
-  const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(o) { this.body = o; return this; } };
+  const res = {
+    code: 200, body: null, headers: {}, stream: "", writableEnded: false,
+    status(c) { this.code = c; return this; },
+    setHeader(k, v) { this.headers[k.toLowerCase()] = v; },
+    flushHeaders() {},
+    write(chunk) { this.stream += String(chunk); return true; },
+    end(chunk) { if (chunk) this.stream += String(chunk); this.writableEnded = true; return this; },
+    json(o) { this.body = o; return this; },
+  };
   await handler({ method, body, headers: { 'x-forwarded-for': ip } }, res);
   return res;
 };
@@ -52,13 +65,22 @@ describe('api/chat gateway', () => {
     expect(r.body.choices[0].message.content).toBe('mock answer');
   });
 
+  it('streams hosted deltas as server-sent events', async () => {
+    const r = await call({ messages: user(), stream: true, max_tokens: 4096 });
+    expect(r.code).toBe(200);
+    expect(r.headers['content-type']).toContain('text/event-stream');
+    expect(r.stream).toContain('"content":"mock "');
+    expect(r.stream).toContain('data: [DONE]');
+    expect(received[0].body.stream).toBe(true);
+  });
+
   it('accepts a JSON string body', async () => { expect((await call(JSON.stringify({ messages: user() }))).code).toBe(200); });
 
   it('caps max_tokens and applies a default', async () => {
     await call({ messages: user(), max_tokens: 1_000_000 });
     await call({ messages: user() });
-    expect(received[0].body.max_tokens).toBeLessThanOrEqual(2048);
-    expect(received[1].body.max_tokens).toBe(512);
+    expect(received[0].body.max_tokens).toBeLessThanOrEqual(8192);
+    expect(received[1].body.max_tokens).toBe(2048);
   });
 
   it('rate limits one IP but not another', async () => {

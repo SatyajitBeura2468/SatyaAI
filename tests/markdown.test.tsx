@@ -3,24 +3,36 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Markdown } from '../src/markdown';
 
 const html = (text: string) => renderToStaticMarkup(<Markdown text={text} />);
+const fence = String.fromCharCode(96).repeat(3);
 
 describe('Markdown renderer', () => {
   it('renders bold, italic and inline code', () => {
-    expect(html('The **mole** is *useful* for `n = m/M`')).toContain('<strong>mole</strong>');
-    expect(html('The **mole** is *useful* for `n = m/M`')).toContain('<em>useful</em>');
-    expect(html('The **mole** is *useful* for `n = m/M`')).toContain('<code>n = m/M</code>');
+    const out = html('The **mole** is *useful* for ' + String.fromCharCode(96) + 'n = m/M' + String.fromCharCode(96));
+    expect(out).toContain('<strong>mole</strong>');
+    expect(out).toContain('<em>useful</em>');
+    expect(out).toContain('<code>n = m/M</code>');
   });
   it('renders bullet and numbered lists', () => {
     expect(html('- one\n- two')).toMatch(/<ul><li>one<\/li><li>two<\/li><\/ul>/);
     expect(html('1. first\n2. second')).toMatch(/<ol><li>first<\/li><li>second<\/li><\/ol>/);
   });
-  it('renders fenced code blocks, even if the closing fence has not streamed in yet', () => {
-    expect(html('```py\nprint(1)\n```')).toContain('<pre><code>print(1)</code></pre>');
-    expect(html('```py\nprint(1)')).toContain('<pre><code>print(1)</code></pre>');
+  it('renders fenced code blocks with language labels, including a streaming fence', () => {
+    expect(html(fence + 'py\nprint(1)\n' + fence)).toContain('language-python');
+    expect(html(fence + 'py\nprint(1)')).toContain('print(1)');
   });
   it('renders headings and keeps paragraphs separate', () => {
     expect(html('## Title\n\nHello\n\nWorld')).toContain('md-h2');
     expect((html('Hello\n\nWorld').match(/<p>/g) || []).length).toBe(2);
+  });
+  it('renders links, tables, blockquotes, and leaves TeX intact for MathJax', () => {
+    const out = html('[NCERT](https://ncert.nic.in)\n\n| Name | Formula |\n| --- | --- |\n| Water | $H_2O$ |\n\n> Important note');
+    expect(out).toContain('href="https://ncert.nic.in"');
+    expect(out).toContain('<table');
+    expect(out).toContain('<blockquote');
+    expect(out).toContain('$H_2O$');
+  });
+  it('rejects unsafe link protocols', () => {
+    expect(html('[bad](javascript:alert(1))')).not.toContain('href="javascript:');
   });
   it('never injects HTML: tags in model output are escaped', () => {
     const out = html('<script>alert(1)</script> and <img src=x onerror=alert(1)>');

@@ -4,7 +4,7 @@
    =================================================================== */
 :root{
   color-scheme:dark;
-  --font:"Inter var",Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font:"Inter var",Inter,"Noto Sans Devanagari","Noto Sans Oriya","Noto Sans Odia","Nirmala UI",-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   --bg:#05060b; --bg-2:#0a0c15;
   --glass:rgba(17,19,32,.52); --glass-strong:rgba(14,16,28,.86);
@@ -425,3 +425,63 @@ button:disabled{cursor:not-allowed}
   .composer-tools .tool-btn svg { flex: none; width: 17px; height: 17px; }
   .composer-tools .tool-btn em { display: none; }
 }
+
+
+/* Composer add menu, chat overflow menu, profile chip and native confirmation modal. */
+.composer-plus-wrap { position: relative; }
+.composer-plus-menu, .chat-row-menu {
+  position: absolute; z-index: 30; display: flex; flex-direction: column; min-width: 220px;
+  padding: 7px; border: 1px solid var(--border-strong); border-radius: 15px;
+  background: var(--glass-strong); box-shadow: var(--shadow), var(--hi);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+}
+.composer-plus-menu { left: 0; bottom: calc(100% + 10px); }
+.composer-plus-menu button, .chat-row-menu button {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px;
+  padding: 8px 10px; border-radius: 9px; color: var(--text-2); text-align: left; font-size: 12.5px;
+}
+.composer-plus-menu button:hover:not(:disabled), .chat-row-menu button:hover:not(:disabled) {
+  color: var(--text); background: var(--surface-hover);
+}
+.composer-plus-menu button:disabled { opacity: .46; cursor: not-allowed; }
+.composer-plus-menu button small { margin-left: auto; color: var(--text-3); font-size: 10px; }
+.composer-plus-divider { height: 1px; margin: 5px 4px; background: var(--border); }
+.chat-entry-actions { position: relative; align-self: start; }
+.chat-row-menu { top: calc(100% + 4px); right: 0; min-width: 156px; }
+.chat-row-menu button.danger { color: var(--bad); }
+.account-chip {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px;
+  margin: 5px 0 7px; border: 1px solid var(--border); border-radius: 13px;
+  background: var(--surface); color: var(--text); text-align: left;
+}
+.account-chip:hover { background: var(--surface-hover); }
+.account-chip-avatar {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: none;
+  border-radius: 50%; background: var(--grad); color: white;
+}
+.account-chip strong, .account-chip small { display: block; }
+.account-chip strong { font-size: 12px; font-weight: 650; }
+.account-chip small { margin-top: 2px; color: var(--text-3); font-size: 10.5px; }
+.confirm-backdrop {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px;
+  background: rgba(2,4,10,.68); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.confirm-dialog {
+  position: relative; width: min(420px,100%); padding: 24px; border: 1px solid var(--border-strong);
+  border-radius: 22px; background: var(--glass-strong); color: var(--text);
+  box-shadow: var(--shadow), var(--hi);
+}
+.confirm-icon {
+  display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 14px;
+  border-radius: 12px; color: var(--warn); background: rgba(251,191,36,.1);
+}
+.confirm-close { position: absolute; right: 15px; top: 15px; width: 32px; height: 32px; }
+.confirm-dialog h2 { margin: 0; font-size: 18px; }
+.confirm-dialog p { margin: 8px 0 20px; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.confirm-actions button { min-height: 40px; padding: 0 14px; border-radius: 10px; font-size: 12.5px; }
+.confirm-actions .danger-btn { color: #fff; background: var(--bad); }
+
+.message-version-pager { display: flex; align-items: center; gap: 7px; margin-top: 9px; color: var(--text-3); font: 11px var(--mono); }
+.message-version-pager .msg-action { min-width: 27px; height: 27px; padding: 0 8px; font-size: 17px; line-height: 1; }
+.message-version-pager .msg-action:disabled { opacity: .35; cursor: not-allowed; }
