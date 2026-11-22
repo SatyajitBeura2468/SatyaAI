@@ -69,11 +69,11 @@ The same signed-in Windows companion now serves image generation and the Chakshu
 
 | SatyaAI tier | Upstream weights | Licence | Conservative local hardware gate |
 |---|---|---|---|
-| Chakshu Light | `Wan-AI/Wan2.1-T2V-1.3B-Diffusers` | Apache-2.0 | NVIDIA CUDA GPU with 9 GB free VRAM, 12 GB available RAM, 15 GB free disk; 480p |
-| Chakshu | `Wan-AI/Wan2.2-TI2V-5B-Diffusers` | Apache-2.0 | NVIDIA CUDA GPU with 24 GB free VRAM, 24 GB available RAM, 45 GB free disk; 720p-class output |
-| Divya Chakshu 1 | `Lightricks/LTX-2.5-Diffusers` | LTX-2.x Community License | High-memory NVIDIA CUDA workstation with 48 GB free VRAM, 48 GB available RAM, 120 GB free disk; synchronized audio/video |
+| Chakshu Lite | `Wan-AI/Wan2.1-T2V-1.3B-Diffusers` | Apache-2.0 | NVIDIA CUDA GPU with 9 GB free VRAM, 12 GB available RAM, 15 GB free disk; 480p |
+| Chakshu 1.0 | `Wan-AI/Wan2.2-TI2V-5B-Diffusers` | Apache-2.0 | NVIDIA CUDA GPU with 24 GB free VRAM, 24 GB available RAM, 45 GB free disk; 720p-class output |
+| Divya Chakshu 1 · Experimental | `Lightricks/LTX-2.5-Diffusers` | LTX-2.x Community License | High-memory NVIDIA CUDA workstation with 48 GB free VRAM, 48 GB available RAM, 120 GB free disk; synchronized audio/video |
 
-The app checks free GPU memory, available system RAM, and free cache storage before it attempts to load a video model. The thresholds are deliberately conservative application gates, not universal claims about every quantized or third-party runtime. Light is the smallest tier in this family, but it is not a CPU-only model: integrated graphics and CPU-only laptops will be shown as unsupported rather than silently starting a generation that is unlikely to finish.
+The app checks free GPU memory, available system RAM, and free cache storage before it attempts to load a video model. The thresholds are deliberately conservative application gates, not universal claims about every quantized or third-party runtime. Lite is the smallest tier in this family, but it is not a CPU-only model: integrated graphics and CPU-only laptops will be shown as unsupported rather than silently starting a generation that is unlikely to finish.
 
 Wan2.1 and Wan2.2 model weights are Apache-2.0. LTX-2.5 is open-weight, but its weights are under Lightricks' separate LTX-2.x Community License, not Apache-2.0. Divya Chakshu 1 therefore requires the user to open and acknowledge that model licence in the UI before generation. Review the full terms at the model repository before use.
 
