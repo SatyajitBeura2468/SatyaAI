@@ -46,7 +46,7 @@ See [`docs/architecture.md`](docs/architecture.md), [`docs/privacy-model.md`](do
 
 ## Drishti local image runtime
 
-See [`runtime/README.md`](runtime/README.md) for Windows setup. The companion runs on `127.0.0.1:7860`, loads only the selected model and keeps model downloads in the local Hugging Face cache. Image and video prompts go directly to that local service, never through the SatyaSom chat pipeline. Model licenses and hardware requirements are tier-specific. The Chakshu family uses Wan2.1 1.3B (Light), Wan2.2 TI2V-5B (Chakshu), and LTX-2.5 22B (Divya Chakshu 1); LTX-2.5 weights use a separate community licence and require explicit acknowledgement.
+See [`runtime/README.md`](runtime/README.md) for Windows setup. The companion runs on `127.0.0.1:7860`, loads only the selected model and keeps model downloads in the local Hugging Face cache. Image and video prompts go directly to that local service, never through the SatyaSom chat pipeline. Model licenses and hardware requirements are tier-specific. The Chakshu family uses Wan2.1 1.3B (Chakshu Lite), Wan2.2 TI2V-5B (Chakshu 1.0), and LTX-2.5 22B (Divya Chakshu 1, Experimental); LTX-2.5 weights use a separate community licence and require explicit acknowledgement.
 
 ## SATYA CORE
 
