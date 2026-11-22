@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowUp,
+  Camera,
   Bookmark,
   BookmarkCheck,
   ArrowDown,
@@ -77,6 +78,14 @@ import { loadDrishtiHistory, saveDrishtiHistoryItem, type DrishtiHistoryItem } f
 type Mode = SatyaTierMode;
 type WorkspaceMode = "chat" | "image" | "video";
 type Theme = "light" | "dark";
+type AttachmentKind = "text" | "image" | "video" | "audio" | "document";
+type AttachedFile = {
+  name: string;
+  text: string;
+  kind?: AttachmentKind;
+  mediaType?: string;
+  previewUrl?: string;
+};
 type Message = {
   role: "user" | "ai";
   text: string;
@@ -87,7 +96,7 @@ type Message = {
   interrupted?: boolean;
   versions?: string[];
   versionIndex?: number;
-  file?: { name: string; text: string };
+  file?: AttachedFile;
   createdAt?: number;
 };
 type Chat = { id: string; title: string; updatedAt: number; messages: Message[] };
@@ -162,7 +171,7 @@ const MAX_SAVED = 100;
 const AVATAR_KEY = "satya-avatar";
 const AVATAR_SIZE = 256;
 const ATTACH_MAX_CHARS = 6000;
-const ATTACH_MAX_BYTES = 1_000_000;
+const ATTACH_MAX_BYTES = 12_000_000;
 const newId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const isChatList = (value: unknown) =>
@@ -197,6 +206,28 @@ const readText = (file: File) =>
     reader.onerror = () => reject(reader.error);
     reader.readAsText(file);
   });
+
+async function createImagePreview(file: File): Promise<string> {
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("This image could not be opened."));
+      element.src = sourceUrl;
+    });
+    const scale = Math.min(1, 1400 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Image preview is unavailable in this browser.");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
 type SpeechCtor = new () => {
   lang: string;
   interimResults: boolean;
@@ -372,10 +403,11 @@ function App() {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [endpointFeedback, setEndpointFeedback] = useState("");
   const [confirmRequest, setConfirmRequest] = useState<ConfirmState | null>(null);
-  const [file, setFile] = useState<{ name: string; text: string } | null>(
-    null,
-  );
+  const [file, setFile] = useState<AttachedFile | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState("");
   const [listening, setListening] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
@@ -424,6 +456,9 @@ function App() {
   });
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const composerMenuRef = useRef<HTMLDivElement>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const reasoningRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -460,6 +495,69 @@ function App() {
     : hasWebGPU()
       ? "Browser model"
       : "No inference available";
+
+  useEffect(() => {
+    if (!attachmentMenuOpen && !cameraOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAttachmentMenuOpen(false);
+        setCameraOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    if (!attachmentMenuOpen) {
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (!composerMenuRef.current?.contains(event.target as Node)) {
+        setAttachmentMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", handleOutsidePointer);
+    };
+  }, [attachmentMenuOpen, cameraOpen]);
+
+  useEffect(() => {
+    if (!cameraOpen) {
+      setCameraReady(false);
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    setCameraReady(false);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Camera access is unavailable here. Open SatyaAI over HTTPS in a browser that supports camera access.");
+      return;
+    }
+    void navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    }).then(async (stream) => {
+      if (cancelled) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      cameraStreamRef.current = stream;
+      const video = cameraVideoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        try { await video.play(); } catch { /* Metadata event can still signal readiness. */ }
+      }
+    }).catch((error: unknown) => {
+      if (!cancelled) {
+        setCameraError(error instanceof Error ? error.message : "Camera access was blocked. Check your browser permissions.");
+      }
+    });
+    return () => {
+      cancelled = true;
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    };
+  }, [cameraOpen]);
 
   useEffect(() => {
     if (preferences.saveChatHistory) saveJSON(CHATS_KEY, chats);
@@ -1046,21 +1144,95 @@ function App() {
   async function pickFile(chosen: File | undefined) {
     if (!chosen) return;
     if (chosen.size > ATTACH_MAX_BYTES) {
-      setStatus("That file is larger than 1 MB.");
+      setStatus("That file is larger than 12 MB.");
       return;
     }
+    const extension = chosen.name.split(".").pop()?.toLowerCase() ?? "";
+    const isTextFile = chosen.type.startsWith("text/") ||
+      ["txt", "md", "csv", "json", "log"].includes(extension);
     try {
-      const text = await readText(chosen);
-      setFile({
-        name: chosen.name,
-        text:
-          text.length > ATTACH_MAX_CHARS
+      if (isTextFile) {
+        const text = await readText(chosen);
+        setFile({
+          name: chosen.name,
+          kind: "text",
+          mediaType: chosen.type || "text/plain",
+          text: text.length > ATTACH_MAX_CHARS
             ? text.slice(0, ATTACH_MAX_CHARS) + "\n…[file truncated]"
             : text,
+        });
+        setStatus("Text file attached and ready.");
+        return;
+      }
+      if (chosen.type.startsWith("image/")) {
+        const previewUrl = await createImagePreview(chosen);
+        setFile({
+          name: chosen.name,
+          kind: "image",
+          mediaType: chosen.type,
+          previewUrl,
+          text: "[A photo is attached. Visual understanding is not available yet; the image itself is not sent to the text model.]",
+        });
+        setStatus("Photo attached. Image understanding is coming soon.");
+        return;
+      }
+      const kind: AttachmentKind | null = chosen.type.startsWith("video/")
+        ? "video"
+        : chosen.type.startsWith("audio/")
+          ? "audio"
+          : extension === "pdf" || chosen.type === "application/pdf"
+            ? "document"
+            : null;
+      if (!kind) {
+        setStatus("That file type is not supported yet. Try a text file, photo, video, audio file, or PDF.");
+        return;
+      }
+      const label = kind === "document" ? "Document" : kind[0].toUpperCase() + kind.slice(1);
+      setFile({
+        name: chosen.name,
+        kind,
+        mediaType: chosen.type,
+        text: "[" + label + " attached. Reading this format is coming soon; the file itself is not sent to the text model.]",
       });
-    } catch {
-      setStatus("Could not read that file.");
+      setStatus(label + " attached. Media and document understanding are coming soon.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not read that file.");
     }
+  }
+
+  function openCamera() {
+    setAttachmentMenuOpen(false);
+    setCameraError("");
+    setCameraOpen(true);
+  }
+
+  function captureCameraPhoto() {
+    const video = cameraVideoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setCameraError("The camera is not ready yet. Give the preview a moment to load.");
+      return;
+    }
+    const scale = Math.min(1, 1400 / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError("Photo capture is unavailable in this browser.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const previewUrl = canvas.toDataURL("image/jpeg", 0.82);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    setFile({
+      name: "SatyaAI-camera-" + stamp + ".jpg",
+      kind: "image",
+      mediaType: "image/jpeg",
+      previewUrl,
+      text: "[A photo was captured with the device camera. Visual understanding is not available yet; the image itself is not sent to the text model.]",
+    });
+    setStatus("Photo captured and attached. Image understanding is coming soon.");
+    setCameraOpen(false);
   }
 
   function toggleMic() {
@@ -1435,7 +1607,7 @@ function App() {
     if (file && nextMode !== "chat") {
       setConfirmRequest({
         title: "Remove attached file?",
-        message: "Switching to the media workspace will remove the current text attachment from the composer.",
+        message: "Switching to the media workspace will remove the current attachment from the composer.",
         confirmLabel: "Switch workspace",
         onConfirm: () => {
           setFile(null);
@@ -1495,9 +1667,9 @@ function App() {
     }
 
     const chatId = activeRef.current;
-    const withFile = (message: { text: string; file?: { name: string; text: string } }) =>
+    const withFile = (message: { text: string; file?: AttachedFile }) =>
       message.file
-        ? "[Attached file: " + message.file.name + "]\n" + message.file.text + "\n\nQuestion: " + message.text
+        ? "[Attached " + (message.file.kind ?? "file") + ": " + message.file.name + "]\n" + message.file.text + "\n\nQuestion: " + message.text
         : message.text;
     const priorMessages = (historyOverride ?? messages).filter((message) => !message.pending);
     const history: ChatMessage[] = priorMessages
@@ -1585,7 +1757,14 @@ function App() {
       role: "user",
       text,
       createdAt: Date.now(),
-      ...(attached ? { file: attached } : {}),
+      ...(attached ? {
+        file: {
+          name: attached.name,
+          text: attached.text,
+          kind: attached.kind,
+          mediaType: attached.mediaType,
+        },
+      } : {}),
     };
     setMessages([
       ...priorMessages,
@@ -2183,7 +2362,8 @@ function App() {
                     )}
                     {message.file && (
                       <small className="file-note">
-                        <FileText size={12} /> {message.file.name}
+                        {message.file.kind === "image" ? <ImageIcon size={12} /> : message.file.kind === "video" ? <VideoIcon size={12} /> : message.file.kind === "audio" ? <Mic size={12} /> : <FileText size={12} />}
+                        {message.file.name}
                       </small>
                     )}
                     {message.role === "ai" &&
@@ -2297,8 +2477,19 @@ function App() {
           <div className="composer-wrap">
             {workspaceMode === "chat" && file && (
               <div className="attachment">
-                <FileText size={16} />
-                <span>{file.name}</span>
+                {file.previewUrl ? (
+                  <img className="attachment-preview" src={file.previewUrl} alt="Attached photo preview" />
+                ) : file.kind === "video" ? (
+                  <VideoIcon size={16} />
+                ) : file.kind === "audio" ? (
+                  <Mic size={16} />
+                ) : (
+                  <FileText size={16} />
+                )}
+                <div className="attachment-copy">
+                  <span>{file.name}</span>
+                  <small>{file.kind === "image" ? "Photo attached · image understanding coming soon" : file.kind === "video" || file.kind === "audio" || file.kind === "document" ? "Attached · reading this format is coming soon" : "Ready to include in your message"}</small>
+                </div>
                 <button onClick={() => setFile(null)} aria-label="Remove attachment">
                   <X size={14} />
                 </button>
@@ -2324,41 +2515,68 @@ function App() {
                 aria-label={workspaceMode === "image" ? "Image prompt for Drishti" : workspaceMode === "video" ? "Video prompt for Chakshu" : "Message SatyaAI"}
               />
               <div className="composer-bottom">
-                <div className="composer-tools">
-                  {workspaceMode === "chat" && (
-                    <div className="composer-plus-wrap">
-                      <button
-                        className="tool-btn composer-plus"
-                        onClick={() => setAttachmentMenuOpen((open) => !open)}
-                        disabled={busy}
-                        aria-label="Open add menu"
-                        aria-expanded={attachmentMenuOpen}
-                        aria-haspopup="menu"
-                      >
-                        <Plus size={17} /> Add
+                <div className="composer-tools composer-actions" aria-label="Message tools">
+                  {workspaceMode === "chat" ? (
+                    <>
+                      <div className="composer-plus-wrap" ref={composerMenuRef}>
+                        <button
+                          type="button"
+                          className="composer-action-pill composer-add-action"
+                          onClick={() => setAttachmentMenuOpen((open) => !open)}
+                          disabled={busy}
+                          aria-label="Open add menu"
+                          aria-expanded={attachmentMenuOpen}
+                          aria-haspopup="menu"
+                        >
+                          <Plus size={17} /> <span>Add</span>
+                        </button>
+                        {attachmentMenuOpen && (
+                          <div className="composer-plus-menu" role="menu" aria-label="Add to message">
+                            <div className="composer-menu-section-label">ATTACH FROM DEVICE</div>
+                            <button type="button" role="menuitem" className="composer-menu-item" onClick={openCamera}>
+                              <Camera size={17} />
+                              <span><strong>Camera</strong><small>Take a photo with your device</small></span>
+                            </button>
+                            <button type="button" role="menuitem" className="composer-menu-item" onClick={() => { setAttachmentMenuOpen(false); inputRef.current?.click(); }}>
+                              <FileText size={17} />
+                              <span><strong>Add media &amp; files</strong><small>Photos, videos, audio and documents</small></span>
+                            </button>
+                            <div className="composer-plus-divider" />
+                            <div className="composer-menu-section-label">MORE TOOLS</div>
+                            <button type="button" role="menuitem" className="composer-menu-item composer-menu-soon" disabled title="Photo understanding is coming soon">
+                              <ImageIcon size={17} />
+                              <span><strong>Photo understanding</strong><small>Ask questions about an attached photo</small></span>
+                              <small className="composer-coming-soon">Coming soon</small>
+                            </button>
+                            <button type="button" role="menuitem" className="composer-menu-item composer-menu-soon" disabled title="Web search is coming soon">
+                              <Search size={17} />
+                              <span><strong>Web search</strong><small>Search and cite live sources</small></span>
+                              <small className="composer-coming-soon">Coming soon</small>
+                            </button>
+                          </div>
+                        )}
+                        <input
+                          ref={inputRef}
+                          hidden
+                          type="file"
+                          accept="image/*,video/*,audio/*,.txt,.md,.csv,.json,.log,.pdf,text/plain,application/pdf"
+                          onChange={(event) => {
+                            void pickFile(event.target.files?.[0]);
+                            event.target.value = "";
+                          }}
+                        />
+                      </div>
+                      <button type="button" className="composer-action-pill composer-image-action" onClick={() => switchWorkspaceMode("image")} disabled={busy}>
+                        <ImageIcon size={16} /><span>Create image</span>
                       </button>
-                      {attachmentMenuOpen && (
-                        <div className="composer-plus-menu" role="menu" aria-label="Add to message">
-                          <button role="menuitem" onClick={() => { setAttachmentMenuOpen(false); inputRef.current?.click(); }}><FileText size={15} /> Upload file</button>
-                          <button role="menuitem" disabled title="Photo question support is coming soon"><ImageIcon size={15} /> Photo <small>Soon</small></button>
-                          <button role="menuitem" disabled title="Camera capture is coming soon"><Aperture size={15} /> Camera <small>Soon</small></button>
-                          <button role="menuitem" disabled title="Web search is coming soon"><Search size={15} /> Web search <small>Soon</small></button>
-                          <div className="composer-plus-divider" />
-                          <button role="menuitem" onClick={() => { setAttachmentMenuOpen(false); switchWorkspaceMode("image"); }}><ImageIcon size={15} /> Create image</button>
-                          <button role="menuitem" onClick={() => { setAttachmentMenuOpen(false); switchWorkspaceMode("video"); }}><VideoIcon size={15} /> Create video</button>
-                        </div>
-                      )}
-                      <input
-                        ref={inputRef}
-                        hidden
-                        type="file"
-                        accept=".txt,.md,.csv,.json,text/plain"
-                        onChange={(event) => {
-                          void pickFile(event.target.files?.[0]);
-                          event.target.value = "";
-                        }}
-                      />
-                    </div>
+                      <button type="button" className="composer-action-pill composer-video-action" onClick={() => switchWorkspaceMode("video")} disabled={busy}>
+                        <VideoIcon size={16} /><span>Create video</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" className="composer-action-pill composer-add-action" onClick={() => switchWorkspaceMode("chat")}>
+                      <Sparkles size={16} /><span>Back to chat</span>
+                    </button>
                   )}
                 </div>
                 <button
@@ -2424,13 +2642,57 @@ function App() {
                       ? status + " Keep this tab open."
                       : "SatyaAI can make mistakes. Verify important information."}
               </span>
-              <span><a href="https://dev.meta.ai/llama/llama3_2/license" target="_blank" rel="noreferrer">Built with Llama</a></span>
+              <span className="composer-engine-note">SatyaSom Engine · Local-first</span>
               <button onClick={() => openSettings("privacy")}>Privacy & data</button>
             </div>
           </div>
         </section>
       </main>
 
+      {cameraOpen && (
+        <div
+          className="camera-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setCameraOpen(false);
+          }}
+        >
+          <section className="camera-dialog" role="dialog" aria-modal="true" aria-labelledby="camera-dialog-title">
+            <header className="camera-dialog-header">
+              <div>
+                <span className="camera-dialog-kicker">SATYA SOM · CAMERA</span>
+                <h2 id="camera-dialog-title">Capture a photo</h2>
+                <p>Use your device camera to add a photo to this conversation.</p>
+              </div>
+              <button type="button" className="camera-close" onClick={() => setCameraOpen(false)} aria-label="Close camera">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="camera-preview-frame">
+              <video
+                ref={cameraVideoRef}
+                autoPlay
+                playsInline
+                muted
+                onLoadedMetadata={() => setCameraReady(true)}
+              />
+              {!cameraReady && (
+                <div className="camera-preview-message" role="status">
+                  <Camera size={24} />
+                  <strong>{cameraError ? "Camera unavailable" : "Starting your camera…"}</strong>
+                  <span>{cameraError || "Allow camera permission when your browser asks."}</span>
+                </div>
+              )}
+            </div>
+            <footer className="camera-dialog-footer">
+              <small>Photo previews can be attached now. Image understanding is coming soon.</small>
+              <button type="button" className="camera-capture-button" onClick={captureCameraPhoto} disabled={!cameraReady || Boolean(cameraError)}>
+                <Camera size={16} /> Capture photo
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
       <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} onConfirm={() => {
         const request = confirmRequest;
         setConfirmRequest(null);
