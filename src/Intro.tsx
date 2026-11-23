@@ -208,14 +208,16 @@ export function Intro() {
       return s;
     };
     function resize() {
-      w = window.innerWidth;
-      h = window.innerHeight;
+      // Mobile browsers change their visual viewport as browser chrome expands/collapses.
+      const visual = coarse ? window.visualViewport : null;
+      w = Math.round(visual?.width || window.innerWidth);
+      h = Math.round(visual?.height || window.innerHeight);
       canvas!.width = Math.round(w * dpr);
       canvas!.height = Math.round(h * dpr);
       diag = Math.hypot(w, h);
       f = diag * 0.4;
       cx = w / 2;
-      cy = h * 0.46;
+      cy = h * 0.47;
       stars = Array.from({ length: coarse ? 380 : 720 }, makeStar);
     }
 
@@ -408,6 +410,10 @@ export function Intro() {
 
     resize();
     window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", resize);
+    if (coarse && window.visualViewport) {
+      window.visualViewport.addEventListener("resize", resize);
+    }
     raf = requestAnimationFrame(frame);
     const toExit = window.setTimeout(() => {
       if (phaseRef.current === "play") setPhase("exit");
@@ -416,6 +422,10 @@ export function Intro() {
       cancelAnimationFrame(raf);
       window.clearTimeout(toExit);
       window.removeEventListener("resize", resize);
+      window.removeEventListener("orientationchange", resize);
+      if (coarse && window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", resize);
+      }
     };
   }, [running]);
 
