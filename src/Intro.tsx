@@ -25,8 +25,12 @@ const T_HIT = 4.6; // flash, shockwave and hard brake
 const T_SETTLE = 6.4; // stars have come to rest
 const T_EXIT = 8.8; // overlay starts to leave
 const STAGES = [0, 0.9, T_WARP, 4.75, 5.5, 6.8]; // s1 line, s2 warp, s3 logo, s4 word, s5 tagline
-const MOBILE_STAGES = [0, 1.15, 3.2, 5.1, 6.35, 7.75]; // slower mobile reveals with a longer breathing room
-const MOBILE_T_EXIT = 11.6; // hold the completed mobile brand reveal before fading out
+const MOBILE_STAGES = [0, 1.05, 3.25, 5.85, 7.25, 8.15]; // line, warp, logo, wordmark, tagline
+const MOBILE_T_WARP = 3.1;
+const MOBILE_T_PEAK = 4.7;
+const MOBILE_T_HIT = 5.0;
+const MOBILE_T_SETTLE = 7.0;
+const MOBILE_T_EXIT = 12.8; // allow the full logo and wordmark reveal to breathe
 const EXIT_MS = 1200;
 const SKIP_EXIT_MS = 500;
 
@@ -54,22 +58,30 @@ function shouldPlay(): boolean {
 }
 
 // Camera speed: a slow drift, a long cubic ignition, a hold, then a hard brake.
-function speedAt(t: number): number {
-  if (t < T_WARP) return 0.012 + 0.02 * smooth(t / T_WARP);
-  if (t < T_PEAK) {
-    const k = (t - T_WARP) / (T_PEAK - T_WARP);
+function speedAt(t: number, mobile = false): number {
+  const warp = mobile ? MOBILE_T_WARP : T_WARP;
+  const peak = mobile ? MOBILE_T_PEAK : T_PEAK;
+  const hit = mobile ? MOBILE_T_HIT : T_HIT;
+  const settle = mobile ? MOBILE_T_SETTLE : T_SETTLE;
+  if (t < warp) return 0.012 + 0.02 * smooth(t / warp);
+  if (t < peak) {
+    const k = (t - warp) / (peak - warp);
     return 0.03 + 0.97 * k * k * k;
   }
-  if (t < T_HIT) return 1;
-  const k = clamp01((t - T_HIT) / (T_SETTLE - T_HIT));
+  if (t < hit) return 1;
+  const k = clamp01((t - hit) / (settle - hit));
   return 0.014 + 0.986 * Math.pow(1 - k, 3.2);
 }
 
 // White-hot flash: swells into the hit, then burns off.
-function flashAt(t: number): number {
-  if (t < 4.2 || t > 5.7) return 0;
-  if (t < T_HIT) return smooth((t - 4.2) / (T_HIT - 4.2));
-  return Math.pow(1 - clamp01((t - T_HIT) / 1.0), 2.4);
+function flashAt(t: number, mobile = false): number {
+  const start = mobile ? 4.55 : 4.2;
+  const hit = mobile ? MOBILE_T_HIT : T_HIT;
+  const duration = mobile ? 1.15 : 1.0;
+  const end = hit + duration;
+  if (t < start || t > end) return 0;
+  if (t < hit) return smooth((t - start) / (hit - start));
+  return Math.pow(1 - clamp01((t - hit) / duration), 2.4);
 }
 
 // Value-noise fbm, used once to paint the nebula clouds.
@@ -181,7 +193,8 @@ export function Intro() {
     const coarse = window.matchMedia("(pointer: coarse)").matches;
     const mobileIntro = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
     const stageTimes = mobileIntro ? MOBILE_STAGES : STAGES;
-    const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+    const hitTime = mobileIntro ? MOBILE_T_HIT : T_HIT;
+    const dpr = Math.min(window.devicePixelRatio || 1, mobileIntro ? 1.5 : coarse ? 1.5 : 2);
     const sprites = TINTS.map(makeSprite);
     const nebula = makeNebula(coarse ? 160 : 256);
     let w = 0;
@@ -218,16 +231,17 @@ export function Intro() {
       return s;
     };
     function resize() {
-      // Mobile browsers change their visual viewport as browser chrome expands/collapses.
-      const visual = coarse ? window.visualViewport : null;
-      w = Math.round(visual?.width || window.innerWidth);
-      h = Math.round(visual?.height || window.innerHeight);
+      // Measure the actual overlay box. 100vw and visualViewport can disagree
+      // on Android when the browser chrome or scrollbar changes the viewport.
+      const rect = canvas!.getBoundingClientRect();
+      w = Math.max(1, Math.round(rect.width));
+      h = Math.max(1, Math.round(rect.height));
       canvas!.width = Math.round(w * dpr);
       canvas!.height = Math.round(h * dpr);
       diag = Math.hypot(w, h);
       f = diag * 0.4;
       cx = w / 2;
-      cy = h * (coarse ? 0.47 : 0.46);
+      cy = h * (mobileIntro ? 0.47 : 0.46);
       stars = Array.from({ length: mobileIntro ? 240 : coarse ? 380 : 720 }, makeStar);
     }
 
@@ -266,9 +280,9 @@ export function Intro() {
         setStage(st);
       }
 
-      const v = speedAt(t);
-      const flash = flashAt(t);
-      const hit = t >= T_HIT ? t - T_HIT : -1;
+      const v = speedAt(t, mobileIntro);
+      const flash = flashAt(t, mobileIntro);
+      const hit = t >= hitTime ? t - hitTime : -1;
 
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.globalCompositeOperation = "source-over";
@@ -452,13 +466,11 @@ export function Intro() {
   // Skip with any tap, click or key.
   useEffect(() => {
     if (phase !== "play") return;
-    const skip = () => setPhase((p) => (p === "play" ? "skip" : p));
-    window.addEventListener("pointerdown", skip);
-    window.addEventListener("keydown", skip);
-    return () => {
-      window.removeEventListener("pointerdown", skip);
-      window.removeEventListener("keydown", skip);
+    const skip = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPhase((p) => (p === "play" ? "skip" : p));
     };
+    window.addEventListener("keydown", skip);
+    return () => window.removeEventListener("keydown", skip);
   }, [phase]);
 
   // Unmount once the exit transition has finished.
@@ -470,8 +482,9 @@ export function Intro() {
 
   if (phase === "off") return null;
   const stageClasses = Array.from({ length: stage }, (_, i) => "s" + (i + 1)).join(" ");
+  const mobileIntroMode = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
   return (
-    <div className={"intro " + phase + " " + stageClasses} aria-hidden="true">
+    <div className={"intro " + phase + (mobileIntroMode ? " mobile-intro" : "") + " " + stageClasses} aria-hidden="true">
       <canvas ref={canvasRef} className="intro-canvas" />
       <div className="intro-rays" />
       <div className="intro-vig" />
@@ -489,7 +502,12 @@ export function Intro() {
         </div>
         <p className="intro-tag">Truth-first AI for curious minds</p>
       </div>
-      <span className="intro-skip">Tap to skip</span>
+      <button
+        type="button"
+        className="intro-skip"
+        aria-label="Skip intro"
+        onClick={() => setPhase((p) => (p === "play" ? "skip" : p))}
+      >Tap to skip</button>
     </div>
   );
 }
