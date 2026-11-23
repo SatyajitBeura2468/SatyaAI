@@ -463,14 +463,25 @@ export function Intro() {
     };
   }, [running]);
 
-  // Skip with any tap, click or key.
+  // Phone: only the visible skip button or Escape skips the cinematic.
+  // Desktop: preserve the original any-click / any-key skip behaviour.
   useEffect(() => {
     if (phase !== "play") return;
-    const skip = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPhase((p) => (p === "play" ? "skip" : p));
+    const phone = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
+    if (phone) {
+      const skipKey = (event: KeyboardEvent) => {
+        if (event.key === "Escape") setPhase((p) => (p === "play" ? "skip" : p));
+      };
+      window.addEventListener("keydown", skipKey);
+      return () => window.removeEventListener("keydown", skipKey);
+    }
+    const skipDesktop = () => setPhase((p) => (p === "play" ? "skip" : p));
+    window.addEventListener("pointerdown", skipDesktop);
+    window.addEventListener("keydown", skipDesktop);
+    return () => {
+      window.removeEventListener("pointerdown", skipDesktop);
+      window.removeEventListener("keydown", skipDesktop);
     };
-    window.addEventListener("keydown", skip);
-    return () => window.removeEventListener("keydown", skip);
   }, [phase]);
 
   // Unmount once the exit transition has finished.
