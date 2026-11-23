@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getKanaCapabilitySnapshot, getKanaResourceProfile, KANA_CONFIG } from "./kana.config";
 
-describe("Kaṇa Micro runtime configuration", () => {
+describe("Kaṇa Nano runtime configuration", () => {
   it("selects the dedicated 135M INT8 checkpoint on WebAssembly CPU", () => {
     expect(KANA_CONFIG.modelId).toBe("onnx-community/SmolLM2-135M-Instruct-ONNX-MHA");
+    expect(KANA_CONFIG.tier).toBe("Nano");
     expect(KANA_CONFIG.parameterCount).toBe(135_000_000);
     expect(KANA_CONFIG.dtype).toBe("int8");
     expect(KANA_CONFIG.device).toBe("wasm");
