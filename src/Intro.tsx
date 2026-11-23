@@ -149,6 +149,11 @@ function makeSprite(rgb: [number, number, number]): HTMLCanvasElement {
 
 export function Intro() {
   const [phase, setPhase] = useState<"off" | "play" | "exit" | "skip">(() => (shouldPlay() ? "play" : "off"));
+
+  // Reveal the app only after the intro overlay has mounted above it.
+  useEffect(() => {
+    document.documentElement.classList.remove("satya-intro-pending");
+  }, []);
   const [stage, setStage] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const phaseRef = useRef(phase);
