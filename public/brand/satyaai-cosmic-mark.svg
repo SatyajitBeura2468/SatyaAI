@@ -1,4 +1,65 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="89" viewBox="0 0 96 89">
-  <image width="96" height="89" href="data:image/jpeg;base64,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"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 125" fill="none">
+  <defs>
+    <linearGradient id="upper" x1="25" y1="18" x2="123" y2="63" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/><stop offset=".22" stop-color="#9ce9ff"/><stop offset=".58" stop-color="#1679ff"/><stop offset="1" stop-color="#dceaff"/>
+    </linearGradient>
+    <linearGradient id="lower" x1="42" y1="48" x2="104" y2="117" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#26aaff"/><stop offset=".36" stop-color="#3636ff"/><stop offset=".72" stop-color="#9029ff"/><stop offset="1" stop-color="#f0a4ff"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1="7" y1="89" x2="151" y2="39" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6deaff"/><stop offset=".48" stop-color="#fff"/><stop offset=".76" stop-color="#9f9cff"/><stop offset="1" stop-color="#76dfff"/>
+    </linearGradient>
+    <radialGradient id="planet" cx="0" cy="0" r="1" gradientTransform="matrix(5 5 -5 5 0 0)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/><stop offset=".58" stop-color="#d9f5ff"/><stop offset="1" stop-color="#6abfff"/>
+    </radialGradient>
+    <filter id="bloom" x="-35%" y="-45%" width="170%" height="190%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 .20 0 0 0 0 .42 0 0 0 0 1 0 0 0 .85 0" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="starGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="meshClip">
+      <path d="M67 47C91 47 111 58 116 75c7 22-20 37-88 42 27-10 51-20 60-34 9-14-1-27-21-36Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Soft atmospheric halo -->
+  <g filter="url(#bloom)" opacity=".65">
+    <path d="M17 56C22 28 59 8 132 13 103 18 70 29 50 47 35 60 39 72 58 79 31 76 13 67 17 56Z" fill="#167dff" opacity=".32"/>
+    <path d="M68 47c25-1 46 11 49 31 3 21-22 35-90 39 30-12 52-21 61-36 8-14-1-27-20-34Z" fill="#a12cff" opacity=".38"/>
+  </g>
+
+  <!-- Upper planetary crescent -->
+  <path d="M17 56C22 28 59 8 132 13 103 18 70 29 50 47 35 60 39 72 58 79 31 76 13 67 17 56Z" fill="url(#upper)" stroke="#e9f8ff" stroke-width="1.15"/>
+  <path d="M25 54C34 32 66 18 115 17" stroke="#fff" stroke-opacity=".85" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M33 47c18-15 42-22 69-24M35 54c17-13 35-18 52-21M42 61c12-8 23-12 35-14" stroke="#d9f4ff" stroke-opacity=".34" stroke-width=".75" stroke-linecap="round"/>
+  <path d="M25 60c-1 8 8 14 20 17" stroke="#b4eaff" stroke-opacity=".55" stroke-width="1.1" stroke-linecap="round"/>
+
+  <!-- AI network ribbon forming the lower sweep -->
+  <path d="M67 47C91 47 111 58 116 75c7 22-20 37-88 42 27-10 51-20 60-34 9-14-1-27-21-36Z" fill="url(#lower)" stroke="#e0c9ff" stroke-width="1.1"/>
+  <g clip-path="url(#meshClip)" stroke="#8feaff" stroke-opacity=".58" stroke-width=".65">
+    <path d="M38 48 62 65 83 53 105 68 124 57M30 68 52 78 75 68 96 82 119 76M24 88 48 91 70 82 94 96 117 94M20 107 46 105 70 97 93 111 116 109"/>
+    <path d="M38 48 30 68 24 88 20 107M62 65 52 78 48 91 46 105M83 53 75 68 70 82 70 97M105 68 96 82 94 96 93 111M124 57 119 76 117 94 116 109"/>
+  </g>
+  <g clip-path="url(#meshClip)" fill="#d9f7ff">
+    <circle cx="62" cy="65" r="1.25"/><circle cx="83" cy="53" r="1.45"/><circle cx="105" cy="68" r="1.4"/>
+    <circle cx="52" cy="78" r="1.2"/><circle cx="75" cy="68" r="1.55"/><circle cx="96" cy="82" r="1.5"/>
+    <circle cx="48" cy="91" r="1.35"/><circle cx="70" cy="82" r="1.6"/><circle cx="94" cy="96" r="1.6"/>
+    <circle cx="46" cy="105" r="1.2"/><circle cx="70" cy="97" r="1.45"/><circle cx="93" cy="111" r="1.2"/>
+  </g>
+  <path d="M32 113c29-10 48-20 58-34 5-7 5-14 1-20" stroke="#fff" stroke-opacity=".72" stroke-width="1.15" stroke-linecap="round"/>
+
+  <!-- Tilted orbital path -->
+  <ellipse cx="80" cy="62" rx="73.5" ry="20.8" transform="rotate(-18 80 62)" stroke="url(#orbit)" stroke-width="2.05" filter="url(#bloom)"/>
+  <ellipse cx="80" cy="62" rx="73.5" ry="20.8" transform="rotate(-18 80 62)" stroke="#e8faff" stroke-width=".55" stroke-opacity=".9"/>
+
+  <!-- Central stellar intelligence point -->
+  <path d="M80 34 84.2 56.7 107 61 84.2 65.2 80 88 75.8 65.2 53 61 75.8 56.7 80 34Z" fill="#fff" filter="url(#starGlow)"/>
+  <circle cx="80" cy="61" r="4.1" fill="#fff"/>
+
+  <!-- Orbital bodies -->
+  <circle cx="17.4" cy="84.6" r="4.1" fill="url(#planet)" filter="url(#starGlow)"/>
+  <circle cx="143" cy="39.3" r="4.1" fill="url(#planet)" filter="url(#starGlow)"/>
 </svg>
