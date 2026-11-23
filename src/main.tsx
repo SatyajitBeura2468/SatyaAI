@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   Menu,
+  Microscope,
   MessageSquare,
   Mic,
   Plus,
@@ -41,7 +42,7 @@ import "./reasoning-profile.css";
 import "./drishti.css";
 import { Starfield } from "./Starfield";
 import { freshStarters } from "./starters";
-import { HOME_HERO_OPTIONS, pickOnLoad } from "./ui-copy";
+import { HOME_HERO_OPTIONS, MORE_TOOLS_COPY, REASONING_MODE_DESCRIPTIONS, pickOnLoad } from "./ui-copy";
 import { createThinkingPhraseOrder, THINKING_PHRASES } from "./thinking-phrases";
 import {
   createLoadingPhraseOrder,
@@ -146,11 +147,11 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 const modes: Record<Mode, { desc: string }> = {
-  micro: { desc: "Feather-light answers for quick, simple questions." },
-  nano: { desc: "A compact step up for longer chats and more context." },
-  fast: { desc: "Straight to the point. Less waiting, more doing." },
-  smart: { desc: "Thoughtful answers without making things needlessly complicated." },
-  deep: { desc: "For the big questions that deserve a proper deep dive." },
+  micro: { desc: REASONING_MODE_DESCRIPTIONS.micro },
+  nano: { desc: REASONING_MODE_DESCRIPTIONS.nano },
+  fast: { desc: REASONING_MODE_DESCRIPTIONS.fast },
+  smart: { desc: REASONING_MODE_DESCRIPTIONS.smart },
+  deep: { desc: REASONING_MODE_DESCRIPTIONS.deep },
 };
 
 const CHATS_KEY = "satya-chats-v1";
@@ -2595,11 +2596,21 @@ function App() {
                           </button>
                           <div className="composer-plus-divider" />
                           <div className="composer-menu-section-label">MORE TOOLS</div>
-                          <button type="button" role="menuitem" className="composer-menu-item composer-menu-soon" disabled title="Web search is coming soon">
-                            <Search size={17} />
-                            <span><strong>Web search</strong><small>Search and cite live sources</small></span>
-                            <small className="composer-coming-soon">Coming soon</small>
-                          </button>
+                          {MORE_TOOLS_COPY.map((tool) => (
+                            <button
+                              key={tool.id}
+                              type="button"
+                              role="menuitem"
+                              className="composer-menu-item composer-menu-soon"
+                              disabled
+                              title={tool.label + " is coming soon"}
+                              aria-label={tool.label + ". " + tool.description + " Coming soon."}
+                            >
+                              {tool.id === "web-search" ? <Search size={17} /> : <Microscope size={17} />}
+                              <span><strong>{tool.label}</strong><small>{tool.description}</small></span>
+                              <small className="composer-coming-soon">{tool.status}</small>
+                            </button>
+                          ))}
                         </div>
                       )}
                       <input
