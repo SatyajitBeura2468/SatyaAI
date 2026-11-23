@@ -222,7 +222,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             <p>Pick the default reasoning mode used when a new chat starts. You can still change it from the header at any time.</p>
                             <label className="setting-field">Default model
                               <select value={preferences.defaultMode} onChange={(event) => setPreferences((p) => ({ ...p, defaultMode: event.target.value as Mode }))}>
-                                <option value="micro">Kaṇa · Micro · 135M</option><option value="nano">Anu · Nano</option><option value="fast">Indu · Fast</option><option value="smart">Dhara · Smart</option><option value="deep">Aditya · Deep Think</option>
+                                <option value="micro">Kaṇa · Nano</option><option value="nano">Anu · Micro</option><option value="fast">Indu · Fast</option><option value="smart">Dhara · Smart</option><option value="deep">Aditya · Deep Think</option>
                               </select>
                             </label>
                             <div className="diag-row"><span>Currently selected</span><strong>{current.name} · {current.modeLabel}</strong></div>
