@@ -164,14 +164,14 @@ function makeSprite(rgb: [number, number, number]): HTMLCanvasElement {
 export function Intro() {
   const [phase, setPhase] = useState<"off" | "play" | "exit" | "skip">(() => (shouldPlay() ? "play" : "off"));
 
-  // Keep the app hidden for the complete phone intro, including its exit fade.
-  // Desktop retains its existing mount-time behaviour.
+  // Keep the application hidden for the entire intro on desktop and phone.
+  // Release it only after the fade/skip transition has completed.
   useEffect(() => {
-    const phone = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
-    if (phone && phase !== "off") {
-      document.documentElement.classList.add("satya-intro-pending");
+    const root = document.documentElement;
+    if (phase === "off") {
+      root.classList.remove("satya-intro-pending");
     } else {
-      document.documentElement.classList.remove("satya-intro-pending");
+      root.classList.add("satya-intro-pending");
     }
   }, [phase]);
   const [stage, setStage] = useState(0);
