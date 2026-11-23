@@ -17,6 +17,7 @@ type WorkerRequest =
 let kanaWorker: Worker | null = null;
 let requestSequence = 0;
 let serialQueue: Promise<void> = Promise.resolve();
+let workerTeardown: Promise<void> = Promise.resolve();
 
 function ensureWorker(): Worker {
   if (!kanaWorker) kanaWorker = new Worker(new URL("./kana.worker.ts", import.meta.url), { type: "module", name: "satyaai-kana-inference" });
@@ -39,19 +40,22 @@ export function unloadKana(): void {
   kanaWorker = null;
   if (!worker) return;
   const id = ++requestSequence;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const cleanup = () => {
-    if (timer !== undefined) clearTimeout(timer);
-    worker.removeEventListener("message", handleMessage);
-    worker.terminate();
-  };
-  const handleMessage = (event: MessageEvent<WorkerResponse>) => {
-    if (event.data?.id === id && event.data.type === "unloaded") cleanup();
-  };
-  worker.addEventListener("message", handleMessage);
-  timer = setTimeout(cleanup, 2_000);
-  try { worker.postMessage({ type: "unload", id } satisfies WorkerRequest); }
-  catch { cleanup(); }
+  workerTeardown = new Promise<void>((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      worker.removeEventListener("message", handleMessage);
+      worker.terminate();
+      resolve();
+    };
+    const handleMessage = (event: MessageEvent<WorkerResponse>) => {
+      if (event.data?.id === id && event.data.type === "unloaded") cleanup();
+    };
+    worker.addEventListener("message", handleMessage);
+    timer = setTimeout(cleanup, 2_000);
+    try { worker.postMessage({ type: "unload", id } satisfies WorkerRequest); }
+    catch { cleanup(); }
+  });
 }
 
 export async function localKana(
@@ -62,6 +66,7 @@ export async function localKana(
   signal?: AbortSignal,
 ): Promise<string> {
   return enqueue(async () => {
+    await workerTeardown;
     if (signal?.aborted) throw new DOMException("Kaṇa inference cancelled.", "AbortError");
     const capabilities = getKanaCapabilitySnapshot();
     if (!capabilities.webAssembly || !capabilities.worker) {
