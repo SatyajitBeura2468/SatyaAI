@@ -84,8 +84,10 @@ function progressCallback(id: number) {
   return (event: { status?: string; file?: string; loaded?: number; total?: number; progress?: number }) => {
     if (event.status === "progress_total" && typeof event.progress === "number" && Number.isFinite(event.progress)) {
       postProgress(id, "download", "Downloading Kaṇa model assets…", Math.max(0, Math.min(100, Math.round(event.progress))));
+    } else if (event.status === "progress" && event.file && typeof event.progress === "number" && Number.isFinite(event.progress)) {
+      // The displayed percentage is the runtime's actual progress for this file.
+      postProgress(id, "download", "Downloading " + event.file + "…", Math.max(0, Math.min(100, Math.round(event.progress))));
     } else if (event.status === "progress" && event.file) {
-      // Progress text updates are real, but only aggregate progress moves the percentage.
       postProgress(id, "download", "Downloading " + event.file + "…");
     } else if (event.status === "ready") {
       postProgress(id, "initializing", "The ONNX CPU runtime is ready. Verifying inference…");
@@ -218,4 +220,8 @@ workerScope.onmessage = (event) => {
 
 env.useBrowserCache = typeof caches !== "undefined";
 env.useWasmCache = typeof caches !== "undefined";
-env.backends.onnx.wasm.numThreads = KANA_CONFIG.wasmThreads;
+// The browser backend may be absent in non-WASM environments; when present,
+// constrain it to one thread. Without SharedArrayBuffer, browsers also default
+// to the single-threaded WASM path.
+const wasmBackend = env.backends.onnx.wasm;
+if (wasmBackend) wasmBackend.numThreads = KANA_CONFIG.wasmThreads;
