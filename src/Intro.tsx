@@ -445,19 +445,7 @@ export function Intro() {
       <p className="intro-line">Curiosity has no speed limit.</p>
       <div className="intro-center">
         <div className="intro-mark">
-          <svg viewBox="0 0 512 512" width="100%" height="100%">
-            <defs>
-              <linearGradient id="introG" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#9a8bff" />
-                <stop offset="1" stopColor="#5ec8ff" />
-              </linearGradient>
-            </defs>
-            <circle cx="256" cy="256" r="176" fill="url(#introG)" opacity=".22" />
-            <path
-              d="M342 164c-22-25-53-38-91-38-67 0-111 35-111 89 0 46 28 69 102 84 51 10 68 20 68 40 0 22-23 36-59 36-38 0-72-15-99-44l-39 46c35 38 83 59 138 59 74 0 121-37 121-96 0-49-30-73-105-88-48-10-65-19-65-38 0-17 19-29 49-29 30 0 56 11 78 33z"
-              fill="#fff"
-            />
-          </svg>
+          <img src="/brand/satyaai-cosmic-mark.svg" alt="" />
         </div>
         <div className="intro-word">
           {WORD.split("").map((ch, i) => (
