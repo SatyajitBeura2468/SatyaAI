@@ -495,7 +495,7 @@ export function Intro() {
   const stageClasses = Array.from({ length: stage }, (_, i) => "s" + (i + 1)).join(" ");
   const mobileIntroMode = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
   return (
-    <div className={"intro " + phase + (mobileIntroMode ? " mobile-intro" : "") + " " + stageClasses} aria-hidden="true">
+    <div className={"intro " + phase + (mobileIntroMode ? " mobile-intro" : "") + " " + stageClasses} aria-hidden={!mobileIntroMode}>
       <canvas ref={canvasRef} className="intro-canvas" />
       <div className="intro-rays" />
       <div className="intro-vig" />
@@ -513,12 +513,16 @@ export function Intro() {
         </div>
         <p className="intro-tag">Truth-first AI for curious minds</p>
       </div>
-      <button
-        type="button"
-        className="intro-skip"
-        aria-label="Skip intro"
-        onClick={() => setPhase((p) => (p === "play" ? "skip" : p))}
-      >Tap to skip</button>
+      {mobileIntroMode ? (
+        <button
+          type="button"
+          className="intro-skip"
+          aria-label="Skip intro"
+          onClick={() => setPhase((p) => (p === "play" ? "skip" : p))}
+        >Tap to skip</button>
+      ) : (
+        <span className="intro-skip">Tap to skip</span>
+      )}
     </div>
   );
 }
