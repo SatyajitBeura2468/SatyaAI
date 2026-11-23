@@ -6,13 +6,13 @@ Truth-first intelligence for curious minds, thinking, learning, and creation.
 
 ## Product engine
 
-**SatyaSom Engine** is SatyaAI's product identity and original application-level architecture for conversation flow, local inference orchestration, memory, and creative workspaces. The four user-facing tiers are Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). The current tiers run locally in the browser through WebGPU; model files are downloaded to the device and reused from its cache. A compatible remote endpoint is optional and is used only when a user configures one.
+**SatyaSom Engine** is SatyaAI's product identity and original application-level architecture for conversation flow, local inference orchestration, memory, and creative workspaces. The five user-facing tiers are Kaṇa (Micro), Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). Kaṇa uses the 135M SmolLM2-Instruct ONNX checkpoint through Transformers.js on WebAssembly CPU and does not require WebGPU. The other four tiers retain their existing browser-local WebGPU inference path. Model assets are cached by the browser after download. A compatible remote endpoint is optional and is used only when a user configures one.
 
 ## Required model attribution
 
 **Built with Llama.** The current Fast, Smart, and Deep text tiers use Llama 3.2 model weights. This exact attribution is retained in product documentation to comply with the model licence; it does not replace SatyaSom Engine as the product identity. See the [Llama 3.2 Community License](https://dev.meta.ai/llama/llama3_2/license) and [model notices](docs/model-notices.md).
 
-SatyaAI V0.1 is a privacy-conscious, local-first AI application. SatyaSom Engine is the application-level architecture; each tier selects its own local model configuration and generation settings. All four tiers run locally in the browser through WebGPU. Model weights download to the device once and are reused from the browser cache. No hosted API key or paid inference provider is required. An optional compatible endpoint can be configured in Settings when a user deliberately wants remote inference. A supported WebGPU browser and compatible hardware are required for local inference.
+SatyaAI V0.1 is a privacy-conscious, local-first AI application. SatyaSom Engine is the application-level architecture; each tier selects its own local model configuration and generation settings. Kaṇa runs in a dedicated browser Worker through ONNX Runtime WebAssembly CPU; Anu, Indu, Dhara and Aditya retain their existing WebGPU paths. Model weights are downloaded to the device and reused from the browser cache. No hosted API key or paid inference provider is required for local inference. A compatible endpoint can be configured for supported tiers; Kaṇa offers it only as an explicit one-turn action after local inference fails.
 
 ## Run locally
 
@@ -21,7 +21,7 @@ pnpm install
 pnpm dev
 ```
 
-All four tiers run locally by default and do not require Vercel inference secrets. Users may optionally configure a compatible endpoint under Settings → Models & inference. Keep endpoint credentials out of source control. See [docs/hosting.md](docs/hosting.md).
+All five tiers run locally by default and do not require Vercel inference secrets. Users may optionally configure a compatible endpoint under Settings → Models & inference. Keep endpoint credentials out of source control. See [docs/hosting.md](docs/hosting.md).
 
 ## Architecture
 
@@ -29,7 +29,7 @@ All four tiers run locally by default and do not require Vercel inference secret
 flowchart TD
   User --> UI[SatyaAI UI]
   UI --> Orchestrator[Conversation Orchestrator]
-  Orchestrator --> Modes[Nano / Fast / Smart / Deep Think]
+  Orchestrator --> Modes[Micro / Nano / Fast / Smart / Deep Think]
   Orchestrator --> Perception[Text / Drishti images / Audio / Video / Documents]
   Orchestrator --> Tools[Search / Research / Retrieval]
   Orchestrator --> Providers[Provider Layer]
