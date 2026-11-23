@@ -56,7 +56,7 @@ describe("SATYA CORE canonical registry", () => {
     expect(prompt).toContain("Shared model engine: SatyaSom Engine.");
     expect(prompt).toContain("Shared architecture: SatyaSom Engine Architecture, designed and developed from scratch.");
     expect(prompt).toContain("Selected SatyaAI tier: Aditya");
-    expect(prompt).toContain("Official SatyaAI tier mapping: Micro = Kaṇa; Nano = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
+    expect(prompt).toContain("Official SatyaAI tier mapping: Nano = Kaṇa; Micro = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
     expect(prompt).toContain("Never state or imply that an external named AI/model is your base model");
     expect(prompt).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     expect(prompt).toContain('"name":"Omm"');
@@ -64,15 +64,17 @@ describe("SATYA CORE canonical registry", () => {
   });
   it("supplies the fixed public reasoning-tier identity for every reasoning mode", () => {
     expect(SATYAAI_TIERS.micro.name).toBe("Kaṇa");
+    expect(SATYAAI_TIERS.micro.modeLabel).toBe("Nano");
     expect(SATYAAI_TIERS.nano.name).toBe("Anu");
+    expect(SATYAAI_TIERS.nano.modeLabel).toBe("Micro");
     expect(SATYAAI_TIERS.fast.name).toBe("Indu");
     expect(SATYAAI_TIERS.smart.name).toBe("Dhara");
     expect(SATYAAI_TIERS.deep.name).toBe("Aditya");
     const microRuntime = formatRuntimeContext({ mode: "micro", inferenceRoute: "browser-local" });
-    expect(microRuntime).toContain("Selected reasoning mode: Micro");
+    expect(microRuntime).toContain("Selected reasoning mode: Nano");
     expect(microRuntime).toContain("Selected SatyaAI tier: Kaṇa");
     const runtime = formatRuntimeContext({ mode: "nano", inferenceRoute: "browser-local" });
-    expect(runtime).toContain("Selected reasoning mode: Nano");
+    expect(runtime).toContain("Selected reasoning mode: Micro");
     expect(runtime).toContain("Shared model engine: SatyaSom Engine.");
     expect(runtime).toContain("Selected SatyaAI tier: Anu");
     expect(runtime).toContain("Inference route: browser-local");

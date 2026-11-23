@@ -1,7 +1,7 @@
 export const KANA_CONFIG = Object.freeze({
   publicName: "Kaṇa",
   sanskritName: "कण",
-  tier: "Micro",
+  tier: "Nano",
   parameterCount: 135_000_000,
   modelId: "onnx-community/SmolLM2-135M-Instruct-ONNX-MHA",
   revision: "main",

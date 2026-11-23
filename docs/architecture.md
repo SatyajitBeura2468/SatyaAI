@@ -10,9 +10,9 @@ src/ai/identity.ts is the application-facing adapter. It keeps user-editable pro
 
 ## SatyaSom Engine and reasoning tiers
 
-SatyaAI's model family is built on the **SatyaSom Engine Architecture**, an architecture designed and developed from scratch. SatyaSom Engine is the shared architecture and engine framework, not one single foundation model. The five purpose-built model variants are Kaṇa (Micro), Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). Each variant is intended for its own workload and is configured with its own model scale, parameter settings, capabilities, and use cases.
+SatyaAI's model family is built on the **SatyaSom Engine Architecture**, an architecture designed and developed from scratch. SatyaSom Engine is the shared architecture and engine framework, not one single foundation model. The five purpose-built model variants are Kaṇa (Nano), Anu (Micro), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). Each variant is intended for its own workload and is configured with its own model scale, parameter settings, capabilities, and use cases.
 
-There is no single universal foundation model shared by the five variants, and no one tier is the foundation model for another. The public tier names identify the selected variant; the Micro, Nano, Fast, Smart, and Deep Think labels identify its reasoning mode.
+There is no single universal foundation model shared by the five variants, and no one tier is the foundation model for another. The public tier names identify the selected variant; the Nano, Micro, Fast, Smart, and Deep Think labels identify its reasoning mode.
 
 **Runtime implementation note:** the current provider configuration still contains legacy WebLLM checkpoint identifiers. Those identifiers are inference-loader references, not the public SatyaAI identity. They must be replaced or mapped to the correct SatyaSom-built artifacts as those runtime artifacts become available, so the deployed weights and the documented architecture stay aligned.
 
@@ -35,14 +35,14 @@ The current integration includes the Image workspace, persistent model selection
 
 ## Inference routes
 
-- **Kaṇa (Micro):** always attempts browser-local ONNX inference through Transformers.js on WebAssembly CPU in a separate Worker. It does not require WebGPU, uses the INT8 model file, and caches model/runtime assets through the browser Cache API where available. If local inference fails and a compatible endpoint is configured, a one-turn remote retry is offered only as an explicit user action; no conversation data is sent remotely automatically.
-- **Anu (Nano):** always browser-local and on-device. It bypasses configured cloud/custom endpoints. Assets are downloaded on first use and cached by the browser. A compatible build of the same engine family may be used when required by the device's GPU feature support.
+- **Kaṇa (Nano):** always attempts browser-local ONNX inference through Transformers.js on WebAssembly CPU in a separate Worker. It does not require WebGPU, uses the INT8 model file, and caches model/runtime assets through the browser Cache API where available. If local inference fails and a compatible endpoint is configured, a one-turn remote retry is offered only as an explicit user action; no conversation data is sent remotely automatically.
+- **Anu (Micro):** always browser-local and on-device. It bypasses configured cloud/custom endpoints. Assets are downloaded on first use and cached by the browser. A compatible build of the same engine family may be used when required by the device's GPU feature support.
 - **Indu (Fast), Dhara (Smart), and Aditya (Deep Think):** use their selected mode configuration and the configured local, custom-compatible, or remote-gateway route. Deep Think has a higher generation budget than Smart.
 - **Browser-local inference:** the provider loads the selected mode's configured engine and builds runtime context using the public SatyaAI tier identity only.
 - **Configured compatible endpoint:** the client sends the selected mode and SatyaAI system identity to the configured endpoint. Privacy depends on that endpoint's terms and configuration.
 - **Vercel remote gateway:** the browser sends conversation turns, a validated mode, and optional profile data. api/chat.js discards browser-supplied system messages and constructs SATYA CORE using trusted server code.
 
-The fixed public engine mapping is Kaṇa = Micro, Anu = Nano, Indu = Fast, Dhara = Smart, and Aditya = Deep Think. Runtime context exposes only the selected SatyaAI tier identity and inference route; low-level implementation identifiers are intentionally excluded from conversational self-description.
+The fixed public engine mapping is Kaṇa = Nano, Anu = Micro, Indu = Fast, Dhara = Smart, and Aditya = Deep Think. Runtime context exposes only the selected SatyaAI tier identity and inference route; low-level implementation identifiers are intentionally excluded from conversational self-description.
 
 ## Loading-message rotation
 
@@ -50,7 +50,7 @@ Model loading uses separate English-first Hinglish message pools for cache check
 
 ## Thinking-line rotation
 
-The response-generation indicator uses a curated set of 30 English-first Hinglish phrases. It displays only while a model/provider is actively generating a response, not while model weights are downloading or during deterministic identity replies. A shuffled deck runs through all phrases before reshuffling, and the next deck starts with a different phrase from the previous deck’s last phrase. The same UI indicator is shared by Micro, Nano, Fast, Smart, and Deep Think.
+The response-generation indicator uses a curated set of 30 English-first Hinglish phrases. It displays only while a model/provider is actively generating a response, not while model weights are downloading or during deterministic identity replies. A shuffled deck runs through all phrases before reshuffling, and the next deck starts with a different phrase from the previous deck’s last phrase. The same UI indicator is shared by Nano, Micro, Fast, Smart, and Deep Think.
 
 ## Memory layers
 

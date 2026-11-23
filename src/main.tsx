@@ -146,8 +146,8 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 const modes: Record<Mode, { desc: string }> = {
-  micro: { desc: "Ultra-lightweight intelligence for everyday devices." },
-  nano: { desc: "Small, quick and ready for everyday stuff." },
+  micro: { desc: "Feather-light answers for quick, simple questions." },
+  nano: { desc: "A compact step up for longer chats and more context." },
   fast: { desc: "Straight to the point. Less waiting, more doing." },
   smart: { desc: "Thoughtful answers without making things needlessly complicated." },
   deep: { desc: "For the big questions that deserve a proper deep dive." },
@@ -2172,7 +2172,7 @@ function App() {
                       <span className="ro-text">
                         <span className="ro-primary">
                           <strong>{getSatyaTier(key)!.name}</strong>
-                          <small className="ro-mode">{getSatyaTier(key)!.modeLabel}{key === "micro" ? " · 135M Parameters" : ""}</small>
+                          <small className="ro-mode">{getSatyaTier(key)!.modeLabel}</small>
                         </span>
                         <small>{modes[key].desc}</small>
                       </span>

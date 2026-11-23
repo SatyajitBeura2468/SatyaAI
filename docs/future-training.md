@@ -8,7 +8,7 @@ SatyaSom Engine is the shared architecture and engine framework. It is not one s
 
 The architecture includes four purpose-built model variants:
 
-- **Anu (Nano):** lightweight, resource-conscious reasoning.
+- **Anu (Micro):** lightweight, resource-conscious reasoning.
 - **Indu (Fast):** responsive general-purpose reasoning.
 - **Dhara (Smart):** balanced reasoning, quality, and capability.
 - **Aditya (Deep Think):** extended reasoning and larger generation budgets.
