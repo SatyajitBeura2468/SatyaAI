@@ -61,3 +61,129 @@
 @keyframes introTag{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes introSkip{to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.intro{display:none}}
+
+
+/* Phone-only cinematic layout and compositor hardening. Desktop styles above remain unchanged. */
+@media (pointer:coarse) and (max-width:760px) {
+  #intro-root {
+    position:fixed;
+    inset:0;
+    z-index:2147483000;
+    isolation:isolate;
+    pointer-events:none;
+  }
+  #intro-root .intro {
+    position:fixed;
+    inset:0;
+    width:100vw;
+    height:100vh;
+    height:100dvh;
+    min-height:100svh;
+    max-height:none;
+    box-sizing:border-box;
+    background:#05060b !important;
+    opacity:1;
+    isolation:isolate;
+    -webkit-backface-visibility:hidden;
+    backface-visibility:hidden;
+    pointer-events:auto;
+  }
+  #intro-root .intro.play { opacity:1; }
+  #intro-root .intro-canvas {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    z-index:0;
+  }
+  #intro-root .intro-rays { z-index:1; }
+  #intro-root .intro-vig {
+    z-index:1;
+    background:radial-gradient(ellipse at 50% 47%, rgba(5,6,11,0) 12%, rgba(5,6,11,.34) 58%, #05060b 115%);
+  }
+  #intro-root .intro-bar {
+    height:clamp(28px,5.2svh,40px);
+    z-index:5;
+  }
+  #intro-root .intro-line {
+    top:34%;
+    padding:0 26px;
+    box-sizing:border-box;
+    font-size:clamp(10px,2.9vw,12px);
+    line-height:1.55;
+    letter-spacing:.16em;
+    text-wrap:balance;
+  }
+  #intro-root .s1 .intro-line { letter-spacing:.19em; }
+  #intro-root .s2 .intro-line { letter-spacing:.32em; }
+  #intro-root .intro-center {
+    top:49%;
+    width:min(100%,440px);
+    padding:0 18px;
+    box-sizing:border-box;
+    gap:clamp(8px,1.8svh,13px);
+  }
+  #intro-root .intro-mark {
+    width:clamp(112px,31vw,148px);
+    height:auto;
+    aspect-ratio:160 / 125;
+    flex:0 0 auto;
+  }
+  #intro-root .intro-mark img {
+    width:100%;
+    height:100%;
+    object-fit:contain;
+  }
+  #intro-root .intro-word {
+    max-width:100%;
+    white-space:nowrap;
+    font-size:clamp(34px,9.4vw,44px);
+    letter-spacing:.01em;
+    line-height:1.08;
+  }
+  #intro-root .intro-word span {
+    letter-spacing:.12em;
+  }
+  #intro-root .s4 .intro-word span {
+    animation-duration:1.15s,1.8s;
+    animation-delay:calc(var(--i) * .045s),calc(.38s + var(--i) * .045s);
+  }
+  #intro-root .intro-tag {
+    width:100%;
+    max-width:330px;
+    padding:0 4px;
+    box-sizing:border-box;
+    font-size:clamp(10px,2.8vw,12px);
+    line-height:1.55;
+    letter-spacing:.105em;
+    white-space:normal;
+    text-wrap:balance;
+  }
+  #intro-root .intro-skip {
+    z-index:8;
+    bottom:calc(18px + env(safe-area-inset-bottom,0px));
+    font-size:11px;
+    letter-spacing:.14em;
+    color:rgba(225,235,255,.78);
+    text-shadow:0 1px 8px rgba(0,0,0,.9);
+    opacity:1;
+    animation:none;
+  }
+}
+
+@media (pointer:coarse) and (max-width:380px) {
+  #intro-root .intro-center { gap:8px; }
+  #intro-root .intro-mark { width:clamp(104px,30vw,124px); }
+  #intro-root .intro-word { font-size:clamp(32px,9vw,36px); }
+  #intro-root .intro-tag { max-width:290px; font-size:10px; letter-spacing:.09em; }
+  #intro-root .intro-line { padding-inline:20px; font-size:10px; letter-spacing:.13em; }
+}
+
+@media (pointer:coarse) and (max-height:520px) {
+  #intro-root .intro-center { top:48%; gap:5px; }
+  #intro-root .intro-mark { width:clamp(76px,19vh,96px); }
+  #intro-root .intro-word { font-size:clamp(26px,6.2vw,36px); }
+  #intro-root .intro-tag { font-size:10px; line-height:1.25; }
+  #intro-root .intro-line { top:24%; }
+  #intro-root .intro-skip { bottom:calc(8px + env(safe-area-inset-bottom,0px)); }
+}
