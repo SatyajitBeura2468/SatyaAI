@@ -3,6 +3,29 @@ export function pickOnLoad<T>(items: readonly T[], random: () => number = Math.r
   if (items.length === 0) throw new Error("At least one copy option is required.");
   return items[Math.min(items.length - 1, Math.floor(random() * items.length))];
 }
+
+export const REASONING_MODE_DESCRIPTIONS = Object.freeze({
+  micro: "Featherweight intelligence for the simplest of everyday tasks.",
+  nano: "Light on resources, ready for a wider range of everyday tasks.",
+  fast: "Responsive intelligence that gets things done without the wait.",
+  smart: "Balanced reasoning for thoughtful, well-rounded answers.",
+  deep: "Deeper analysis for ambitious ideas and challenging problems.",
+});
+
+export const MORE_TOOLS_COPY = Object.freeze([
+  {
+    id: "web-search",
+    label: "Web search",
+    description: "Search and cite live sources",
+    status: "Coming soon",
+  },
+  {
+    id: "deep-research",
+    label: "Deep research",
+    description: "Investigate complex questions in depth and turn findings into detailed reports.",
+    status: "Coming soon",
+  },
+] as const);
 export const HOME_HERO_OPTIONS = Object.freeze([
   { lead: "Well, what are we", accent: "curious about today?", tagline: "Big questions, strange ideas, serious thinking. Bring everything." },
   { lead: "Got a question?", accent: "Let's make it interesting.", tagline: "From tiny curiosities to full-blown rabbit holes." },
