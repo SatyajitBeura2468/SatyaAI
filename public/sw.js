@@ -1,4 +1,4 @@
-const CACHE_NAME = "satyaai-shell-v1";
+const CACHE_NAME = "satyaai-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/satya-icon.svg"];
 
 self.addEventListener("install", (event) => {
