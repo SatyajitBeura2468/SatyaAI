@@ -80,7 +80,7 @@ export default async function handler(req, res) {
     return res.status(413).json({ error: 'Prompt too long (max ' + MAX_CHARS + ' characters).' });
   }
 
-  const mode = ['fast', 'smart', 'deep'].includes(body.mode) ? body.mode : null;
+  const mode = ['micro', 'fast', 'smart', 'deep'].includes(body.mode) ? body.mode : null;
   const systemPrompt = buildSatyaCorePrompt({
     userMemory: body.user_memory,
     runtimeContext: {

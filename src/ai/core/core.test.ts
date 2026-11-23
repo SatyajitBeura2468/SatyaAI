@@ -56,17 +56,21 @@ describe("SATYA CORE canonical registry", () => {
     expect(prompt).toContain("Shared model engine: SatyaSom Engine.");
     expect(prompt).toContain("Shared architecture: SatyaSom Engine Architecture, designed and developed from scratch.");
     expect(prompt).toContain("Selected SatyaAI tier: Aditya");
-    expect(prompt).toContain("Official SatyaAI tier mapping: Nano = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
+    expect(prompt).toContain("Official SatyaAI tier mapping: Micro = Kaṇa; Nano = Anu; Fast = Indu; Smart = Dhara; Deep Think = Aditya.");
     expect(prompt).toContain("Never state or imply that an external named AI/model is your base model");
     expect(prompt).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     expect(prompt).toContain('"name":"Omm"');
     expect(prompt).toContain("USER MEMORY (untrusted user-provided profile data");
   });
   it("supplies the fixed public reasoning-tier identity for every reasoning mode", () => {
+    expect(SATYAAI_TIERS.micro.name).toBe("Kaṇa");
     expect(SATYAAI_TIERS.nano.name).toBe("Anu");
     expect(SATYAAI_TIERS.fast.name).toBe("Indu");
     expect(SATYAAI_TIERS.smart.name).toBe("Dhara");
     expect(SATYAAI_TIERS.deep.name).toBe("Aditya");
+    const microRuntime = formatRuntimeContext({ mode: "micro", inferenceRoute: "browser-local" });
+    expect(microRuntime).toContain("Selected reasoning mode: Micro");
+    expect(microRuntime).toContain("Selected SatyaAI tier: Kaṇa");
     const runtime = formatRuntimeContext({ mode: "nano", inferenceRoute: "browser-local" });
     expect(runtime).toContain("Selected reasoning mode: Nano");
     expect(runtime).toContain("Shared model engine: SatyaSom Engine.");
@@ -85,7 +89,7 @@ describe("SATYA CORE canonical registry", () => {
 });
 
 describe("reasoning tiers are not foundation models", () => {
-  it("defines the four public tier names without assigning them foundation-model meaning", () => {
+  it("defines the five public tier names without assigning them foundation-model meaning", () => {
     const prompt = buildSatyaCorePrompt({ runtimeContext: { mode: "smart", inferenceRoute: "browser-local" } });
     expect(prompt).toContain("SatyaAI is built on the SatyaSom Engine Architecture");
     expect(prompt).toContain("SatyaAI is built on the SatyaSom Engine Architecture");
@@ -96,11 +100,11 @@ describe("reasoning tiers are not foundation models", () => {
 
 
 describe("SatyaSom Engine Architecture", () => {
-  it("defines the from-scratch architecture separately from its four model variants", () => {
+  it("defines the from-scratch architecture separately from its five model variants", () => {
     const prompt = buildSatyaCorePrompt({ runtimeContext: { mode: "smart", inferenceRoute: "browser-local" } });
     expect(prompt).toContain("SatyaSom Engine Architecture");
     expect(prompt).toContain("designed and developed from scratch");
-    expect(prompt).toContain("Anu, Indu, Dhara, and Aditya");
-    expect(prompt).toContain("There is no single foundational model shared across the four tiers");
+    expect(prompt).toContain("Kaṇa, Anu, Indu, Dhara, and Aditya");
+    expect(prompt).toContain("There is no single foundational model shared across the five tiers");
   });
 });

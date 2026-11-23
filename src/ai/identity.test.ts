@@ -19,7 +19,7 @@ describe("creator identity is internal; user memory belongs to the user", () => 
     const prompt = buildSatyaSystemPrompt(DEFAULT_USER_MEMORY);
     expect(prompt).toContain(`created and developed by ${APP_IDENTITY.creator}`);
     expect(prompt).toContain("Never identify yourself as, impersonate, or describe yourself as another AI product");
-    expect(prompt).toContain("The official SatyaAI reasoning-tier names are fixed: Anu = Nano; Indu = Fast; Dhara = Smart; Aditya = Deep Think");
+    expect(prompt).toContain("The official SatyaAI reasoning-tier names are fixed: Kaṇa = Micro; Anu = Nano; Indu = Fast; Dhara = Smart; Aditya = Deep Think");
     expect(prompt).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
     expect(prompt).toContain("The user has not shared their name");
   });
@@ -48,7 +48,8 @@ describe("creator identity is internal; user memory belongs to the user", () => 
     expect(answer).not.toMatch(/Llama|Qwen|SmolLM|Mistral|Gemini/i);
   });
 
-  it("uses the selected SatyaAI tier for all four mode identity answers", () => {
+  it("uses the selected SatyaAI tier for all five mode identity answers", () => {
+    expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "micro")).toContain("Kaṇa");
     expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "nano")).toContain("Anu");
     expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "fast")).toContain("Indu");
     expect(getIdentityReply("Which tier are you using?", DEFAULT_USER_MEMORY, "smart")).toContain("Dhara");
