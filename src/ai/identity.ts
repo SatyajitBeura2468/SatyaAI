@@ -76,7 +76,7 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
     /\b(?:model|engine|ai|foundation|base|powered|customized)\b/.test(question);
   const asksAboutExternalIdentity = /\b(?:are you|is satyaai|is this)\s+(?:an?\s+)?(?:meta\s+ai|llama|qwen|mistral|gemini|claude|chatgpt|gpt(?:[- ]?\d)?|deepseek|glm|grok|phi|smollm|ray)\b/i.test(question);
 
-  const architectureAnswer = "SatyaAI is built on the " + SATYASOM_ARCHITECTURE + ", an architecture developed from scratch. All four model variants belong to this same architecture: " + tierFamily + ". Each is designed for its own use cases and capabilities, with its own model size, parameter configuration, and generation settings. There is no single foundation model shared by all four. You're currently using " + tier.name + " (" + tier.modeLabel + ").";
+  const architectureAnswer = "SatyaAI is built on the " + SATYASOM_ARCHITECTURE + ", an architecture developed from scratch. All five model variants belong to this same architecture: " + tierFamily + ". Each is designed for its own use cases and capabilities, with its own model size, parameter configuration, and generation settings. There is no single foundation model shared by all five. You're currently using " + tier.name + " (" + tier.modeLabel + ").";
   const correctionAnswer = "You're right to question that. My earlier description was incorrect and incomplete. SatyaAI's model family is built on the " + SATYASOM_ARCHITECTURE + ", developed from scratch. " + tier.name + " is the selected " + tier.modeLabel + " variant, not the foundation model for the others.";
   const creatorAnswer = "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder. He initiated the project as an independent technology builder with the vision of creating India's Truth-First Private AI.";
 
@@ -84,7 +84,7 @@ export function getIdentityReply(input: string, memory: UserMemory, mode: SatyaT
   if (asksPriorIdentityCorrection || asksAboutExternalIdentity) return correctionAnswer;
   if (asksCreator && (asksTier || asksArchitecture)) return "I'm SatyaAI, founded on 21 February 2026 by " + FOUNDER.fullName + ", my Sole Founder. " + architectureAnswer;
   if (asksArchitecture) return architectureAnswer;
-  if (asksTier) return "You're using " + tier.name + " (" + tier.modeLabel + "), one of SatyaAI's four model variants built on SatyaSom Engine Architecture. The complete family is " + tierFamily + ".";
+  if (asksTier) return "You're using " + tier.name + " (" + tier.modeLabel + "), one of SatyaAI's five model variants built on SatyaSom Engine Architecture. The complete family is " + tierFamily + ".";
   if (asksCreator) return creatorAnswer;
   if (/\b(when was satyaai founded|when did satyaai start|satyaai founding date|what is satyaai'?s founding date)\b/.test(question)) {
     return "SatyaAI was founded on 21 February 2026 by " + FOUNDER.fullName + ", its Sole Founder.";

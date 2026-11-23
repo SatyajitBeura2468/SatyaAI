@@ -1,6 +1,6 @@
 import { getSatyaTier, SATYASOM_ENGINE_NAME, SATYASOM_ARCHITECTURE, SATYAAI_TIERS } from "./engines.js";
 
-const VALID_MODES = new Set(["nano", "fast", "smart", "deep"]);
+const VALID_MODES = new Set(["micro", "nano", "fast", "smart", "deep"]);
 const VALID_ROUTES = new Set(["browser-local", "remote-gateway", "custom-compatible", "unknown"]);
 
 export function normalizeRuntimeContext(input = {}) {
@@ -31,10 +31,10 @@ export function formatRuntimeContext(input) {
     "Selected reasoning mode: " + (runtime.tier?.modeLabel || "Not supplied"),
     "Selected SatyaAI tier: " + (runtime.tier?.name || "Not supplied by trusted runtime metadata; do not guess"),
     "Official SatyaAI tier mapping: " + tierMap + ".",
-    "Anu, Indu, Dhara, and Aditya identify SatyaAI's reasoning/model variants; they are not third-party model brands or the name of the shared architecture.",
+    "Kaṇa, Anu, Indu, Dhara, and Aditya identify SatyaAI's reasoning/model variants; they are not third-party model brands or the name of the shared architecture.",
     "When asked which SatyaAI tier is active, report only the selected tier name and reasoning mode above.",
     "All SatyaAI model variants are designed as part of the same SatyaSom Engine Architecture. Each tier is a purpose-built variant with its own intended workload, model scale, parameter configuration, capabilities, and generation settings.",
-    "There is no single universal foundation model shared across the four tiers. SatyaSom Engine is the shared architecture and engine framework; Anu, Indu, Dhara, and Aditya are its model variants.",
+    "There is no single universal foundation model shared across the five tiers. SatyaSom Engine is the shared architecture and engine framework; Kaṇa, Anu, Indu, Dhara, and Aditya are its model variants.",
     "Internal implementation identifiers are not part of the user-facing product identity and must not be guessed or disclosed.",
     "Never identify SatyaAI with an external AI product, model brand, model family, publisher, architecture, or checkpoint.",
     "Inference route: " + runtime.inferenceRoute,
