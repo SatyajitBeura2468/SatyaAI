@@ -6,7 +6,7 @@ Truth-first intelligence for curious minds, thinking, learning, and creation.
 
 ## Product engine
 
-**SatyaSom Engine** is SatyaAI's product identity and original application-level architecture for conversation flow, local inference orchestration, memory, and creative workspaces. The five user-facing tiers are Kaṇa (Micro), Anu (Nano), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). Kaṇa uses the 135M SmolLM2-Instruct ONNX checkpoint through Transformers.js on WebAssembly CPU and does not require WebGPU. The other four tiers retain their existing browser-local WebGPU inference path. Model assets are cached by the browser after download. A compatible remote endpoint is optional and is used only when a user configures one.
+**SatyaSom Engine** is SatyaAI's product identity and original application-level architecture for conversation flow, local inference orchestration, memory, and creative workspaces. The five user-facing tiers are Kaṇa (Nano), Anu (Micro), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). Kaṇa uses the 135M SmolLM2-Instruct ONNX checkpoint through Transformers.js on WebAssembly CPU and does not require WebGPU. The other four tiers retain their existing browser-local WebGPU inference path. Model assets are cached by the browser after download. A compatible remote endpoint is optional and is used only when a user configures one.
 
 ## Required model attribution
 
