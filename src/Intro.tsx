@@ -181,7 +181,7 @@ export function Intro() {
     const coarse = window.matchMedia("(pointer: coarse)").matches;
     const mobileIntro = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
     const stageTimes = mobileIntro ? MOBILE_STAGES : STAGES;
-    const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.35 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
     const sprites = TINTS.map(makeSprite);
     const nebula = makeNebula(coarse ? 160 : 256);
     let w = 0;
@@ -228,7 +228,7 @@ export function Intro() {
       f = diag * 0.4;
       cx = w / 2;
       cy = h * (coarse ? 0.47 : 0.46);
-      stars = Array.from({ length: coarse ? 240 : 720 }, makeStar);
+      stars = Array.from({ length: mobileIntro ? 240 : coarse ? 380 : 720 }, makeStar);
     }
 
     function drawNebula(x: number, y: number, size: number, rot: number) {
@@ -337,7 +337,7 @@ export function Intro() {
         const alpha = clamp01(s.b * born * appear * tw * Math.min(1, 0.35 + depth * 1.2));
         if (alpha < 0.01) continue;
 
-        const L = v * v * (coarse ? 0.16 : 0.34) * s.zv;
+        const L = v * v * (mobileIntro ? 0.16 : 0.34) * s.zv;
         if (L > 0.004) {
           const zt = Math.min(1.5, s.z + L);
           let tx = cx + (s.x * f) / zt;
@@ -347,7 +347,7 @@ export function Intro() {
           let len = Math.hypot(dx, dy);
           // Keep phone streaks atmospheric rather than turning the portrait
           // screen into a wall of long, chaotic lines.
-          if (coarse && len > 42) {
+          if (mobileIntro && len > 42) {
             const keep = 42 / len;
             tx = sx - dx * keep;
             ty = sy - dy * keep;
