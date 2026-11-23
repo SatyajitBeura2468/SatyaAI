@@ -217,7 +217,7 @@ export function Intro() {
       diag = Math.hypot(w, h);
       f = diag * 0.4;
       cx = w / 2;
-      cy = h * 0.47;
+      cy = h * (coarse ? 0.47 : 0.46);
       stars = Array.from({ length: coarse ? 380 : 720 }, makeStar);
     }
 
