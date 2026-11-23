@@ -3,7 +3,7 @@ import { Download, Moon, Sun, Trash2, User, X } from "lucide-react";
 import type { ProviderSettings } from "../ai/providers";
 import type { UserMemory } from "../ai/identity";
 
-type Mode = "nano" | "fast" | "smart" | "deep";
+type Mode = "micro" | "nano" | "fast" | "smart" | "deep";
 type SettingsTab = "general" | "personalization" | "models" | "privacy" | "shortcuts";
 type AppPreferences = {
   defaultMode: Mode;
@@ -222,17 +222,17 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             <p>Pick the default reasoning mode used when a new chat starts. You can still change it from the header at any time.</p>
                             <label className="setting-field">Default model
                               <select value={preferences.defaultMode} onChange={(event) => setPreferences((p) => ({ ...p, defaultMode: event.target.value as Mode }))}>
-                                <option value="nano">Anu · Nano</option><option value="fast">Indu · Fast</option><option value="smart">Dhara · Smart</option><option value="deep">Aditya · Deep Think</option>
+                                <option value="micro">Kaṇa · Micro · 135M</option><option value="nano">Anu · Nano</option><option value="fast">Indu · Fast</option><option value="smart">Dhara · Smart</option><option value="deep">Aditya · Deep Think</option>
                               </select>
                             </label>
                             <div className="diag-row"><span>Currently selected</span><strong>{current.name} · {current.modeLabel}</strong></div>
                             <div className="diag-row"><span>Inference capability</span><strong>{capability}</strong></div>
-                            <div className="diag-row"><span>Route</span><strong>{mode !== "nano" && provider.baseUrl && provider.model ? "Optional custom endpoint" : "Browser-local · " + current.name}</strong></div>
-<div className="memory-footnote">All four SatyaAI tiers run locally by default. Model files are downloaded once and reused from this device. Requires WebGPU.</div>
+                            <div className="diag-row"><span>Route</span><strong>{mode === "micro" ? "Browser CPU/WASM · Kaṇa" : mode !== "nano" && provider.baseUrl && provider.model ? "Optional custom endpoint" : "Browser-local · " + current.name}</strong></div>
+<div className="memory-footnote">Kaṇa runs on browser CPU/WebAssembly and does not require WebGPU. The other four tiers retain their existing WebGPU route. Model files are cached by the browser after download.</div>
                           </div>
                           <div className="setting-group">
                             <h3>Compatible inference endpoint</h3>
-                            <p>Optional. Configure a compatible endpoint for non-Nano modes. The endpoint receives prompts and conversation context. Its privacy terms apply.</p>
+                            <p>Indu, Dhara and Aditya can use this optional compatible endpoint. Kaṇa always tries local CPU/WebAssembly first; after local inference fails, this endpoint is offered only through an explicit one-turn action. The endpoint receives prompts and conversation context. Its privacy terms apply.</p>
                             <label className="setting-field">Endpoint URL
                               <input value={provider.baseUrl || ""} onChange={(event) => setProvider((p) => ({ ...p, baseUrl: event.target.value.trim() || undefined }))} placeholder="https://your-provider.example/v1" inputMode="url" autoComplete="url" />
                             </label>
@@ -242,7 +242,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
                             <label className="setting-field">API key
                               <input type="password" value={provider.apiKey || ""} onChange={(event) => setProvider((p) => ({ ...p, apiKey: event.target.value || undefined }))} placeholder="Optional bearer token" autoComplete="off" />
                             </label>
-                            <div className="memory-footnote">Endpoint URL and model are saved on this device. The API key remains in memory only and is never written to browser storage. This endpoint is optional; all SatyaAI tiers run locally by default.</div>
+                            <div className="memory-footnote">Endpoint URL and model are saved on this device. The API key remains in memory only and is never written to browser storage. Kaṇa never sends conversation data remotely without an explicit one-turn choice after local inference fails.</div>
                             <div className="setting-actions">
                               <button className="save-btn" onClick={saveEndpointSettings}>Save endpoint</button>
                               <button className="ghost-btn" onClick={clearEndpointSettings}>Clear endpoint</button>
