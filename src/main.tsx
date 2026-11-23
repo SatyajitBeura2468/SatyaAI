@@ -33,6 +33,7 @@ import {
 import { Sidebar } from "./components/Sidebar";
 import { ConfirmDialog, type ConfirmRequest } from "./components/ConfirmDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { KanaLogo } from "./components/KanaLogo";
 import { DrishtiStudio } from "./components/DrishtiStudio";
 import { ChakshuStudio } from "./components/ChakshuStudio";
 import "./cosmos.css";
@@ -59,6 +60,7 @@ import {
   type ModelProgressSnapshot,
   type ProviderSettings,
 } from "./ai/providers";
+import { localKana, unloadKana } from "./ai/kana.provider";
 import {
   DEFAULT_USER_MEMORY,
   buildSatyaSystemPrompt,
@@ -97,6 +99,7 @@ type Message = {
   modelProgress?: ModelProgressSnapshot;
   tierName?: string;
   error?: boolean;
+  remoteFallbackAvailable?: boolean;
   interrupted?: boolean;
   versions?: string[];
   versionIndex?: number;
@@ -143,6 +146,7 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 const modes: Record<Mode, { desc: string }> = {
+  micro: { desc: "Ultra-lightweight intelligence for everyday devices." },
   nano: { desc: "Small, quick and ready for everyday stuff." },
   fast: { desc: "Straight to the point. Less waiting, more doing." },
   smart: { desc: "Thoughtful answers without making things needlessly complicated." },
@@ -511,6 +515,10 @@ function App() {
   const canSpeak = typeof window !== "undefined" && !!speechCtor();
   activeRef.current = activeId;
   const current = getSatyaTier(mode)!;
+  useEffect(() => {
+    if (mode !== "micro" && !busy) unloadKana();
+  }, [mode, busy]);
+  useEffect(() => () => unloadKana(), []);
   const currentDrishti = getDrishtiModel(drishtiModelId);
   const drishtiModelRuntime = drishtiRuntimeHealth?.models?.[drishtiModelId];
   const drishtiCanGenerate = Boolean(!drishtiChecking && !drishtiStarting && !drishtiGenerating && drishtiRuntimeHealth?.ok && drishtiModelRuntime?.available);
@@ -520,19 +528,22 @@ function App() {
   const initials = getInitials(memory.name);
 
   const capability = useMemo(
-    () =>
-      provider.baseUrl
+    () => mode === "micro"
+      ? "WebAssembly CPU · browser-local inference"
+      : provider.baseUrl
         ? "Optional compatible endpoint configured"
         : hasWebGPU()
           ? "WebGPU · browser-local inference"
-          : "This browser has no WebGPU, so the on-device model cannot run",
-    [provider.baseUrl],
+          : "This browser has no WebGPU, so the existing local model cannot run",
+    [mode, provider.baseUrl],
   );
-  const engineTitle = provider.baseUrl
-    ? "Custom endpoint"
-    : hasWebGPU()
-      ? "Browser model"
-      : "No inference available";
+  const engineTitle = mode === "micro"
+    ? "Kaṇa · CPU/WASM"
+    : provider.baseUrl
+      ? "Custom endpoint"
+      : hasWebGPU()
+        ? "Browser model"
+        : "No inference available";
 
   useEffect(() => {
     if (!attachmentMenuOpen && !cameraOpen) return;
@@ -1688,6 +1699,7 @@ function App() {
     historyOverride?: Message[],
     clearComposer = true,
     previousVersions?: string[],
+    forceConfiguredEndpoint = false,
   ) {
     const text = rawText.trim();
     if (!text || busy) return;
@@ -1718,9 +1730,8 @@ function App() {
         content: withFile(message),
       }));
 
-    const inferenceRoute = mode !== "nano" && provider.baseUrl && provider.model
-      ? "custom-compatible"
-      : "browser-local";
+    const useConfiguredEndpoint = Boolean(provider.baseUrl && provider.model && mode !== "nano" && (mode !== "micro" || forceConfiguredEndpoint));
+    const inferenceRoute = useConfiguredEndpoint ? "custom-compatible" : "browser-local";
     const preferenceNotes = [
       preferences.language !== "auto" ? "Preferred response language: " + preferences.language + "." : "",
       preferences.responseStyle !== "balanced" ? "Preferred response style: " + preferences.responseStyle + "." : "",
@@ -1762,10 +1773,10 @@ function App() {
     lastDownloadPercentRef.current = null;
     progressCommentaryUntilRef.current = 0;
     followLatestRef.current = true;
-    const usesLocalModel = !identityAnswer && !(provider.baseUrl && provider.model && mode !== "nano");
+    const usesLocalModel = !identityAnswer && !useConfiguredEndpoint;
     const initialLoadingMessage = identityAnswer
       ? "Preparing a reply…"
-      : provider.baseUrl && provider.model && mode !== "nano"
+      : useConfiguredEndpoint
         ? "Configured model se jud raha hoon…"
         : nextLoadingLine("cache-check");
     const initialModelProgress = usesLocalModel
@@ -1824,58 +1835,52 @@ function App() {
         // Identity questions are answered from the saved app profile, rather
         // than asking a small language model to guess who it is.
         answer = identityAnswer;
-      } else if (provider.baseUrl && provider.model && mode !== "nano") {
+      } else if (useConfiguredEndpoint) {
         setThinkingActive(true);
         answer = await openAICompatible(provider, modelMessages, mode, controller.signal, updateStreamingAnswer);
         setThinkingActive(false);
       } else {
-        answer = await localWebLLM(
-          mode,
-          modelMessages,
-          (progress, details) => {
-            const phase = details?.messagePhase;
-            if (phase === "download" && details?.percent !== null && details?.percent !== undefined) {
-              const previousPercent = lastDownloadPercentRef.current;
-              const activeStage = loadingMessageStageRef.current;
-              const alreadyDownloading = activeStage === "download" ||
-                activeStage === "download-progress" ||
-                activeStage === "download-slow";
+        const onModelProgress = (progress: string, details?: ModelProgressSnapshot) => {
+          const phase = details?.messagePhase;
+          if (phase === "download" && details?.percent !== null && details?.percent !== undefined) {
+            const previousPercent = lastDownloadPercentRef.current;
+            const activeStage = loadingMessageStageRef.current;
+            const alreadyDownloading = activeStage === "download" ||
+              activeStage === "download-progress" ||
+              activeStage === "download-slow";
 
-              // A new download stage starts its own stall clock. During an
-              // active download, only a higher reported percentage resets it.
-              if (!alreadyDownloading || previousPercent === null) {
+            if (!alreadyDownloading || previousPercent === null) {
+              activateLoadingStage("download", details);
+            } else if (details.percent > previousPercent) {
+              lastDownloadProgressAtRef.current = Date.now();
+              lastDownloadPercentRef.current = details.percent;
+              const advancedBy = details.percent - previousPercent;
+              if (advancedBy >= DOWNLOAD_PROGRESS_STEP_PERCENT) {
+                activateLoadingStage("download-progress", details);
+              } else if (activeStage === "download-slow") {
                 activateLoadingStage("download", details);
-              } else if (details.percent > previousPercent) {
-                lastDownloadProgressAtRef.current = Date.now();
-                lastDownloadPercentRef.current = details.percent;
-                const advancedBy = details.percent - previousPercent;
-                if (advancedBy >= DOWNLOAD_PROGRESS_STEP_PERCENT) {
-                  activateLoadingStage("download-progress", details);
-                } else if (activeStage === "download-slow") {
-                  activateLoadingStage("download", details);
-                } else {
-                  updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine("download"), details);
-                }
               } else {
-                // Same-percent callbacks must not make a stalled download
-                // look active or postpone the long-wait messages.
                 updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine("download"), details);
               }
-            } else if (phase) {
-              if (loadingMessageStageRef.current !== phase) {
-                activateLoadingStage(phase, details);
-              } else {
-                updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine(phase), details);
-              }
             } else {
-              updatePendingLoadingText(progress || "Model load ho raha hai…", details);
+              updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine("download"), details);
             }
-          },
-          updateStreamingAnswer,
-          (active) => setThinkingActive(active),
-          memoryForTurn,
-          controller.signal,
-        );
+          } else if (phase) {
+            if (loadingMessageStageRef.current !== phase) {
+              activateLoadingStage(phase, details);
+            } else {
+              updatePendingLoadingText(loadingMessageRef.current || nextLoadingLine(phase), details);
+            }
+          } else {
+            updatePendingLoadingText(progress || "Model load ho raha hai…", details);
+          }
+        };
+        const onThinking = (active: boolean) => setThinkingActive(active);
+        if (mode === "micro") {
+          answer = await localKana(modelMessages, onModelProgress, updateStreamingAnswer, onThinking, controller.signal);
+        } else {
+          answer = await localWebLLM(mode, modelMessages, onModelProgress, updateStreamingAnswer, onThinking, memoryForTurn, controller.signal);
+        }
       }
 
       setMessages((previous) => {
@@ -1917,6 +1922,12 @@ function App() {
       }
       const errorMessage =
         error instanceof Error ? error.message : "Unknown model error";
+      const remoteFallbackAvailable = mode === "micro" && !forceConfiguredEndpoint && Boolean(provider.baseUrl && provider.model);
+      const privacyNote = mode === "micro" && !forceConfiguredEndpoint
+        ? "\n\nKaṇa stayed on-device; no remote inference was contacted."
+        : "";
+      const completeErrorText = "I couldn't generate a response: " + errorMessage + privacyNote +
+        "\n\nCheck the model status or choose a supported inference endpoint in Settings.";
       setMessages((previous) => {
         const next = [...previous];
         const last = next.length - 1;
@@ -1924,12 +1935,10 @@ function App() {
           next[last] = {
             ...next[last],
             role: "ai",
-            text:
-              "I couldn't generate a response: " +
-              errorMessage +
-              "\n\nCheck the model status or choose a supported inference endpoint in Settings.",
+            text: completeErrorText,
             error: true,
             pending: false,
+            ...(remoteFallbackAvailable ? { remoteFallbackAvailable: true } : {}),
           };
         }
         return next;
@@ -1939,8 +1948,9 @@ function App() {
         userMessage,
         {
           role: "ai",
-          text: "I couldn't generate a response: " + errorMessage,
+          text: completeErrorText,
           error: true,
+          ...(remoteFallbackAvailable ? { remoteFallbackAvailable: true } : {}),
           tierName: selectedTier.name,
           createdAt: Date.now(),
         },
@@ -1956,8 +1966,9 @@ function App() {
     }
   }
 
-  function retryFailedAnswer(index: number) {
+  function retryFailedAnswer(index: number, useConfiguredEndpoint = false) {
     if (busy || index !== messages.length - 1 || !messages[index]?.error) return;
+    if (useConfiguredEndpoint && (mode !== "micro" || !provider.baseUrl || !provider.model)) return;
     let userIndex = index - 1;
     while (userIndex >= 0 && messages[userIndex].role !== "user") userIndex -= 1;
     if (userIndex < 0) return;
@@ -1965,7 +1976,7 @@ function App() {
     const previousVersions = messages[messages.length - 1].versions?.length
       ? messages[messages.length - 1].versions
       : [messages[messages.length - 1].text];
-    void sendMessage(question.text, question.file ?? null, messages.slice(0, userIndex), false, previousVersions);
+    void sendMessage(question.text, question.file ?? null, messages.slice(0, userIndex), false, previousVersions, useConfiguredEndpoint);
   }
 
   function continueAnswer(index: number) {
@@ -2122,7 +2133,7 @@ function App() {
                   : "Reasoning mode: " + current.modeLabel + ", engine " + current.name}
             >
               <span className="reasoning-symbol" aria-hidden="true">
-                {workspaceMode === "image" ? <ImageIcon size={18} /> : workspaceMode === "video" ? <VideoIcon size={18} /> : current.symbol}
+                {workspaceMode === "image" ? <ImageIcon size={18} /> : workspaceMode === "video" ? <VideoIcon size={18} /> : mode === "micro" ? <KanaLogo size={18} /> : current.symbol}
               </span>
               <span className="reasoning-full-label">{workspaceMode === "image" ? "Image model" : workspaceMode === "video" ? "Video model" : "Reasoning"}</span>
               <em className="reasoning-current">{workspaceMode === "image" ? currentDrishti.selectorLabel : workspaceMode === "video" ? currentChakshu.selectorLabel : current.modeLabel}</em>
@@ -2157,11 +2168,11 @@ function App() {
                         setReasoningOpen(false);
                       }}
                     >
-                      <span className="ro-icon ro-symbol" aria-hidden="true">{getSatyaTier(key)!.symbol}</span>
+                      <span className="ro-icon ro-symbol" aria-hidden="true">{key === "micro" ? <KanaLogo size={19} /> : getSatyaTier(key)!.symbol}</span>
                       <span className="ro-text">
                         <span className="ro-primary">
                           <strong>{getSatyaTier(key)!.name}</strong>
-                          <small className="ro-mode">{getSatyaTier(key)!.modeLabel}</small>
+                          <small className="ro-mode">{getSatyaTier(key)!.modeLabel}{key === "micro" ? " · 135M Parameters" : ""}</small>
                         </span>
                         <small>{modes[key].desc}</small>
                       </span>
@@ -2396,6 +2407,9 @@ function App() {
                     {message.role === "ai" && message.error && !message.pending && index === messages.length - 1 && (
                       <div className="message-actions">
                         <button className="msg-action primary-action" onClick={() => retryFailedAnswer(index)} disabled={busy}>Retry</button>
+                        {message.remoteFallbackAvailable && provider.baseUrl && provider.model && (
+                          <button className="msg-action" onClick={() => retryFailedAnswer(index, true)} disabled={busy}>Use configured endpoint once</button>
+                        )}
                         <button className="msg-action" onClick={() => void copyText(message.text, "error-" + index)}><Copy size={13} /> Copy error</button>
                       </div>
                     )}

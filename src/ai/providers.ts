@@ -383,7 +383,7 @@ export async function readOpenAIStream(
 export async function openAICompatible(
   settings: ProviderSettings,
   messages: ChatMessage[],
-  mode: SatyaMode,
+  mode: SatyaMode | "micro",
   signal?: AbortSignal,
   onToken?: (partialText: string) => void,
 ): Promise<string> {
@@ -391,6 +391,9 @@ export async function openAICompatible(
     throw new Error("Configure a compatible endpoint and model in Settings first.");
   }
   const base = settings.baseUrl.replace(/\/$/, "");
+  const generationConfig = mode === "micro"
+    ? { temperature: 0.35, maxTokens: 256 }
+    : MODE_CONFIG[mode];
   const response = await fetch(base + "/chat/completions", {
     method: "POST",
     headers: {
@@ -401,8 +404,8 @@ export async function openAICompatible(
     body: JSON.stringify({
       model: settings.model,
       messages,
-      temperature: MODE_CONFIG[mode].temperature,
-      max_tokens: MODE_CONFIG[mode].maxTokens,
+      temperature: generationConfig.temperature,
+      max_tokens: generationConfig.maxTokens,
       stream: true,
     }),
   });

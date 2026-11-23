@@ -1,4 +1,4 @@
-export type SatyaTierMode = "nano" | "fast" | "smart" | "deep";
+export type SatyaTierMode = "micro" | "nano" | "fast" | "smart" | "deep";
 export type SatyaTierIdentity = Readonly<{ name: string; symbol: string; modeLabel: string }>;
 export type CoreCapabilityStatus = "AVAILABLE" | "IN_DEVELOPMENT" | "PLANNED" | "UNAVAILABLE";
 export type CoreRuntimeContext = {

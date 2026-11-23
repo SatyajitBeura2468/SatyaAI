@@ -20,6 +20,7 @@ describe("SatyaAI inference modes", () => {
 describe("SatyaAI branded tier routing", () => {
   it("maps each reasoning mode to its permanent public tier identity", () => {
     expect(SATYAAI_TIERS).toEqual({
+      micro: { name: "Kaṇa", symbol: "·", modeLabel: "Micro" },
       nano: { name: "Anu", symbol: "⚛", modeLabel: "Nano" },
       fast: { name: "Indu", symbol: "☾", modeLabel: "Fast" },
       smart: { name: "Dhara", symbol: "🌍", modeLabel: "Smart" },
