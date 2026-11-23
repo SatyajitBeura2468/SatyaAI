@@ -1,3 +1,32 @@
+/* Shared splash shield: place the independent intro root above the app on every viewport. */
+#intro-root{
+  position:fixed!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  z-index:2147483647!important;
+  isolation:isolate;
+  pointer-events:none;
+}
+#intro-root .intro{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  max-width:none!important;
+  max-height:none!important;
+  box-sizing:border-box;
+  background:#05060b!important;
+  background-color:#05060b!important;
+  mix-blend-mode:normal!important;
+  isolation:isolate;
+}
+#intro-root .intro.play{opacity:1;}
+
 /* Cinematic starry intro (see Intro.tsx). Always dark: it is a night-sky moment.
    Stage classes s1..s5 are added cumulatively by the timeline. */
 .intro{position:fixed;inset:0;z-index:9999;background:#05060b;overflow:hidden;color:#fff;
