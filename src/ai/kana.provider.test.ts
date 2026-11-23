@@ -27,4 +27,4 @@ describe("Kaṇa Micro runtime configuration", () => {
     expect(capabilities).toHaveProperty("persistentStorage");
     expect(capabilities).toHaveProperty("webGPUAvailable");
   });
-}
+});
