@@ -492,7 +492,9 @@ export function Intro() {
   }, [phase]);
 
   if (phase === "off") return null;
-  const stageClasses = Array.from({ length: stage }, (_, i) => "s" + (i + 1)).join(" ");
+  // Namespace intro stages so app-wide .s1/.s2/.s3 cosmic animations
+  // cannot accidentally attach transforms to the full-screen intro container.
+  const stageClasses = Array.from({ length: stage }, (_, i) => "intro-stage-" + (i + 1)).join(" ");
   const mobileIntroMode = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
   return (
     <div className={"intro " + phase + (mobileIntroMode ? " mobile-intro" : "") + " " + stageClasses} aria-hidden={!mobileIntroMode}>
