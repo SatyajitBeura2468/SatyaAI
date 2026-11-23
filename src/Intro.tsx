@@ -25,6 +25,8 @@ const T_HIT = 4.6; // flash, shockwave and hard brake
 const T_SETTLE = 6.4; // stars have come to rest
 const T_EXIT = 8.8; // overlay starts to leave
 const STAGES = [0, 0.9, T_WARP, 4.75, 5.5, 6.8]; // s1 line, s2 warp, s3 logo, s4 word, s5 tagline
+const MOBILE_STAGES = [0, 1.15, 3.2, 5.1, 6.35, 7.75]; // slower mobile reveals with a longer breathing room
+const MOBILE_T_EXIT = 11.6; // hold the completed mobile brand reveal before fading out
 const EXIT_MS = 1200;
 const SKIP_EXIT_MS = 500;
 
@@ -150,10 +152,16 @@ function makeSprite(rgb: [number, number, number]): HTMLCanvasElement {
 export function Intro() {
   const [phase, setPhase] = useState<"off" | "play" | "exit" | "skip">(() => (shouldPlay() ? "play" : "off"));
 
-  // Reveal the app only after the intro overlay has mounted above it.
+  // Keep the app hidden for the complete phone intro, including its exit fade.
+  // Desktop retains its existing mount-time behaviour.
   useEffect(() => {
-    document.documentElement.classList.remove("satya-intro-pending");
-  }, []);
+    const phone = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
+    if (phone && phase !== "off") {
+      document.documentElement.classList.add("satya-intro-pending");
+    } else {
+      document.documentElement.classList.remove("satya-intro-pending");
+    }
+  }, [phase]);
   const [stage, setStage] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const phaseRef = useRef(phase);
@@ -171,7 +179,9 @@ export function Intro() {
     }
 
     const coarse = window.matchMedia("(pointer: coarse)").matches;
-    const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+    const mobileIntro = window.matchMedia("(pointer: coarse) and (max-width: 760px)").matches;
+    const stageTimes = mobileIntro ? MOBILE_STAGES : STAGES;
+    const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.35 : 2);
     const sprites = TINTS.map(makeSprite);
     const nebula = makeNebula(coarse ? 160 : 256);
     let w = 0;
@@ -218,7 +228,7 @@ export function Intro() {
       f = diag * 0.4;
       cx = w / 2;
       cy = h * (coarse ? 0.47 : 0.46);
-      stars = Array.from({ length: coarse ? 380 : 720 }, makeStar);
+      stars = Array.from({ length: coarse ? 240 : 720 }, makeStar);
     }
 
     function drawNebula(x: number, y: number, size: number, rot: number) {
@@ -250,7 +260,7 @@ export function Intro() {
       last = now;
 
       let st = 0;
-      for (let i = 1; i < STAGES.length; i++) if (t >= STAGES[i]) st = i;
+      for (let i = 1; i < stageTimes.length; i++) if (t >= stageTimes[i]) st = i;
       if (st !== stageNow) {
         stageNow = st;
         setStage(st);
@@ -327,14 +337,24 @@ export function Intro() {
         const alpha = clamp01(s.b * born * appear * tw * Math.min(1, 0.35 + depth * 1.2));
         if (alpha < 0.01) continue;
 
-        const L = v * v * 0.34 * s.zv;
+        const L = v * v * (coarse ? 0.16 : 0.34) * s.zv;
         if (L > 0.004) {
           const zt = Math.min(1.5, s.z + L);
-          const tx = cx + (s.x * f) / zt;
-          const ty = cy + (s.y * f) / zt;
-          const dx = sx - tx;
-          const dy = sy - ty;
-          const len = Math.hypot(dx, dy);
+          let tx = cx + (s.x * f) / zt;
+          let ty = cy + (s.y * f) / zt;
+          let dx = sx - tx;
+          let dy = sy - ty;
+          let len = Math.hypot(dx, dy);
+          // Keep phone streaks atmospheric rather than turning the portrait
+          // screen into a wall of long, chaotic lines.
+          if (coarse && len > 42) {
+            const keep = 42 / len;
+            tx = sx - dx * keep;
+            ty = sy - dy * keep;
+            dx = sx - tx;
+            dy = sy - ty;
+            len = 42;
+          }
           if (len > 0.8) {
             ctx!.lineWidth = Math.max(0.6, rad * 0.9);
             ctx!.strokeStyle = STREAK_CSS[s.ci];
@@ -417,7 +437,7 @@ export function Intro() {
     raf = requestAnimationFrame(frame);
     const toExit = window.setTimeout(() => {
       if (phaseRef.current === "play") setPhase("exit");
-    }, T_EXIT * 1000);
+    }, (mobileIntro ? MOBILE_T_EXIT : T_EXIT) * 1000);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(toExit);
