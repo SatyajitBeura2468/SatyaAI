@@ -66,10 +66,17 @@
 /* Phone-only cinematic layout and compositor hardening. Desktop styles above remain unchanged. */
 @media (pointer:coarse) and (max-width:760px) {
   #intro-root {
-    position:fixed;
-    inset:0;
-    z-index:2147483000;
+    position:fixed !important;
+    top:0 !important;
+    right:0 !important;
+    bottom:0 !important;
+    left:0 !important;
+    width:100vw;
+    height:100vh;
+    height:100dvh;
+    z-index:2147483647 !important;
     isolation:isolate;
+    contain:layout style;
     pointer-events:none;
   }
   #intro-root .intro {
@@ -82,8 +89,11 @@
     max-height:none;
     box-sizing:border-box;
     background:#05060b !important;
+    background-color:#05060b !important;
     opacity:1;
     isolation:isolate;
+    mix-blend-mode:normal;
+    contain:paint;
     -webkit-backface-visibility:hidden;
     backface-visibility:hidden;
     pointer-events:auto;
@@ -99,7 +109,7 @@
   #intro-root .intro-rays { z-index:1; }
   #intro-root .intro-vig {
     z-index:1;
-    background:radial-gradient(ellipse at 50% 47%, rgba(5,6,11,0) 12%, rgba(5,6,11,.34) 58%, #05060b 115%);
+    background:radial-gradient(ellipse at 50% 47%, rgba(5,6,11,0) 8%, rgba(5,6,11,.20) 52%, rgba(5,6,11,.78) 100%);
   }
   #intro-root .intro-bar {
     height:clamp(28px,5.2svh,40px);
@@ -124,7 +134,7 @@
     gap:clamp(8px,1.8svh,13px);
   }
   #intro-root .intro-mark {
-    width:clamp(112px,31vw,148px);
+    width:clamp(132px,36vw,166px);
     height:auto;
     aspect-ratio:160 / 125;
     flex:0 0 auto;
