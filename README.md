@@ -1,59 +1,137 @@
+<div align="center">
+
 # SatyaAI
 
-Truth-first intelligence for curious minds, thinking, learning, and creation.
+### Private, Multi-Modal Intelligence Powered by the Satya Som Engine
 
-### [Open SatyaAI →](https://satyaai-five.vercel.app)
+**Think, create, and generate right on your own device. Zero cloud bills. Zero data tracking. Pure local intelligence.**
 
-## Product engine
+[![Launch SatyaAI](https://img.shields.io/badge/Launch_App-SatyaAI_Web-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://satyaai-five.vercel.app)
+[![Engine](https://img.shields.io/badge/Core-Satya_Som_Engine-4F46E5?style=for-the-badge)](#the-satya-som-engine)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25_Local_First-10B981?style=for-the-badge)](#privacy-by-architecture)
+[![Platform](https://img.shields.io/badge/Desktop-Windows_Companion-0078D6?style=for-the-badge&logo=windows&logoColor=white)](#drishti-companion-for-windows)
 
-**SatyaSom Engine** is SatyaAI's product identity and original application-level architecture for conversation flow, local inference orchestration, memory, and creative workspaces. The five user-facing tiers are Kaṇa (Nano), Anu (Micro), Indu (Fast), Dhara (Smart), and Aditya (Deep Think). Kaṇa uses the 135M SmolLM2-Instruct ONNX checkpoint through Transformers.js on WebAssembly CPU and does not require WebGPU. The other four tiers retain their existing browser-local WebGPU inference path. Model assets are cached by the browser after download. A compatible remote endpoint is optional and is used only when a user configures one.
+</div>
 
-## Required model attribution
+---
 
-**Built with Llama.** The current Fast, Smart, and Deep text tiers use Llama 3.2 model weights. This exact attribution is retained in product documentation to comply with the model licence; it does not replace SatyaSom Engine as the product identity. See the [Llama 3.2 Community License](https://dev.meta.ai/llama/llama3_2/license) and [model notices](docs/model-notices.md).
+## Intelligence That Belongs to You
 
-SatyaAI V0.1 is a privacy-conscious, local-first AI application. SatyaSom Engine is the application-level architecture; each tier selects its own local model configuration and generation settings. Kaṇa runs in a dedicated browser Worker through ONNX Runtime WebAssembly CPU; Anu, Indu, Dhara and Aditya retain their existing WebGPU paths. Model weights are downloaded to the device and reused from the browser cache. No hosted API key or paid inference provider is required for local inference. A compatible endpoint can be configured for supported tiers; Kaṇa offers it only as an explicit one-turn action after local inference fails.
+Modern AI expects you to rent your intelligence: pay monthly subscriptions, send your private thoughts to remote servers, and wait in cloud queues.
 
-## Run locally
+**SatyaAI flips the model.** Built from the ground up on the custom **Satya Som Engine**, SatyaAI is a unified, local-first AI workspace that brings conversational reasoning, image synthesis, and video creation straight to your browser and desktop hardware.
+
+No API keys. No account walls. No remote prompt logging. Just open the studio and create.
+
+---
+
+## What You Can Do Inside SatyaAI
+
+* **Adaptive Reasoning Studio:** Switch effortlessly across five custom-tuned Satya Som intelligence tiers, from instant CPU responses on everyday laptops to deep multi-step reasoning on GPU-equipped machines.
+* **Drishti 2.0 (Image Studio):** Generate high-detail visuals locally through a dedicated, privately managed local creative runtime with real-time progress and cancellation controls.
+* **Chakshu (Video Studio):** Turn prompts into local motion clips with a built-in session history strip and instant playback controls.
+* **Deep Research (Preview):** An upcoming multi-stage synthesis workspace designed to break down complex questions into structured, verifiable insights.
+* **Guided by SATYA CORE:** Every text interaction is shaped by our proprietary **SATYA CORE** persona and reasoning framework for clear, direct, and grounded answers.
+
+---
+
+## The Satya Som Engine
+
+Unlike one-size-fits-all cloud chatbots, the **Satya Som Engine** scales to the exact hardware in front of you. Pick the tier that matches your task and your machine:
+
+| Tier | Symbol | Scale | Best For | Execution Runtime |
+| :--- | :---: | :--- | :--- | :--- |
+| **Kaṇa** | `·` | Nano | Instant answers, quick edits, everyday laptops | Browser-local CPU (ONNX / WebAssembly, no GPU required) |
+| **Anu** | `⚛` | Micro | Snappy daily chat and lightweight drafting | Browser-local WebGPU |
+| **Indu** | `☽` | Fast | Balanced speed, summaries, and coding help | Browser-local WebGPU |
+| **Dhara** | `◈` | Smart | Complex problem solving and structured writing | Browser-local WebGPU |
+| **Aditya** | `☀` | Deep Think | High-depth reasoning, analysis, and multi-step logic | Browser-local WebGPU |
+
+> **Hardware Note:** **Kaṇa** is engineered to run directly on standard CPUs via WebAssembly with zero WebGPU requirement. **Anu**, **Indu**, **Dhara**, and **Aditya** automatically unlock hardware acceleration on browsers with WebGPU support.
+
+---
+
+## Drishti Companion for Windows
+
+Heavy creative workloads deserve desktop-grade power without forcing users into command lines or Python configuration headaches.
+
+**SatyaAI Drishti Companion** is a lightweight native Windows desktop bridge built specifically for the Satya Som ecosystem:
+
+1. **One-Click Setup:** Automatically provisions an isolated local runtime environment behind the scenes.
+2. **Smart Hardware Detection:** Automatically selects the optimal compute path for your system.
+3. **Auto-Startup Ready:** Quietly runs on `127.0.0.1:7860` so the web studio connects to your local creative engine the moment you open Drishti 2.0.
+4. **Locked-Down Local Bridge:** Strict origin policies ensure only trusted SatyaAI studio sessions can communicate with your local runtime.
+
+---
+
+## Privacy by Architecture
+
+Privacy in SatyaAI is not a checkbox in a settings menu. It is how the software is wired:
+
+* **Browser-Native Execution:** All Satya Som text tiers run inside your browser sandbox. Once cached locally, your conversations stay on your machine.
+* **Localhost Creative Runtime:** Drishti 2.0 and Chakshu render directly on your computer rather than uploading prompts or media to third-party render farms.
+* **Zero Telemetry:** No tracking pixels, no prompt harvesting, and no silent cloud fallbacks.
+
+---
+
+## Start Using SatyaAI
+
+1. Open the live web studio at **[satyaai-five.vercel.app](https://satyaai-five.vercel.app)**.
+2. Choose **Kaṇa** for instant CPU-ready chat, or select a higher **Satya Som** tier if your browser supports WebGPU.
+3. Ready for local image generation? Install the **SatyaAI Drishti Companion** on Windows, launch it once, and switch to the **Drishti 2.0** tab in the studio.
+
+---
+
+## Roadmap
+
+* [x] Five-tier Satya Som local reasoning ladder (`Kaṇa` through `Aditya`)
+* [x] Zero-GPU CPU/WASM execution via `Kaṇa`
+* [x] **Drishti 2.0** local image studio and native Windows Companion installer
+* [x] **Chakshu** local video generation studio with session history
+* [ ] **Deep Research:** Full multi-step local research and citation workflow
+* [ ] **Smriti Vault:** 100% private in-browser document memory for PDFs and personal notes
+* [ ] **Live Telemetry HUD:** Real-time tokens/sec, memory footprint, and active accelerator badges
+
+---
+
+<details>
+<summary><strong>Want to tinker or run SatyaAI locally? (Quick Dev Setup)</strong></summary>
+
+If you want to explore the codebase, tweak the studio UI, or contribute to the Satya Som Engine, getting up and running takes under a minute.
+
+**Prerequisites:** Node.js (v20+) and `pnpm`.
 
 ```bash
+# 1. Clone the repository
+git clone [https://github.com/SatyajitBeura2468/SatyaAI.git](https://github.com/SatyajitBeura2468/SatyaAI.git)
+cd SatyaAI
+
+# 2. Install dependencies
 pnpm install
+
+# 3. Start the local studio
 pnpm dev
 ```
 
-All five tiers run locally by default and do not require Vercel inference secrets. Users may optionally configure a compatible endpoint under Settings → Models & inference. Keep endpoint credentials out of source control. See [docs/hosting.md](docs/hosting.md).
+Useful scripts when making changes:
 
-## Architecture
-
-```mermaid
-flowchart TD
-  User --> UI[SatyaAI UI]
-  UI --> Orchestrator[Conversation Orchestrator]
-  Orchestrator --> Modes[Micro / Nano / Fast / Smart / Deep Think]
-  Orchestrator --> Perception[Text / Drishti images / Audio / Video / Documents]
-  Orchestrator --> Tools[Search / Research / Retrieval]
-  Orchestrator --> Providers[Provider Layer]
-  Providers --> Local[Browser-local inference]
-  Providers --> Remote[Optional compatible endpoint]
+```bash
+pnpm test     # Run unit tests
+pnpm build    # Create a production build
 ```
 
-## Honest V0.1 boundaries
+For the local creative engine, launch the Windows Companion (`SatyaAI.Drishti.Companion`) or run the local Python runtime on `http://127.0.0.1:7860`.
 
-Browser-local text inference is implemented when the browser and device support WebGPU. All tiers are on-device by default. Engine identity and reasoning-mode labels are application-owned; low-level implementation identifiers are kept separate from the user-facing product identity. The Drishti Image and Chakshu Video workspaces use a loopback-only local Diffusers runtime. Install the Windows companion once; it manages its own private Python environment, starts automatically when needed, and downloads only the selected model on first use. Video model eligibility is checked against current GPU memory, available RAM and disk. Vercel hosts the UI, not image or video inference. Web search, SearXNG integration, citation-backed research, audio transcription, video keyframe extraction, and general multimodal document understanding remain separate capabilities that require additional implementation.
+</details>
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/privacy-model.md`](docs/privacy-model.md), and [`docs/future-training.md`](docs/future-training.md).
+---
 
+<div align="center">
 
-## Drishti local image runtime
+### A SatyaSom Creation
 
-See [`runtime/README.md`](runtime/README.md) for Windows setup. The companion runs on `127.0.0.1:7860`, loads only the selected model and keeps model downloads in the local Hugging Face cache. Image and video prompts go directly to that local service, never through the SatyaSom chat pipeline. Model licenses and hardware requirements are tier-specific. The Chakshu family uses Wan2.1 1.3B (Chakshu Lite), Wan2.2 TI2V-5B (Chakshu 1.0), and LTX-2.5 22B (Divya Chakshu 1, Experimental); LTX-2.5 weights use a separate community licence and require explicit acknowledgement.
+Designed and engineered by **Satyajit Beura** and **Gourav Beura** under **Beura Labs** and **SatyaSom**.
 
-## SATYA CORE
+[GitHub](https://github.com/SatyajitBeura2468) · [Portfolio & Research Hub](https://satyajitbeura2468.github.io) · [Live Studio](https://satyaai-five.vercel.app)
 
-SATYA CORE is SatyaAI's versioned, application-level source of truth for product identity, founder and contributor records, documented origin, philosophy, capability status, personality, and behavioural rules. It is separate from each user's editable profile memory and from dynamic inference metadata.
-
-The shared core is used by browser-local inference, user-configured compatible endpoints, and the Vercel remote gateway. The gateway constructs its system context on the server and discards browser-supplied system messages.
-
-During response generation, all model modes share a rotating set of 30 English-first Hinglish status lines. They are shuffled without immediate repeats and remain separate from model-download progress. Browser-local model loading has separate stage-specific message pools for cache checks, downloads, slow waits, progress, cache retrieval, initialization, model switching, recovery, and readiness.
-
-See [docs/satya-core.md](docs/satya-core.md) for architecture, current status, privacy boundaries, and maintenance instructions.
+</div>
