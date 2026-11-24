@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import "./intro.css";
 
-// Once-per-session cinematic opener (~10s, tap/click/Esc to skip).
+// Once-per-session cinematic opener (~15s + a 2s exit, tap/click/Esc to skip).
 //  1. Letterbox closes in, a lone star ignites, "Curiosity has no speed limit."
 //  2. The camera spools into warp through a breathing nebula.
 //  3. White-hot impact: flash, shockwaves, spark burst. The SatyaAI mark draws
@@ -28,9 +28,9 @@ const TAGLINE = ["Truth-first", "AI", "for", "curious", "minds"];
 const SCRAMBLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#%&@*+=<>/";
 
 // Timeline (seconds).
-const T = { line: 0.9, warp: 2.7, peak: 4.3, hit: 4.8, settle: 7.2, word: 6.1, tag: 7.7, calm: 8.6, exit: 10.4 };
+const T = { line: 2.0, warp: 5.6, peak: 7.9, hit: 8.5, settle: 12.1, word: 10.6, tag: 12.2, calm: 13.2, exit: 14.8 };
 const STAGE_AT = [0, T.line, T.warp, T.hit, T.word, T.tag, T.calm]; // stage 1..6
-const EXIT_MS = 1750;
+const EXIT_MS = 2200;
 const SKIP_EXIT_MS = 500;
 
 // Logo orbit (SVG user units, matches the mark's ellipse).
@@ -101,11 +101,11 @@ function speedAt(t: number): number {
 }
 
 function flashAt(t: number): number {
-  const start = T.hit - 0.5;
-  const end = T.hit + 1.2;
+  const start = T.hit - 0.8;
+  const end = T.hit + 1.8;
   if (t < start || t > end) return 0;
   if (t < T.hit) return smooth((t - start) / (T.hit - start));
-  return Math.pow(1 - clamp01((t - T.hit) / 1.2), 2.4);
+  return Math.pow(1 - clamp01((t - T.hit) / 1.8), 2.4);
 }
 
 // Value-noise fbm, painted once into nebula textures.
@@ -305,19 +305,13 @@ export function Intro() {
   const running = phase !== "off";
   const decoding = running && stage >= 4;
 
-  // Hold the app hidden while the trailer plays; the moment the exit starts, let it
-  // render underneath (it animates in via CSS) so the hand-off is a dissolve, not a cut.
+  // Hold the app hidden while the trailer plays. It is un-hidden (still fully covered by the
+  // opaque overlay) shortly before the exit, so its first paint happens off-camera and the
+  // hand-off is just the overlay fading away: no animated filters/opacity on the app itself.
   useEffect(() => {
     const root = document.documentElement;
-    if (phase === "play") {
-      root.classList.add("satya-intro-pending");
-    } else if (phase === "exit" || phase === "skip") {
-      root.classList.remove("satya-intro-pending");
-      root.classList.add("satya-intro-revealing");
-      root.classList.toggle("satya-intro-quick", phase === "skip");
-    } else {
-      root.classList.remove("satya-intro-pending", "satya-intro-revealing", "satya-intro-quick");
-    }
+    if (phase === "play") root.classList.add("satya-intro-pending");
+    else root.classList.remove("satya-intro-pending");
   }, [phase]);
 
   // Layout flags (portrait / short landscape / touch) follow the viewport live.
@@ -366,12 +360,12 @@ export function Intro() {
     const els = Array.from(word.querySelectorAll<HTMLElement>(".intro-ch"));
     const scr = els.map((el) => el.querySelector<HTMLElement>(".intro-ch-scr"));
     const t0 = performance.now();
-    const ends = els.map((_, i) => i * 105 + 700 + i * 40);
+    const ends = els.map((_, i) => i * 170 + 1100 + i * 60);
     const done = ends[ends.length - 1];
     const iv = window.setInterval(() => {
       const dt = performance.now() - t0;
       els.forEach((el, i) => {
-        const start = i * 105;
+        const start = i * 170;
         if (dt < start) return;
         if (dt < ends[i]) {
           el.classList.add("scr");
@@ -514,7 +508,7 @@ export function Intro() {
       if (phaseRef.current !== "play" && exitAt < 0) exitAt = now;
       const te = exitAt >= 0 ? (now - exitAt) / 1000 : -1;
       const quick = phaseRef.current === "skip";
-      if (frameNo++ % 10 === 0) measureCenter();
+      if (te < 0 && frameNo++ % 10 === 0) measureCenter();
 
       let st = 0;
       for (let i = 1; i < STAGE_AT.length; i++) if (t >= STAGE_AT[i]) st = i;
@@ -525,7 +519,7 @@ export function Intro() {
 
       // HUD: timecode + progress hairline.
       const tf = Math.floor(t * 24);
-      if (tf !== tcFrame && tcRef.current) {
+      if (te < 0 && tf !== tcFrame && tcRef.current) {
         tcFrame = tf;
         const p2 = (n: number) => (n < 10 ? "0" : "") + n;
         tcRef.current.textContent = "00:" + p2(Math.floor(t) % 60) + ":" + p2(tf % 24);
@@ -534,7 +528,7 @@ export function Intro() {
 
       let v = speedAt(t);
       let flash = flashAt(t);
-      if (te >= 0) v = Math.max(v, 0.97 * smooth(te / (quick ? 0.3 : 0.95))); // warp-jump out
+      if (te >= 0) v = Math.max(v, 0.97 * smooth(te / (quick ? 0.3 : 1.3))); // warp-jump out
       const hit = t >= T.hit ? t - T.hit : -1;
 
       // Wordmark light sweep (driven here so it follows the letters exactly).
@@ -545,9 +539,9 @@ export function Intro() {
         const bw = ww * 0.55;
         const since = (now - swAt) / 1000;
         let p = -1;
-        if (since < 1.3) p = since / 1.3;
-        else if (since > 3.6) {
-          const c = ((since - 3.6) % 6.5) / 1.15;
+        if (since < 2.0) p = since / 2.0;
+        else if (since > 5.0) {
+          const c = ((since - 5.0) % 8) / 1.6;
           if (c <= 1) p = c;
         }
         const sw = p < 0 ? -9999 : -bw + (ww + bw * 2) * smooth(p);
@@ -556,13 +550,13 @@ export function Intro() {
           wordEl.style.setProperty("--sw", Math.round(sw) + "px");
         }
       }
-      const surge = swAt > 0 ? Math.exp(-((now - swAt) / 1000) * 1.6) : 0;
-      const sweepBeam = swAt > 0 && (now - swAt) / 1000 < 1.4 ? Math.sin(Math.PI * clamp01((now - swAt) / 1300)) : 0;
+      const surge = swAt > 0 ? Math.exp(-((now - swAt) / 1000) * 1.2) : 0;
+      const sweepBeam = swAt > 0 && (now - swAt) / 1000 < 2.0 ? Math.sin(Math.PI * clamp01((now - swAt) / 2000)) : 0;
 
       // Comet on the logo orbit (SVG units, so it stays glued to the mark).
-      if (comet.length && hit >= 2.0) {
-        const base = (hit - 2.0) * 1.1;
-        const appearK = smooth((hit - 2.0) / 0.8);
+      if (comet.length && hit >= 3.0) {
+        const base = (hit - 3.0) * 0.8;
+        const appearK = smooth((hit - 3.0) / 1.2);
         const cs = Math.cos(ORBIT.rot);
         const sn = Math.sin(ORBIT.rot);
         for (let c = 0; c < 2; c++) {
@@ -588,7 +582,7 @@ export function Intro() {
       ctx.clearRect(0, 0, w, h);
 
       // Camera shake: rumble through warp, a hard kick on the hit.
-      const amp = (coarse ? 1.6 : 2.2) * v * v + (hit >= 0 ? (coarse ? 6 : 8) * Math.exp(-hit * 7) : 0);
+      const amp = (coarse ? 1.6 : 2.2) * v * v + (hit >= 0 ? (coarse ? 6 : 8) * Math.exp(-hit * 5) : 0);
       ctx.save();
       if (amp > 0.05) {
         ctx.translate(
@@ -600,7 +594,7 @@ export function Intro() {
 
       // Nebula: two cool/warm cloud stacks the camera pushes through.
       push = Math.min(1.3, push + dt * (0.02 + 0.35 * v * v));
-      const nebIn = smooth((t - 0.9) / 2.4);
+      const nebIn = te >= 0 ? 0 : smooth((t - 1.4) / 4.5);
       const boost = Math.min(1.3, 0.6 + 0.45 * v + 0.75 * flash);
       if (nebIn > 0.01) {
         ctx.globalAlpha = Math.min(1, nebIn * 0.5 * boost);
@@ -614,8 +608,8 @@ export function Intro() {
       }
 
       // Core glow that swells with speed and the flash.
-      if (t > 0.3) {
-        const k = clamp01(0.1 + 0.5 * v + 0.7 * flash + 0.12 * surge);
+      if (t > 0.3 && te < 0) {
+        const k = clamp01(0.1 + 0.5 * v + 0.7 * flash + 0.12 * surge) * smooth(t / 3);
         const R = Math.min(w, h) * (0.3 + 0.4 * v + 0.35 * flash);
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
         g.addColorStop(0, rgba(205, 190, 255, 0.44 * k));
@@ -627,7 +621,7 @@ export function Intro() {
       }
 
       // The lone ignition star: pulse rings and a four-point glint.
-      const ign = smooth(t / 0.7) * (1 - smooth((t - 2.3) / 1.0));
+      const ign = smooth(t / 2.8) * (1 - smooth((t - (T.warp - 0.5)) / 1.5));
       if (ign > 0.01) {
         const R = 30 + 6 * Math.sin(t * 4.2) + v * 40;
         ctx.globalAlpha = ign * 0.95;
@@ -635,8 +629,8 @@ export function Intro() {
         ctx.globalAlpha = 1;
         drawFlare(cx, cy, ign * 0.55, 0.018, 0.16);
         drawFlare(cx, cy, ign * 0.4, 0.018, 0.12, Math.PI / 2);
-        const cyc = (t * 0.75) % 1;
-        if (t < 2.7) {
+        const cyc = (t * 0.5) % 1;
+        if (t < T.warp) {
           ctx.lineWidth = 1.2;
           ctx.strokeStyle = rgba(180, 205, 255, 1);
           ctx.globalAlpha = ign * (1 - cyc) * (1 - cyc) * 0.4;
@@ -667,7 +661,7 @@ export function Intro() {
       }
 
       // Stars, in true perspective: z shrinks, so they accelerate toward you.
-      const appear = smooth((t - 0.5) / 1.4);
+      const appear = smooth((t - 1.0) / 2.8);
       const streakCap = coarse && Math.min(w, h) < 600 ? 44 : 9999;
       ctx.lineCap = "round";
       for (const s of stars) {
@@ -751,12 +745,12 @@ export function Intro() {
         for (let i = 0; i < n; i++) {
           const a = Math.random() * TAU;
           const sp = (90 + Math.pow(Math.random(), 2) * 1050) * sc;
-          const life = 1.1 + Math.random() * 2.2;
+          const life = 1.6 + Math.random() * 3.0;
           sparks.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, max: life, r: 0.5 + Math.random() * 1.6, ci: Math.floor(Math.random() * TINTS.length) });
         }
       }
       if (sparks.length) {
-        const drag = Math.pow(0.16, dt);
+        const drag = Math.pow(0.3, dt);
         sparks = sparks.filter((p) => (p.life -= dt) > 0);
         for (const p of sparks) {
           p.x += p.vx * dt;
@@ -769,8 +763,8 @@ export function Intro() {
           ctx.drawImage(sprites[p.ci], p.x - R, p.y - R, R * 2, R * 2);
         }
       }
-      if (hit >= 0.8) {
-        const mk = smooth((hit - 0.8) / 1.8);
+      if (hit >= 1.2 && te < 0) {
+        const mk = smooth((hit - 1.2) / 2.6);
         for (const m of motes) {
           m.y -= m.vy * dt;
           if (m.y < -0.05) { m.y = 1.05; m.x = Math.random(); }
@@ -781,17 +775,17 @@ export function Intro() {
       }
 
       // Lens flare: blazes on the hit, lingers behind the logo, surges when the word locks.
-      const flareK = clamp01(flash + (hit >= 0 ? 0.35 * Math.exp(-hit * 0.7) : 0) + 0.12 * v);
+      const flareK = te >= 0 ? 0 : clamp01(flash + (hit >= 0 ? 0.35 * Math.exp(-hit * 0.7) : 0) + 0.12 * v);
       ctx.globalAlpha = 1;
       drawFlare(cx, cy, flareK, 0.045, 0.78);
       drawFlare(cx, cy, flareK * flareK, 0.012, 0.95);
-      if (hit >= 0) drawFlare(cx, cy, 0.22 + 0.1 * Math.sin(t * 1.3), 0.02, 0.5, 0, 1);
+      if (hit >= 0 && te < 0) drawFlare(cx, cy, 0.22 + 0.1 * Math.sin(t * 1.3), 0.02, 0.5, 0, 1);
       if (sweepBeam > 0.01) drawFlare(wx, wy, sweepBeam * 0.55, 0.03, 0.5, 0, 1);
 
       // Shockwave rings from the hit.
       for (let r = 0; r < 3; r++) {
-        const dur = 1.8 + r * 0.5;
-        const hh = hit - r * 0.12;
+        const dur = 2.8 + r * 0.7;
+        const hh = hit - r * 0.18;
         if (hh < 0 || hh >= dur) continue;
         const p = hh / dur;
         const rr = (1 - Math.pow(1 - p, 3)) * diag * (0.62 + r * 0.12);
@@ -832,12 +826,16 @@ export function Intro() {
     window.addEventListener("orientationchange", resize);
     if (coarse && window.visualViewport) window.visualViewport.addEventListener("resize", resize);
     raf = requestAnimationFrame(frame);
+    const warm = window.setTimeout(() => {
+      if (phaseRef.current === "play") document.documentElement.classList.remove("satya-intro-pending");
+    }, (T.exit - 1.6) * 1000);
     const toExit = window.setTimeout(() => {
       if (phaseRef.current === "play") setPhase("exit");
     }, T.exit * 1000);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(toExit);
+      window.clearTimeout(warm);
       window.clearTimeout(nebTimer);
       window.removeEventListener("resize", resize);
       window.removeEventListener("orientationchange", resize);
