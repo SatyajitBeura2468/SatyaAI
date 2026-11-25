@@ -9,8 +9,9 @@ import "./intro.css";
 //     itself (orbit, crescent, network ribbon, star, planets) while a comet orbits.
 //  4. SatyaAI decodes letter by letter out of glyph noise, then a light sweep
 //     crosses it. Tagline resolves word by word.
-//  5. Exit is a warp-jump: the lockup flies through the camera while the real
-//     interface dissolves in underneath (no hard cut).
+//  5. Exit: light speed, then total dark space. Thousands of tiny blocks spin in out of
+//     the black, take on the interface's colours and lock into a grid, then dissolve to
+//     reveal the real (already rendered) interface, so it feels assembled, not shown.
 
 const SEEN_KEY = "satya-intro-seen";
 const TAU = Math.PI * 2;
@@ -28,9 +29,14 @@ const TAGLINE = ["Truth-first", "AI", "for", "curious", "minds"];
 const SCRAMBLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789#%&@*+=<>/";
 
 // Timeline (seconds).
-const T = { line: 2.0, warp: 5.6, peak: 7.9, hit: 8.5, settle: 12.1, word: 10.6, tag: 12.2, calm: 13.2, exit: 14.8 };
+const T = { line: 2.0, warp: 5.6, peak: 7.9, hit: 8.5, settle: 12.1, word: 10.6, tag: 12.2, calm: 13.2, exit: 14.2 };
 const STAGE_AT = [0, T.line, T.warp, T.hit, T.word, T.tag, T.calm]; // stage 1..6
-const EXIT_MS = 2200;
+// Exit choreography (seconds after the exit starts): light speed, fade to dark, tile build.
+const DARK_AT = 0.9;
+const TILE_AT = 1.9;
+const TILE_SPREAD = 1.6;
+const TILE_LIFE = 1.2;
+const EXIT_MS = Math.round((TILE_AT + TILE_SPREAD + TILE_LIFE + 0.2) * 1000);
 const SKIP_EXIT_MS = 500;
 
 // Logo orbit (SVG user units, matches the mark's ellipse).
@@ -41,6 +47,7 @@ type Phase = "off" | "play" | "exit" | "skip";
 type Layout = { touch: boolean; portrait: boolean; short: boolean };
 type Star = { x: number; y: number; z: number; zv: number; r: number; b: number; ci: number; tw: number; chroma: boolean };
 type Spark = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; ci: number };
+type Tile = { x: number; y: number; d: number; spin: number; turns: number; mode: number; pal: [number, number, number]; spark: [number, number, number] };
 type Mote = { x: number; y: number; vy: number; r: number; ph: number; ci: number };
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -205,6 +212,29 @@ function makeGrain(): string {
   return c.toDataURL("image/png");
 }
 
+const INK: [number, number, number] = [5, 6, 11];
+const DARK_UI: Array<[number, number, number]> = [[10, 11, 36], [20, 22, 64], [34, 26, 86], [18, 44, 110], [26, 30, 84]];
+const LIGHT_UI: Array<[number, number, number]> = [[238, 240, 252], [228, 232, 250], [222, 214, 250], [212, 228, 250], [232, 226, 250]];
+const DARK_SPARK: Array<[number, number, number]> = [[120, 200, 255], [170, 140, 255], [255, 255, 255], [110, 235, 255]];
+const LIGHT_SPARK: Array<[number, number, number]> = [[150, 170, 255], [190, 150, 255], [120, 200, 255]];
+const easeOutBack = (k: number) => {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
+};
+const mix = (a: [number, number, number], b: [number, number, number], k: number) =>
+  "rgb(" + Math.round(a[0] + (b[0] - a[0]) * k) + "," + Math.round(a[1] + (b[1] - a[1]) * k) + "," + Math.round(a[2] + (b[2] - a[2]) * k) + ")";
+function interfaceIsLight(): boolean {
+  try {
+    const m = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g);
+    if (!m) return false;
+    const [r, g, b, a = 1] = m.map(Number);
+    return a > 0 && 0.299 * r + 0.587 * g + 0.114 * b > 150;
+  } catch {
+    return false;
+  }
+}
+
 const UP = "M17 56C22 28 59 8 132 13 103 18 70 29 50 47 35 60 39 72 58 79 31 76 13 67 17 56Z";
 const LO = "M67 47C91 47 111 58 116 75c7 22-20 37-88 42 27-10 51-20 60-34 9-14-1-27-21-36Z";
 const NODES: Array<[number, number, number]> = [
@@ -297,6 +327,8 @@ export function Intro() {
   const tcRef = useRef<HTMLSpanElement>(null);
   const progRef = useRef<HTMLElement>(null);
   const grainRef = useRef<HTMLDivElement>(null);
+  const tilesRef = useRef<HTMLCanvasElement>(null);
+  const fxRef = useRef<HTMLDivElement>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const layoutRef = useRef(layout);
@@ -422,6 +454,12 @@ export function Intro() {
     let tcFrame = -1;
     let exitAt = -1;
     let lastSw = Number.NaN;
+    let fxFaded = false;
+    let tiles: Tile[] = [];
+    let tileSize = 32;
+    let tilesBuilt = false;
+    let tilesDone = false;
+    const tctx = tilesRef.current?.getContext("2d") ?? null;
 
     const spawn = (s: Star, initial: boolean) => {
       s.x = (Math.random() * 2 - 1) * 1.05;
@@ -501,6 +539,82 @@ export function Intro() {
       ctx.restore();
     };
 
+    const buildTiles = () => {
+      const tc = tilesRef.current;
+      if (!tc || !tctx) return;
+      tc.width = Math.round(w * dpr);
+      tc.height = Math.round(h * dpr);
+      tileSize = Math.max(22, Math.min(40, Math.round(Math.min(w, h) / 26)));
+      const light = interfaceIsLight();
+      const pals = light ? LIGHT_UI : DARK_UI;
+      const sparks = light ? LIGHT_SPARK : DARK_SPARK;
+      const cols = Math.ceil(w / tileSize);
+      const rows = Math.ceil(h / tileSize);
+      const mx = w / 2;
+      const my = h / 2;
+      const maxD = Math.hypot(mx, my);
+      tiles = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = c * tileSize;
+          const y = r * tileSize;
+          const dist = Math.hypot(x + tileSize / 2 - mx, y + tileSize / 2 - my) / maxD;
+          tiles.push({
+            x, y,
+            d: TILE_SPREAD * (0.78 * dist + 0.22 * Math.random()),
+            spin: (Math.random() < 0.5 ? -1 : 1) * Math.PI * (0.7 + Math.random() * 2),
+            turns: (Math.random() < 0.5 ? -1 : 1) * Math.PI * (1.5 + Math.random() * 2.5),
+            mode: Math.floor(Math.random() * 3),
+            pal: pals[Math.floor(Math.random() * pals.length)],
+            spark: sparks[Math.floor(Math.random() * sparks.length)],
+          });
+        }
+      }
+    };
+    const drawTiles = (tt: number) => {
+      if (!tctx || !tiles.length) return;
+      tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      tctx.clearRect(0, 0, w, h);
+      const half = tileSize / 2;
+      // Pass 1: black space covers every cell that has not finished yet (so nothing peeks through).
+      tctx.fillStyle = "#05060b";
+      for (const tl of tiles) {
+        const u = (tt - tl.d) / TILE_LIFE;
+        if (u >= 1) continue;
+        tctx.globalAlpha = u > 0.8 ? 1 - smooth((u - 0.8) / 0.2) : 1;
+        tctx.fillRect(tl.x, tl.y, tileSize + 0.5, tileSize + 0.5);
+      }
+      // Pass 2: the spinning blocks, black -> spark -> interface colour, settling into the grid.
+      for (const tl of tiles) {
+        const u = (tt - tl.d) / TILE_LIFE;
+        if (u <= 0 || u >= 1) continue;
+        const k = clamp01(u / 0.6);
+        const e = 1 - Math.pow(1 - k, 3);
+        const sc = k < 1 ? Math.max(0, easeOutBack(k)) : 1;
+        const ang = tl.mode === 0 ? tl.spin * (1 - e) : 0;
+        let sx = sc;
+        let sy = sc;
+        if (tl.mode === 1) sx = sc * Math.cos(tl.turns * (1 - e));
+        else if (tl.mode === 2) sy = sc * Math.cos(tl.turns * (1 - e));
+        tctx.globalAlpha = u > 0.8 ? 1 - smooth((u - 0.8) / 0.2) : 1;
+        tctx.fillStyle = u < 0.3 ? mix(INK, tl.spark, u / 0.3) : u < 0.62 ? mix(tl.spark, tl.pal, (u - 0.3) / 0.32) : mix(tl.pal, tl.pal, 0);
+        tctx.save();
+        tctx.translate(tl.x + half, tl.y + half);
+        tctx.rotate(ang);
+        tctx.scale(sx, sy);
+        const hh = half - (u < 0.62 ? 0.8 : -0.3);
+        tctx.fillRect(-hh, -hh, hh * 2, hh * 2);
+        if (u < 0.7) {
+          tctx.globalAlpha *= 0.28 * (1 - u / 0.7);
+          tctx.strokeStyle = "rgb(190,200,255)";
+          tctx.lineWidth = 1;
+          tctx.strokeRect(-hh, -hh, hh * 2, hh * 2);
+        }
+        tctx.restore();
+      }
+      tctx.globalAlpha = 1;
+    };
+
     const frame = (now: number) => {
       const t = (now - t0) / 1000;
       const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
@@ -529,6 +643,13 @@ export function Intro() {
       let v = speedAt(t);
       let flash = flashAt(t);
       if (te >= 0) v = Math.max(v, 0.97 * smooth(te / (quick ? 0.3 : 1.3))); // warp-jump out
+      const dark = te >= 0 && !quick ? smooth((te - DARK_AT) / 0.95) : 0; // light speed -> black space
+      if (dark > 0) v *= 1 - 0.95 * dark;
+      if (te >= DARK_AT - 0.1 && !quick && !fxFaded && fxRef.current) {
+        fxFaded = true;
+        fxRef.current.style.transition = "opacity 1s ease";
+        fxRef.current.style.opacity = "0";
+      }
       const hit = t >= T.hit ? t - T.hit : -1;
 
       // Wordmark light sweep (driven here so it follows the letters exactly).
@@ -664,7 +785,8 @@ export function Intro() {
       const appear = smooth((t - 1.0) / 2.8);
       const streakCap = coarse && Math.min(w, h) < 600 ? 44 : 9999;
       ctx.lineCap = "round";
-      for (const s of stars) {
+      for (let si = 0; si < stars.length; si++) {
+        const s = stars[si];
         s.z -= dt * 1.5 * v * s.zv;
         if (s.z < 0.04) spawn(s, false);
         const sx = cx + (s.x * f) / s.z;
@@ -677,7 +799,7 @@ export function Intro() {
         const rad = s.r * (0.55 + depth * 1.5);
         const born = smooth(depth / 0.08);
         const tw = v < 0.3 ? 0.72 + 0.28 * Math.sin(t * (1.6 + (s.tw % 1.5)) + s.tw) : 1;
-        const alpha = clamp01(s.b * born * appear * tw * Math.min(1, 0.35 + depth * 1.2));
+        const alpha = clamp01(s.b * born * appear * tw * Math.min(1, 0.35 + depth * 1.2)) * (si % 11 === 0 ? 1 - 0.78 * dark : 1 - dark);
         if (alpha < 0.01) continue;
 
         const L = v * v * (coarse ? 0.2 : 0.34) * s.zv;
@@ -818,6 +940,20 @@ export function Intro() {
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
+      if (te >= TILE_AT && !quick && !tilesDone) {
+        const tt = te - TILE_AT;
+        if (!tilesBuilt) {
+          tilesBuilt = true;
+          buildTiles();
+        }
+        drawTiles(tt);
+        // The black cover now lives on the tile canvas, so the overlay itself can turn transparent.
+        rootRef.current?.style.setProperty("background", "transparent", "important");
+        if (tt > TILE_SPREAD + TILE_LIFE + 0.05) {
+          tilesDone = true;
+          tctx?.clearRect(0, 0, w, h);
+        }
+      }
       raf = requestAnimationFrame(frame);
     };
 
@@ -879,12 +1015,15 @@ export function Intro() {
   return (
     <div ref={rootRef} className={cls} role="presentation">
       <canvas ref={canvasRef} className="intro-canvas" />
-      <div className="intro-halo" />
-      <div className="intro-rays" />
-      <div className="intro-rays intro-rays-b" />
-      <div ref={grainRef} className="intro-grain" />
-      <div className="intro-vig" />
-      <div className="intro-exitflash" />
+      <div ref={fxRef} className="intro-fx">
+        <div className="intro-halo" />
+        <div className="intro-rays" />
+        <div className="intro-rays intro-rays-b" />
+        <div ref={grainRef} className="intro-grain" />
+        <div className="intro-vig" />
+        <div className="intro-exitflash" />
+      </div>
+      <canvas ref={tilesRef} className="intro-tiles" />
       <div className="intro-bar top">
         <span className="intro-hud">SatyaAI · Truth-first intelligence</span>
         <span className="intro-tc" ref={tcRef}>00:00:00</span>

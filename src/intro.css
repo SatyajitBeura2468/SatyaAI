@@ -44,6 +44,8 @@
   --center-y:50%;
 }
 
+.intro-fx{position:absolute;inset:0;pointer-events:none}
+.intro-tiles{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none}
 .intro-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
 
 /* Glow, rays, grain, vignette */
@@ -181,7 +183,6 @@ button.intro-skip{min-height:44px;padding:0 6px;background:transparent;border:0;
 
 /* Exit: overlay dissolves while the app resolves underneath. */
 #intro-root .intro{will-change:opacity}
-#intro-root .intro.exit{opacity:0;transition:opacity 1.6s cubic-bezier(.4,0,.2,1) .5s}
 .exit .intro-halo,.exit .intro-rays,.exit .intro-grain,.exit .sx-logo,.exit .sx-star{animation-play-state:paused}
 #intro-root .intro.skip{opacity:0;transition:opacity .5s ease}
 
