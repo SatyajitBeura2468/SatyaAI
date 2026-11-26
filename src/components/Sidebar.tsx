@@ -1,5 +1,6 @@
 import React from "react";
 import { EMPTY_CONVERSATION_COPY, EMPTY_SAVED_COPY, EMPTY_SEARCH_COPY, pickOnLoad } from "../ui-copy";
+import { resolveTabTitle } from "../tab-identity";
 
 const EMPTY_CONVERSATION_MESSAGE = pickOnLoad(EMPTY_CONVERSATION_COPY);
 const EMPTY_SAVED_MESSAGE = pickOnLoad(EMPTY_SAVED_COPY);
@@ -68,6 +69,12 @@ export function Sidebar(props: SidebarProps) {
     beginRenameChat, exportChat, deleteChat, busy, activeId, openSaved, removeSaved,
     status, engineTitle, capability, openSettings, theme, setTheme, appearanceLabel,
   } = props;
+
+  // Keep the browser-tab title in step with the open conversation.
+  React.useEffect(() => {
+    document.title = resolveTabTitle(chats, activeId);
+  }, [chats, activeId, busy]);
+
   return (
       <aside className={"sidebar " + (menu ? "open" : "")}>
               <div className="brand">
