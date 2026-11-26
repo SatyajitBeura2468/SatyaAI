@@ -1,9 +1,24 @@
 // Browser-tab identity for SatyaAI.
-// The tab icon is static (set once in index.html) so it never changes.
-// The tab title is the app name on the home screen, and the conversation
-// name once a chat is open.
+// The tab icon is the real SatyaAI logo and never changes. The tab title is the
+// app name on the home screen, and the conversation name once a chat is open.
 
 export const APP_TAB_TITLE = "SatyaAI (Private Truth-first AI)";
+
+// New URL (note the ?v=) so browsers drop the old cached "S" favicon.
+const APP_ICON_HREF = "/icons/satya-icon.svg?v=2";
+
+// Replace every icon link with the logo once at startup. Re-adding the link
+// makes the browser fetch the icon again instead of reusing a stale one.
+function applyAppIcon() {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"]').forEach((node) => node.remove());
+  const link = document.createElement("link");
+  link.rel = "icon";
+  link.type = "image/svg+xml";
+  link.href = APP_ICON_HREF;
+  document.head.appendChild(link);
+}
+applyAppIcon();
 
 type TabChat = { id: string; title: string };
 
